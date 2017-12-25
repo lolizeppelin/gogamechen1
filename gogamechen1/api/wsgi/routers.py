@@ -14,7 +14,7 @@ class Routers(router.RoutersBase):
     def append_routers(self, mapper, routers=None):
 
 
-        resource_name = 'objtype'
+        resource_name = 'objfile'
         collection_name = resource_name + 's'
 
         group_controller = controller_return_response(controller.ObjtypeFileReuest(),
@@ -47,6 +47,10 @@ class Routers(router.RoutersBase):
         game_controller = controller_return_response(controller.AppEntityReuest(),
                                                    controller.FAULT_MAP)
 
+        self._add_resource(mapper, game_controller,
+                           path='/%s/entity/{entity}' % common.NAME,
+                           post_action='bondto')
+
         collection = mapper.collection(collection_name=collection_name,
                                        resource_name=resource_name,
                                        controller=game_controller,
@@ -54,10 +58,9 @@ class Routers(router.RoutersBase):
                                        member_prefix='/{entity}',
                                        collection_actions=COLLECTION_ACTIONS,
                                        member_actions=MEMBER_ACTIONS)
-
-        collection.member.link('start', method='POST')
-        collection.member.link('stop', method='POST')
-        collection.member.link('status', method='POST')
-        collection.member.link('hotfix', method='POST')
-        collection.member.link('upgrade', method='POST')
+        # collection.member.link('databases', method='GET')
+        # collection.member.link('stop', method='POST')
+        # collection.member.link('status', method='POST')
+        # collection.member.link('hotfix', method='POST')
+        # collection.member.link('upgrade', method='POST')
 

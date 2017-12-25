@@ -2,7 +2,7 @@
 import os
 import sys
 
-from gopdb import __version__
+from gogamechen1 import __version__
 
 try:
     from setuptools import setup, find_packages
@@ -34,6 +34,8 @@ f.close()
 setup(
     install_requires=('goperation>=1.0',
                       'goperation<1.1',
+                      'gopdb>=1.0',
+                      'gopdb<1.1',
                       'simpleutil>=1.0',
                       'simpleutil<1.1',
                       'simpleservice>=1.0',
@@ -41,18 +43,18 @@ setup(
                       'simpleflow>=1.0',
                       'simpleflow<1.1',
                       ),
-    name='gopdb',
+    name='gogamechen1',
     version=__version__,
-    description='python database resource update tool',
+    description='xiaochen go game operation',
     long_description=long_description,
-    url='http://github.com/lolizeppelin/gopdb',
+    url='http://github.com/lolizeppelin/gogamechen1',
     author='Lolizeppelin',
     author_email='lolizeppelin@gmail.com',
     maintainer='Lolizeppelin',
     maintainer_email='lolizeppelin@gmail.com',
-    keywords=['gopdb'],
+    keywords=['gogamechen1'],
     license='MIT',
-    packages=find_packages(include=['gopdb*']),
+    packages=find_packages(include=['gogamechen1*']),
     tests_require=['pytest>=2.5.0'],
     cmdclass={'test': PyTest},
     classifiers=[

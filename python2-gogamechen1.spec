@@ -8,7 +8,7 @@
 Name:           python-%{proj_name}
 Version:        RPMVERSION
 Release:        %{_release}%{?dist}
-Summary:        simpleutil copy from openstack
+Summary:        xiaochen go game operation
 Group:          Development/Libraries
 License:        MPLv1.1 or GPLv2
 URL:            http://github.com/Lolizeppelin/%{proj_name}
@@ -22,9 +22,11 @@ Requires:       python >= 2.6.6
 Requires:       python < 3.0
 Requires:       python-goperation >= 1.0
 Requires:       python-goperation < 1.1
+Requires:       python-gopdb >= 1.0
+Requires:       python-gopdb < 1.1
 
 %description
-utils for update database resource
+xiaochen go game operation
 
 %prep
 %setup -q -n %{proj_name}-%{version}
@@ -64,7 +66,7 @@ install -p -D -m 0754 bin/* %{buildroot}%{_sbindir}
 
 
 %package server
-Summary:        Goperation database wsgi routes
+Summary:        xiaochen go game rpc wsgi server
 Group:          Development/Libraries
 Requires:       %{name} == %{version}
 Requires:       python-goperation-server >= 1.0
@@ -78,11 +80,11 @@ Goperation database wsgi routes
 %defattr(-,root,root,-)
 %dir %{python_sitelib}/%{proj_name}/api/wsgi
 %{python_sitelib}/%{proj_name}/api/wsgi/*
-%{_sysconfdir}/goperation/endpoints/gopdb.server.conf.sample
+%{_sysconfdir}/goperation/endpoints/gogamechen1.server.conf.sample
 
 
 %package agent
-Summary:        Goperation database rpc agent
+Summary:        xiaochen go game rpc agent
 Group:          Development/Libraries
 Requires:       %{name} == %{version}
 Requires:       python-goperation-application >= 1.0
@@ -96,7 +98,7 @@ Goperation database rpc agent
 %defattr(-,root,root,-)
 %dir %{python_sitelib}/%{proj_name}/api/rpc
 %{python_sitelib}/%{proj_name}/api/rpc/*
-%{_sysconfdir}/goperation/endpoints/gopdb.agent.conf.sample
+%{_sysconfdir}/goperation/endpoints/gogamechen1.agent.conf.sample
 
 
 %changelog

@@ -1,8 +1,2 @@
-from simpleutil.config import cfg
-from gogamechen1.config import register_opts
-
-from gogamechen1 import common
-
-CONF = cfg.CONF
-
-register_opts(CONF.find_group(common.NAME))
+__version__ = '1.0.0'
+VERSION = tuple(map(int, __version__.split('.')))

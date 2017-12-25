@@ -1,0 +1,83 @@
+[DEFAULT]
+
+
+[gogamechen1]
+
+#
+# From gogamechen1
+#
+
+# Manager extend rpc endpoint module string (import string value)
+#module = gogamechen1.api.rpc
+
+# Endpoint max lock size (integer value)
+#max_lock = 5
+
+
+[gogamechen1.cross]
+
+#
+# From gogamechen1.cross
+#
+
+# data db rw user name (string value)
+#datadb_user = gocross-rw
+
+# data db rw user passwd (string value)
+#datadb_passwd = <None>
+
+# data db ro user name (string value)
+#datadb_ro_user = gocross-ro
+
+# data db ro user passwd (integer value)
+#datadb_ro_passwd = <None>
+
+
+[gogamechen1.game]
+
+#
+# From gogamechen1.game
+#
+
+# data db rw user name (string value)
+#datadb_user = gocross-rw
+
+# data db rw user passwd (string value)
+#datadb_passwd = <None>
+
+# data db ro user name (string value)
+#datadb_ro_user = gocross-ro
+
+# data db ro user passwd (integer value)
+#datadb_ro_passwd = <None>
+
+# logdb db rw user name (string value)
+#logdb_user = <None>
+
+# logdb db rw user passwd (string value)
+#logdb_passwd = <None>
+
+# logdb db ro user name (string value)
+#logdb_ro_user = <None>
+
+# logdb db ro user passwd (integer value)
+#logdb_ro_passwd = <None>
+
+
+[gogamechen1.gm]
+
+#
+# From gogamechen1.gm
+#
+
+# data db rw user name (string value)
+#datadb_user = gocross-rw
+
+# data db rw user passwd (string value)
+#datadb_passwd = <None>
+
+# data db ro user name (string value)
+#datadb_ro_user = gocross-ro
+
+# data db ro user passwd (integer value)
+#datadb_ro_passwd = <None>
