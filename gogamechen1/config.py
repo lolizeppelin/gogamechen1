@@ -13,8 +13,4 @@ def list_agent_opts():
     CONF.register_group(group)
     from goperation.manager.rpc.agent.config import rpc_endpoint_opts
     cfg.set_defaults(rpc_endpoint_opts, module='gogamechen1.api.rpc')
-    from gogamechen1.api.rpc.config import register_opts
-
-
-
     return rpc_endpoint_opts

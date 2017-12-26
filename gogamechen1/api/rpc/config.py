@@ -1,3 +1,4 @@
+import copy
 from simpleutil.config import cfg
 
 from gogamechen1 import common
@@ -43,9 +44,11 @@ crossserver_group = cfg.OptGroup(name='%s.cross' % common.NAME)
 
 
 def list_game_opts():
-    cfg.set_defaults(datadb_opts, datadb_user='gogamedb-rw', datadb_ro_user='gogamedb-ro')
-    cfg.set_defaults(logdb_opts, datadb_user='gogamelog-rw', datadb_ro_user='gogamelog-ro')
-    return  datadb_opts + logdb_opts
+    _datadb_opts = copy.deepcopy(datadb_opts)
+    _logdb_opts = copy.deepcopy(logdb_opts)
+    cfg.set_defaults(_datadb_opts, datadb_user='gogamedb-rw', datadb_ro_user='gogamedb-ro')
+    cfg.set_defaults(_logdb_opts, logdb_user='gogamelog-rw', logdb_ro_user='gogamelog-ro')
+    return  _datadb_opts + _logdb_opts
 
 def game_register_opts(group):
     # database for gameserver
@@ -53,8 +56,9 @@ def game_register_opts(group):
 
 
 def list_gm_opts():
-    cfg.set_defaults(datadb_opts, datadb_user='gogmdb-rw', datadb_ro_user='gogmdb-ro')
-    return datadb_opts
+    _datadb_opts = copy.deepcopy(datadb_opts)
+    cfg.set_defaults(_datadb_opts, datadb_user='gogmdb-rw', datadb_ro_user='gogmdb-ro')
+    return _datadb_opts
 
 
 def gm_register_opts(group):
@@ -63,13 +67,14 @@ def gm_register_opts(group):
 
 
 def list_cross_opts():
-    cfg.set_defaults(datadb_opts, datadb_user='gocross-rw', datadb_ro_user='gocross-ro')
-    return datadb_opts
+    _datadb_opts = copy.deepcopy(datadb_opts)
+    cfg.set_defaults(_datadb_opts, datadb_user='gocross-rw', datadb_ro_user='gocross-ro')
+    return _datadb_opts
 
 
 def cross_register_opts(group):
     # database for cross server
-    CONF.register_opts(list_cross_opts, group)
+    CONF.register_opts(list_cross_opts(), group)
 
 
 def register_opts():

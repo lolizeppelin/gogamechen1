@@ -40,25 +40,25 @@
 #
 
 # data db rw user name (string value)
-#datadb_user = gocross-rw
+#datadb_user = gogamedb-rw
 
 # data db rw user passwd (string value)
 #datadb_passwd = <None>
 
 # data db ro user name (string value)
-#datadb_ro_user = gocross-ro
+#datadb_ro_user = gogamedb-ro
 
 # data db ro user passwd (integer value)
 #datadb_ro_passwd = <None>
 
 # logdb db rw user name (string value)
-#logdb_user = <None>
+#logdb_user = gogamelog-rw
 
 # logdb db rw user passwd (string value)
 #logdb_passwd = <None>
 
 # logdb db ro user name (string value)
-#logdb_ro_user = <None>
+#logdb_ro_user = gogamelog-ro
 
 # logdb db ro user passwd (integer value)
 #logdb_ro_passwd = <None>
@@ -71,13 +71,13 @@
 #
 
 # data db rw user name (string value)
-#datadb_user = gocross-rw
+#datadb_user = gogmdb-rw
 
 # data db rw user passwd (string value)
 #datadb_passwd = <None>
 
 # data db ro user name (string value)
-#datadb_ro_user = gocross-ro
+#datadb_ro_user = gogmdb-ro
 
 # data db ro user passwd (integer value)
 #datadb_ro_passwd = <None>
