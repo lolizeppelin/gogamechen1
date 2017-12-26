@@ -1,6 +1,7 @@
 # -*- coding:utf-8 -*-
 import re
 import random
+import eventlet
 import webob.exc
 from six.moves import zip
 
@@ -257,8 +258,68 @@ class AppEntityReuest(BaseContorller):
                               }
                     }
 
+    def _entityinfo(self, req, entity):
+        entityinfo = entity_controller.show(req=req, entity=entity,
+                                         endpoint=common.NAME, body={'ports': True})['data'][0]
+        ports = entityinfo['ports']
+        attributes = entityinfo['attributes']
+        return attributes, ports
+
+    def _areas_map(self, group_id):
+        session = endpoint_session(readonly=True)
+        query = model_query(session, GameArea, filter=GameArea.group_id == group_id)
+        maps = {}
+        for _areas in query:
+            try:
+                maps[_areas.entity].append(_areas.area_id)
+            except KeyError:
+                maps[_areas.entity] = [_areas.area_id, ]
+        return maps
+
     def index(self, req, group_id, objtype, body=None):
-        pass
+        body = body or {}
+        order = body.pop('order', None)
+        desc = body.pop('desc', False)
+        detail = body.pop('detail', False)
+        page_num = int(body.pop('page_num', 0))
+
+        session = endpoint_session(readonly=True)
+        columns = [AppEntity.entity,
+                  AppEntity.group_id,
+                  AppEntity.name,
+                  AppEntity.objtype,
+                  AppEntity.desc,
+                  ]
+
+        th = eventlet.spawn(self._areas_map, group_id)
+
+        option = None
+        if detail:
+            columns.append(AppEntity.databases)
+            option = joinedload(AppEntity.databases, innerjoin=False)
+
+        results = resultutils.bulk_results(session,
+                                           model=AppEntity,
+                                           columns=columns,
+                                           counter=AppEntity.entity,
+                                           order=order, desc=desc,
+                                           option=option,
+                                           filter=and_(AppEntity.group_id == group_id,
+                                                            AppEntity.objtype == objtype),
+                                           page_num=page_num)
+        maps = th.wait()
+
+        for column in results['data']:
+            if detail:
+                databases = column.get('databases', [])
+                column['databases'] = []
+                for database in databases:
+                    column['databases'].append(dict(quote_id=database.quote_id, subtype=database.subtype,
+                                                    host=database.host, port=database.port,
+                                                    ))
+            column.setdefault('areas', maps.get(column.get('entity', [])))
+        return results
+
 
     def create(self, req, group_id, objtype, body=None):
         body = body or {}
@@ -394,6 +455,7 @@ class AppEntityReuest(BaseContorller):
         query = query.options(joins)
         group = query.filter(and_(AppEntity.entity == entity, AppEntity.objtype == objtype)).one()
         _entity = group.entitys[0]
+        attributes, ports = self._entityinfo(req, entity)
         return resultutils.results(result='show %s areas success' % objtype,
                                    data=[dict(entity=_entity.entity, objtype=objtype,
                                               status=_entity.status,
@@ -409,7 +471,8 @@ class AppEntityReuest(BaseContorller):
                                                                                       database.type,
                                                                                       entity)
                                                               )
-                                                         for database in _entity.databases])])
+                                                         for database in _entity.databases],
+                                              attributes=attributes, ports=ports)])
 
     def update(self, req, group_id, objtype, entity, body=None):
             pass
@@ -423,9 +486,51 @@ class AppEntityReuest(BaseContorller):
         session = endpoint_session()
         with session.begin():
             for database in databases:
-                session.add(AreaDatabase(quote_id=database.get('quote_id'),
+                session.add(AreaDatabase(quote_id=database.get('quote_id'), database_id=database.get('database_id'),
                                          entity=database.get('entity'), subtype=database.get('subtype'),
                                          host=database.get('host'), port=database.get('port'),
-                                         user=database.get('user'), passwd=database.get('passwd')))
+                                         user=database.get('user'), passwd=database.get('passwd'),
+                                         ro_user=database.get('ro_user'), ro_passwd=database.get('ro_passwd'),
+                                         )
+                            )
                 session.flush()
         return resultutils.results(result='bond entity %d database success' % entity)
+
+    def chiefs(self, req, body=None):
+        body = body or {}
+        chiefs = body.pop('chiefs')
+        detail = body.get('detail')
+
+        _chiefs = {}
+        session = endpoint_session(readonly=True)
+        query = model_query(session, AppEntity, filter=AppEntity.entity.in_(chiefs.value))
+
+        if detail:
+            query = query.options(joinedload(AppEntity.databases))
+            g = eventlet.spawn(entity_controller._shows, endpoint=common.NAME, entitys=chiefs.value)
+
+
+        for _entity in query:
+            if _entity.objtype in chiefs:
+                _chiefs[_entity.objtype] = dict(entity=_entity.entity,
+                                                group_id=_entity.group_id,
+                                                agent_id=_entity.agent_id)
+                if detail:
+                    _chiefs[_entity.objtype].setdefault('databases', [dict(quote_id=_database.quote_id,
+                                                                           subtype=_database.subtype,
+                                                                           host=_database.host,
+                                                                           port=_database.port,
+                                                                           user=_database.user,
+                                                                           passwd=_database.passwd)
+                                                                      for _database in _entity.databases])
+        if len(chiefs) != len(_chiefs):
+            raise InvalidArgument('chiefs entity can not be found')
+        if detail:
+            entitysinfo = g.wait()
+            for entity in _chiefs.values():
+                _entity = entity.get('entity')
+                entity.setdefault('ports', entitysinfo[_entity]['ports'])
+                entity.setdefault('attributes', entitysinfo[_entity]['attributes'])
+
+        return resultutils.results(result='show chiefs success',
+                                   data=[_chiefs, ])

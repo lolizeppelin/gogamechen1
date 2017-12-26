@@ -181,13 +181,19 @@ class Application(AppEndpointBase):
             self.konwn_database[entity]['pid'] = None
             return None
 
-    def flush_config(self, entity, databases, chiefs):
+    def flush_config(self, entity, databases, chiefs=None):
         eventlet.sleep(0.01)
         posts = self._get_ports(entity)
         objtype = self.konwn_appentitys[entity].get('objtype')
+
         def _bond():
             self.client.bondto(entity, databases)
         threadpool.add_thread(_bond)
+
+        if chiefs:
+            chiefs = self.client.chiefs(chiefs, detail=True)['data'][0]
+
+
 
     def delete_entity(self, entity, token):
         if token != self._entity_token(entity):

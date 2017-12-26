@@ -42,17 +42,25 @@ class GogameDatabaseCreate(StandardTask):
 
     def execute(self):
         # 创建并绑定数据库
+        auth = self.data.get('auth')
         dbresult = self.client.schemas_create(self.data.get('database_id'),
                                               body={'schema': self.data.get('schema'),
-                                                    'auth': self.data.get('auth'),
-                                                    'bind': {'entity': self.data.get('entity'),
+                                                    'auth': auth,
+                                                    'bond': {'entity': self.data.get('entity'),
                                                              'endpoint': common.NAME}})['data'][0]
         # 设置返回结果
         self.middleware.database.setdefault(self.data.get('subtype'), dict(schema=dbresult.get('schema'),
                                                                            database_id=dbresult.get('database_id'),
                                                                            quote_id=dbresult.get('quote_id'),
                                                                            host=dbresult.get('host'),
-                                                                           port=dbresult.get('port')))
+                                                                           user=auth.get('user'),
+                                                                           passwd=auth.get('passwd'),
+                                                                           ro_user=auth.get('ro_user'),
+                                                                           ro_passwd=auth.get('ro_passwd')
+                                                                           ))
+
+
+
 
     def revert(self, *args, **kwargs):
         result = kwargs.get('result') or args[0]

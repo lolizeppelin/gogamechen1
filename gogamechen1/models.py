@@ -34,6 +34,7 @@ class ObjtypeFile(TableBase):
 
 class AreaDatabase(TableBase):
     quote_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
+    databae_id = sa.Column(INTEGER(unsigned=True), nullable=False)
     entity = sa.Column(sa.ForeignKey('appentitys.entity', ondelete="RESTRICT", onupdate='RESTRICT'),
                        nullable=False)
     subtype = sa.Column(VARCHAR(64), nullable=False)
@@ -41,6 +42,8 @@ class AreaDatabase(TableBase):
     port = sa.Column(SMALLINT(unsigned=True), default=3306, nullable=False)
     user = sa.Column(VARCHAR(64), default=None, nullable=False)
     passwd = sa.Column(VARCHAR(128), default=None, nullable=False)
+    ro_user = sa.Column(VARCHAR(64), default=None, nullable=False)
+    ro_passwd = sa.Column(VARCHAR(128), default=None, nullable=False)
 
     __table_args__ = (
         sa.UniqueConstraint('entity', 'objtype', name='type_unique'),
@@ -57,6 +60,7 @@ class GameArea(TableBase):
     cross_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
 
     __table_args__ = (
+        sa.Index('group_id', name='group_index'),
         sa.UniqueConstraint('area_id', 'group_id', name='area_id_unique'),
         InnoDBTableBase.__table_args__
     )

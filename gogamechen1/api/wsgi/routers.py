@@ -51,6 +51,10 @@ class Routers(router.RoutersBase):
                            path='/%s/entity/{entity}' % common.NAME,
                            post_action='bondto')
 
+        self._add_resource(mapper, game_controller,
+                   path='/%s/chiefs' % common.NAME,
+                   get_action='chiefs')
+
         collection = mapper.collection(collection_name=collection_name,
                                        resource_name=resource_name,
                                        controller=game_controller,

@@ -23,6 +23,7 @@ class GogameChen1DBClient(GopDBClient):
     cross_path = '/gopgamechen1/group/%s/publicsvr/entity/%s'
 
     bond_path = '/gopgamechen1/entity/%s'
+    chiefs_path = '/gopgamechen1/chiefs'
 
     def objfiles_index(self, body=None):
         resp, results = self.get(action=self.objfiles_path, body=body)
@@ -103,6 +104,15 @@ class GogameChen1DBClient(GopDBClient):
                                   timout=15)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='bond gogamechen1 databases fail:%d' % results['resultcode'],
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def chiefs(self, chiefs, detail=False):
+        resp, results = self.post(action=self.chiefs_path, body=dict(chiefs=chiefs, detail=detail),
+                                  timout=15)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='get gogamechen1 chiefs fail:%d' % results['resultcode'],
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
