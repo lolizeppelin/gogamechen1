@@ -286,7 +286,8 @@ class Application(AppEndpointBase):
                 result = 'delete %d success' % entity
             except Exception as e:
                 resultcode = manager_common.RESULT_ERROR
-                result = 'delete %d fail with %s' % (entity, e.__class__.__name__)
+                result = 'delete %d fail with %s:%s' % (entity, e.__class__.__name__,
+                                                        str(e.message) if hasattr(e, 'message') else 'unknown err msg')
         details.append(dict(detail_id=entity,
                             resultcode=resultcode,
                             result=result))
