@@ -38,9 +38,9 @@ logdb_opts = [
 ]
 
 
-gameserver_group = cfg.OptGroup(name='%s.game' % common.NAME)
-gmserver_group = cfg.OptGroup(name='%s.gm' % common.NAME)
-crossserver_group = cfg.OptGroup(name='%s.cross' % common.NAME)
+gameserver_group = cfg.OptGroup(name='%s.%s' % (common.NAME, common.GAMESERVER))
+gmserver_group = cfg.OptGroup(name='%s.%s' % (common.NAME, common.GMSERVER))
+crossserver_group = cfg.OptGroup(name='%s.%s' % (common.NAME, common.CROSSSERVER))
 
 
 def list_game_opts():

@@ -95,7 +95,7 @@ def create_db_flowfactory(app, store):
     middleware = app.middleware
     entity = middleware.entity
     objtype = middleware.objtype
-    uflow = uf.Flow('create_%s_%d' % (common.NAME, objtype))
+    uflow = uf.Flow('create_%s_%s_%d' % (common.NAME, objtype, entity))
     appendpoint = middleware.reflection()
     for database in app.databases:
         subtype = database.get('subtype')

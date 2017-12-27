@@ -140,7 +140,7 @@ class GogameChen1DBClient(GopDBClient):
         return results
 
     def games_create(self, group_id, body=None):
-        resp, results = self.post(action=self.games_path % str(group_id), body=body)
+        resp, results = self.post(action=self.games_path % str(group_id), body=body, timeout=15)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='create gogamechen1 gameserver fail:%d' % results['resultcode'],
                                             code=resp.status_code,
@@ -178,7 +178,7 @@ class GogameChen1DBClient(GopDBClient):
         return results
 
     def gms_create(self, group_id, body=None):
-        resp, results = self.post(action=self.gms_path % str(group_id), body=body)
+        resp, results = self.post(action=self.gms_path % str(group_id), body=body, timeout=15)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='create gogamechen1 gmserver fail:%d' % results['resultcode'],
                                             code=resp.status_code,
@@ -217,7 +217,7 @@ class GogameChen1DBClient(GopDBClient):
         return results
 
     def crosss_create(self, group_id, body=None):
-        resp, results = self.post(action=self.crosss_path % str(group_id), body=body)
+        resp, results = self.post(action=self.crosss_path % str(group_id), body=body, timeout=15)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='create gogamechen1 gmserver fail:%d' % results['resultcode'],
                                             code=resp.status_code,

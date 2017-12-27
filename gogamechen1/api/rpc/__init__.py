@@ -94,6 +94,7 @@ class Application(AppEndpointBase):
         pids = utils.find_process()
         # reflect entity objtype
         if self.entitys:
+            LOG.info('Try reflect entity objtype and group info')
             entitymaps = self.client.appentitys(entitys=self.entitys)['data']
             if len(entitymaps) != len(self.entitys):
                 raise RuntimeError('Entity count error, miss some entity')
@@ -139,7 +140,7 @@ class Application(AppEndpointBase):
 
     @contextlib.contextmanager
     def _allocate_port(self, entity, objtype, ports):
-        if isinstance(ports, (int, long)):
+        if isinstance(ports, (int, long, type(None))):
             ports = [ports]
         if objtype == common.GAMESERVER:
             if len(ports) == 1:
@@ -230,9 +231,10 @@ class Application(AppEndpointBase):
             threadpool.add_thread(_postdo)
 
     def rpc_create_entity(self, ctxt, entity, **kwargs):
+        LOG.info('Get create gogamechen1 entity command')
         timeout = count_timeout(ctxt, kwargs)
         objfile = kwargs.pop('objfile', None)
-        ports = kwargs.pop('ports')
+        ports = kwargs.pop('ports', None)
         chiefs = kwargs.pop('chiefs', None)
         objtype = kwargs.pop('objtype')
         databases = kwargs.pop('databases')

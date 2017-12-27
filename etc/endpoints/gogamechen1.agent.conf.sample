@@ -14,29 +14,10 @@
 #max_lock = 5
 
 
-[gogamechen1.cross]
+[gogamechen1.gamesvr]
 
 #
-# From gogamechen1.cross
-#
-
-# data db rw user name (string value)
-#datadb_user = gocross-rw
-
-# data db rw user passwd (string value)
-#datadb_passwd = <None>
-
-# data db ro user name (string value)
-#datadb_ro_user = gocross-ro
-
-# data db ro user passwd (integer value)
-#datadb_ro_passwd = <None>
-
-
-[gogamechen1.game]
-
-#
-# From gogamechen1.game
+# From gogamechen1.gamesvr
 #
 
 # data db rw user name (string value)
@@ -64,10 +45,10 @@
 #logdb_ro_passwd = <None>
 
 
-[gogamechen1.gm]
+[gogamechen1.loginsvr]
 
 #
-# From gogamechen1.gm
+# From gogamechen1.loginsvr
 #
 
 # data db rw user name (string value)
@@ -78,6 +59,25 @@
 
 # data db ro user name (string value)
 #datadb_ro_user = gogmdb-ro
+
+# data db ro user passwd (integer value)
+#datadb_ro_passwd = <None>
+
+
+[gogamechen1.publicsvr]
+
+#
+# From gogamechen1.publicsvr
+#
+
+# data db rw user name (string value)
+#datadb_user = gocross-rw
+
+# data db rw user passwd (string value)
+#datadb_passwd = <None>
+
+# data db ro user name (string value)
+#datadb_ro_user = gocross-ro
 
 # data db ro user passwd (integer value)
 #datadb_ro_passwd = <None>
