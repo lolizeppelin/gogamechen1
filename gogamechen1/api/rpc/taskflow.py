@@ -133,9 +133,7 @@ class GogameAppCreate(application.AppCreateBase):
         super(GogameAppCreate, self).revert(result, **kwargs)
         if isinstance(result, failure.Failure):
             LOG.debug(result.pformat(traceback=True))
-            endpoint = self.middleware.reflection()
-            # 删除实体
-            endpoint.delete_entity(self.middleware.entity, new=True)
+            # 外部会自动清理,这里不需要回滚
             self.middleware.set_return(self.__class__.__name__, task_common.REVERTED)
 
 
