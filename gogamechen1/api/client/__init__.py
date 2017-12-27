@@ -25,6 +25,8 @@ class GogameChen1DBClient(GopDBClient):
 
     bond_path = '/gogamechen1/entity/%s'
 
+    appentitys_path = '/gogamechen1/entitys'
+
     def objfiles_index(self, body=None):
         resp, results = self.get(action=self.objfiles_path, body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
@@ -115,6 +117,15 @@ class GogameChen1DBClient(GopDBClient):
                                   timout=15)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='bond gogamechen1 databases fail:%d' % results['resultcode'],
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def appentitys(self, entitys):
+        resp, results = self.post(action=self.appentitys_path, body=dict(entitys=entitys),
+                                  timout=15)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='get gogamechen1 entitys fail:%d' % results['resultcode'],
                                             code=resp.status_code,
                                             resone=results['result'])
         return results

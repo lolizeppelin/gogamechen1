@@ -93,13 +93,18 @@ class Application(AppEndpointBase):
         super(Application, self).post_start()
         pids = utils.find_process()
         # reflect entity objtype
-        entitymaps = self.client._appentity(impl='local', body=dict(entitys=self.entitys))['data']
-        for entityinfo in entitymaps:
-            _entity = int(entityinfo.get('entity'))
-            objtype = entityinfo.get('objtype')
-            if _entity in self.konwn_appentitys:
-                raise RuntimeError('App Entity %d Duplicate' % _entity)
-            self.konwn_appentitys.setdefault(_entity, dict(objtype=objtype, pid=None))
+        if self.entitys:
+            entitymaps = self.client.appentitys(entitys=self.entitys)['data']
+            if len(entitymaps) != len(self.entitys):
+                raise RuntimeError('Entity count error, miss some entity')
+            for entityinfo in entitymaps:
+                _entity = entityinfo.get('entity')
+                objtype = entityinfo.get('objtype')
+                group_id = entityinfo.get('group_id')
+                if _entity in self.konwn_appentitys:
+                    raise RuntimeError('App Entity %d Duplicate' % _entity)
+                self.konwn_appentitys.setdefault(_entity, dict(objtype=objtype,group_id=group_id,
+                                                               pid=None))
         # find entity pid
         for entity in self.entitys:
             _pid = self._find_from_pids(entity, self.konwn_appentitys[entity].get('objtype'),
@@ -269,7 +274,9 @@ class Application(AppEndpointBase):
                                                    result='wait %s start' % objtype)])
 
     def rpc_post_create_entity(self, ctxt, entity, **kwargs):
-        self.konwn_appentitys.setdefault(entity, dict(objtype=kwargs.pop('objtype'), pid=None))
+        self.konwn_appentitys.setdefault(entity, dict(objtype=kwargs.pop('objtype'),
+                                                      group_id=kwargs.pop('group_id'),
+                                                      pid=None))
 
     def rpc_reset_entity(self, ctxt, entity, **kwargs):
         entity = int(entity)

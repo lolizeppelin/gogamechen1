@@ -547,6 +547,16 @@ class AppEntityReuest(BaseContorller):
                 session.flush()
         return resultutils.results(result='bond entity %d database success' % entity)
 
+    def entitys(self, body=None):
+        entitys = body.get('entitys')
+        session = endpoint_session(readonly=True)
+        query = model_query(session, AppEntity, filter=AppEntity.entity.in_(entitys))
+        return resultutils.results(result='get entitys success',
+                                   data=[dict(entity=_entity.entity,
+                                              group_id=_entity.group_id,
+                                              objtype=_entity.objtype) for _entity in query])
+
+
 def areas_map(group_id):
     session = endpoint_session(readonly=True)
     query = model_query(session, GameArea, filter=GameArea.group_id == group_id)
