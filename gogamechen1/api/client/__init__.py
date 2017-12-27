@@ -34,10 +34,13 @@ class GogameChen1DBClient(GopDBClient):
                                             resone=results['result'])
         return results
 
-    def objfile_create(self, objtype, subtype, version):
+    def objfile_create(self, objtype, subtype, version, body=None):
+        body = body or {}
+        body.setdefault('objtype', objtype)
+        body.setdefault('subtype', subtype)
+        body.setdefault('version', version)
         resp, results = self.retryable_post(action=self.objfiles_path,
-                                            body=dict(objtype=objtype, subtype=subtype,
-                                                      version=version))
+                                            body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='create gogamechen1 objfiles fail:%d' % results['resultcode'],
                                             code=resp.status_code,
@@ -81,7 +84,7 @@ class GogameChen1DBClient(GopDBClient):
         return results
 
     def group_show(self, group_id, detail=False):
-        resp, results = self.post(action=self.group_path % str(group_id), body=dict(detail=detail))
+        resp, results = self.get(action=self.group_path % str(group_id), body=dict(detail=detail))
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='show gogamechen1 group fail:%d' % results['resultcode'],
                                             code=resp.status_code,
@@ -100,7 +103,7 @@ class GogameChen1DBClient(GopDBClient):
         return results
 
     def group_maps(self, group_id, body=None):
-        resp, results = self.delete(action=self.group_path_ex % (str(group_id), 'maps'), body=body)
+        resp, results = self.get(action=self.group_path_ex % (str(group_id), 'maps'), body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='get gogamechen1 group maps fail:%d' % results['resultcode'],
                                             code=resp.status_code,

@@ -5,6 +5,7 @@ import re
 import contextlib
 import eventlet
 import psutil
+import functools
 
 from collections import namedtuple
 
@@ -92,7 +93,7 @@ class Application(AppEndpointBase):
         super(Application, self).post_start()
         pids = utils.find_process()
         # reflect entity objtype
-        entitymaps = self.client.show_appentity(impl='local', body=dict(entitys=self.entitys))['data']
+        entitymaps = self.client._appentity(impl='local', body=dict(entitys=self.entitys))['data']
         for entityinfo in entitymaps:
             _entity = int(entityinfo.get('entity'))
             objtype = entityinfo.get('objtype')
@@ -186,15 +187,6 @@ class Application(AppEndpointBase):
         posts = self._get_ports(entity)
         objtype = self.konwn_appentitys[entity].get('objtype')
 
-        def _bond():
-            self.client.bondto(entity, databases)
-        threadpool.add_thread(_bond)
-
-        if chiefs:
-            chiefs = self.client.chiefs(chiefs, detail=True)['data'][0]
-
-
-
     def delete_entity(self, entity, token):
         if token != self._entity_token(entity):
             raise
@@ -212,18 +204,31 @@ class Application(AppEndpointBase):
                 self._free_port(entity)
                 self.entitys_map.pop(entity)
 
-    def create_entity(self, entity, objtype, objfile, timeout):
+    def create_entity(self, entity, objtype, objfile, timeout,
+                      databases, chiefs):
         with self._prepare_entity_path(entity):
-            zlibutils.async_extract(src=objfile, dst=self.apppath(entity), timeout=timeout,
-                                    fork=safe_fork(user=self.entity_user(entity),
-                                                   group=self.entity_group(entity)),
-                                    exclude=self._exclude(objtype))
+            wait = zlibutils.async_extract(src=objfile, dst=self.apppath(entity), timeout=timeout,
+                                           fork=functools.partial(safe_fork, self.entity_user(entity),
+                                                                  self.entity_group(entity)),
+                                           exclude=self._exclude(objtype))
+            overtime = int(time.time()) + timeout
+
+            def _postdo():
+                wait()
+                if entity not in self.konwn_appentitys:
+                    if int(time.time()) > overtime:
+                        return
+                    eventlet.sleep(0.1)
+                # init config file
+                self.flush_config(entity, databases, chiefs)
+
+            threadpool.add_thread(_postdo)
 
     def rpc_create_entity(self, ctxt, entity, **kwargs):
         timeout = count_timeout(ctxt, kwargs)
         objfile = kwargs.pop('objfile', None)
         ports = kwargs.pop('ports')
-        chiefs = kwargs.pop('chiefs')
+        chiefs = kwargs.pop('chiefs', None)
         objtype = kwargs.pop('objtype')
         databases = kwargs.pop('databases')
         objfile = self.filemanager.get(objfile, download=False)
@@ -238,11 +243,14 @@ class Application(AppEndpointBase):
                                                   result='create %s database fail, entity exist' % entity)
             with self._prepare_entity_path(entity):
                 with self._allocate_port(entity, objtype, ports) as ports:
-                    wapper = taskflow.create_entity(self, entity, objtype, databases,
-                                                    chiefs, objfile, timeout)
-                    threadpool.add_thread(wapper)
+                    middleware = taskflow.create_entity(self, entity, objtype, databases,
+                                                        chiefs, objfile, timeout)
+                    if not middleware.success:
+                        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                                          ctxt=ctxt,
+                                                          resultcode=manager_common.RESULT_ERROR,
+                                                          result=str(middleware))
                     self.konwn_appentitys.setdefault(entity, dict(objtype=objtype, pid=None))
-
                     def _port_notity():
                         """notify port bond"""
                         self.client.ports_add(agent_id=self.manager.agent_id,
@@ -250,7 +258,7 @@ class Application(AppEndpointBase):
                     threadpool.add_thread(_port_notity)
 
         resultcode = manager_common.RESULT_SUCCESS
-        result = 'create database success'
+        result = 'create %s success' % objtype
 
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           ctxt=ctxt,
@@ -258,7 +266,10 @@ class Application(AppEndpointBase):
                                           result=result,
                                           details=[dict(detail_id=entity,
                                                    resultcode=resultcode,
-                                                   result='wait database start')])
+                                                   result='wait %s start' % objtype)])
+
+    def rpc_post_create_entity(self, ctxt, entity, **kwargs):
+        self.konwn_appentitys.setdefault(entity, dict(objtype=kwargs.pop('objtype'), pid=None))
 
     def rpc_reset_entity(self, ctxt, entity, **kwargs):
         entity = int(entity)

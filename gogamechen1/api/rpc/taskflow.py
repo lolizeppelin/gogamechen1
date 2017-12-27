@@ -10,6 +10,7 @@ from simpleflow.patterns import unordered_flow as uf
 from simpleflow.storage.middleware import LogBook
 from simpleflow.engines.engine import ParallelActionEngine
 
+from goperation import threadpool
 from goperation.manager.rpc.agent import sqlite
 from goperation.manager.rpc.agent.application.taskflow.middleware import EntityMiddleware
 from goperation.manager.rpc.agent.application.taskflow import application
@@ -58,9 +59,13 @@ class GogameDatabaseCreate(StandardTask):
                                                                            ro_user=auth.get('ro_user'),
                                                                            ro_passwd=auth.get('ro_passwd')
                                                                            ))
+        appendpoint = self.middleware.reflection()
 
+        def _bond():
+            # 数据库本地绑定记录
+            appendpoint.client.bondto(self.middleware.entity, self.middleware.databases)
 
-
+        threadpool.add_thread(_bond)
 
     def revert(self, *args, **kwargs):
         result = kwargs.get('result') or args[0]
@@ -115,12 +120,13 @@ class GogameAppCreate(application.AppCreateBase):
         super(GogameAppCreate, self).__init__(middleware)
         self.timeout = timeout
 
-    def execute(self, objfile):
+    def execute(self, objfile, chiefs=None):
         if self.middleware.is_success(self.__class__.__name__):
             return
         endpoint = self.middleware.reflection()
         # 创建实体
-        endpoint.create_entity(self.middleware.entity, self.middleware.objtype, objfile, self.timeout)
+        endpoint.create_entity(self.middleware.entity, self.middleware.objtype, objfile, self.timeout,
+                               self.middleware.databases, chiefs)
 
     def revert(self, result, **kwargs):
         super(GogameAppCreate, self).revert(result, **kwargs)
@@ -132,17 +138,17 @@ class GogameAppCreate(application.AppCreateBase):
             self.middleware.set_return(self.__class__.__name__, task_common.REVERTED)
 
 
-class ConfigUpdate(application.AppUpdateBase):
-
-    def execute(self, chiefs=None):
-        endpoint = self.middleware.reflection()
-        # 调用更新配置
-        endpoint.flush_config(self.middleware.entity, self.middleware.databases, chiefs)
-
-    def revert(self, result, **kwargs):
-        super(ConfigUpdate, self).revert(result, **kwargs)
-        if isinstance(result, failure.Failure):
-            LOG.error('%s:%d Update config fail' % (self.middleware.objtype, self.middleware.entity))
+# class ConfigUpdate(application.AppUpdateBase):
+#
+#     def execute(self, chiefs=None):
+#         endpoint = self.middleware.reflection()
+#         # 调用更新配置
+#         endpoint.flush_config(self.middleware.entity, self.middleware.databases, chiefs)
+#
+#     def revert(self, result, **kwargs):
+#         super(ConfigUpdate, self).revert(result, **kwargs)
+#         if isinstance(result, failure.Failure):
+#             LOG.error('%s:%d Update config fail' % (self.middleware.objtype, self.middleware.entity))
 
 
 def create_entity(appendpoint, entity, objtype, databases,
@@ -150,7 +156,6 @@ def create_entity(appendpoint, entity, objtype, databases,
     middleware = GogameMiddle(endpoint=appendpoint, entity=entity, objtype=objtype)
     app = application.Application(middleware,
                                   createtask=GogameAppCreate(middleware, timeout),
-                                  updatetask=ConfigUpdate(middleware),
                                   databases=databases)
 
     book = LogBook(name='create_%s_%d' % (appendpoint.namespace, entity))
@@ -162,14 +167,13 @@ def create_entity(appendpoint, entity, objtype, databases,
     engine = load(connection, create_flow, store=store,
                   book=book, engine_cls=ParallelActionEngine)
 
-    def wapper():
-        try:
-            engine.run()
-        except Exception:
-            LOG.error('create middleware result %s' % str(middleware))
-            raise
-        finally:
-            connection.destroy_logbook(book.uuid)
-            for dberror in middleware.dberrors:
-                LOG.error(str(dberror))
-    return wapper
+    try:
+        engine.run()
+        return middleware
+    except Exception:
+        LOG.error('create middleware result %s' % str(middleware))
+        raise
+    finally:
+        connection.destroy_logbook(book.uuid)
+        for dberror in middleware.dberrors:
+            LOG.error(str(dberror))

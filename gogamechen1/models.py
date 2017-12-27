@@ -34,7 +34,7 @@ class ObjtypeFile(TableBase):
 
 class AreaDatabase(TableBase):
     quote_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
-    databae_id = sa.Column(INTEGER(unsigned=True), nullable=False)
+    # databae_id = sa.Column(INTEGER(unsigned=True), nullable=False)
     entity = sa.Column(sa.ForeignKey('appentitys.entity', ondelete="RESTRICT", onupdate='RESTRICT'),
                        nullable=False)
     subtype = sa.Column(VARCHAR(64), nullable=False)
@@ -68,7 +68,7 @@ class GameArea(TableBase):
 
 class AppEntity(TableBase):
     entity = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
-    agent_id = sa.Column(INTEGER(unsigned=True), nullable=False)
+    # agent_id = sa.Column(INTEGER(unsigned=True), nullable=False)
     group_id = sa.Column(sa.ForeignKey('groups.group_id', ondelete="RESTRICT", onupdate='RESTRICT'),
                          nullable=False)
     objtype = sa.Column(VARCHAR(64), nullable=False)
@@ -79,7 +79,7 @@ class AppEntity(TableBase):
                                  cascade='delete,delete-orphan')
 
     __table_args__ = (
-        sa.Index('agent_id_index', 'agent_id'),
+        # sa.Index('agent_id_index', 'agent_id'),
         InnoDBTableBase.__table_args__
     )
 

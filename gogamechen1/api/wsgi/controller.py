@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 import re
+import six
 import random
 import eventlet
 import webob.exc
@@ -21,7 +22,7 @@ from simpleservice.rpc.exceptions import AMQPDestinationNotFound
 from simpleservice.rpc.exceptions import MessagingTimeout
 from simpleservice.rpc.exceptions import NoSuchMethod
 
-
+from goperation import threadpool
 from goperation.manager import common as manager_common
 from goperation.manager.exceptions import CacheStoneError
 from goperation.manager.utils import resultutils
@@ -247,6 +248,8 @@ class AppEntityReuest(BaseContorller):
                                     'description': '需要下载的文件信息'},
                         'agent_id': {'type': 'integer', 'minimum': 1,
                                      'description': '程序安装的目标机器'},
+                        'cross_id': {'type': 'integer', 'minimum': 1,
+                                     'description': '跨服程序的实体id'},
                         'databases': {'type': 'array',
                                       'items': {'type': 'object',
                                                 'required': ['type', 'database_id'],
@@ -312,7 +315,12 @@ class AppEntityReuest(BaseContorller):
                                            page_num=page_num)
         maps = th.wait()
 
+        emaps = entity_controller._shows(endpoint=common.NAME, entitys=[ column.get('entity')
+                                                                         for column in results['data']])
+
         for column in results['data']:
+            entity = column.get('entity')
+            entityinfo = emaps.get(entity)
             if detail:
                 databases = column.get('databases', [])
                 column['databases'] = []
@@ -321,6 +329,17 @@ class AppEntityReuest(BaseContorller):
                                                     host=database.host, port=database.port,
                                                     ))
             column.setdefault('areas', maps.get(column.get('entity', [])))
+            column['agent_id'] = entityinfo.get('agent_id')
+            column['ports'] = entityinfo.get('ports')
+            attributes = entityinfo.get('attributes')
+            if attributes:
+                local_ip = attributes.get('local_ip')
+                external_ips = attributes.get('external_ips')
+            else:
+                local_ip = external_ips = None
+            column['local_ip'] = local_ip
+            column['external_ips'] = external_ips
+
         return results
 
     def create(self, req, group_id, objtype, body=None):
@@ -375,25 +394,25 @@ class AppEntityReuest(BaseContorller):
                 if objtype == common.GAMESERVER:
                     # 游戏服务器需要在同组中找到gm和cross实例
                     try:
-                        gm = typemap[common.GMSERVER][0].entity
+                        gm = typemap[common.GMSERVER]
+                        cross = None
                         crossservers = typemap[common.CROSSSERVER]
                     except KeyError as e:
                         return resultutils.results('create entity fail, can not find my chief: %s' % e.message,
                                                    resultcode=manager_common.RESULT_ERROR)
-                    # 设置chiefs列表
-                    chiefs = {common.GMSERVER: gm}
+                    # 找cross服务
                     cross_id = body.get('cross_id')
                     # 如果指定了cross实例id
                     if cross_id:
                         # 判断cross实例id是否在当前组中
                         for _cross in crossservers:
-                            if cross_id == _cross:
-                                chiefs.setdefault(common.CROSSSERVER, cross_id)
+                            if cross_id == _cross.entity:
+                                cross = _cross
                                 break
                     else:
                         # 游戏服没有相同实例,直接使用第一个cross实例
                         if not same_type_entitys:
-                            chiefs.setdefault(common.CROSSSERVER, crossservers[0].entity)
+                            cross = crossservers[0]
                         else:
                             # 统计所有cross实例的引用次数
                             counted = set()
@@ -406,37 +425,66 @@ class AppEntityReuest(BaseContorller):
                                     continue
                                 _area.entity.add(_area.entity)
                                 counter[_area.cross_id] += 1
-                            # 选取引用次数最少的cross实例
-                            chiefs.setdefault(common.CROSSSERVER,
-                                              zip(counter.itervalues(), counter.iterkeys()).sort()[0][1])
-                    if chiefs.get(common.CROSSSERVER, None) is None:
+                            # 选取引用次数最少的cross_id
+                            cross_id = sorted(zip(counter.itervalues(), counter.iterkeys()))[0][1]
+                            for _cross in crossservers:
+                                if cross_id == _cross.entity:
+                                    cross = _cross
+                                    break
+
+                    if not cross:
                         raise InvalidArgument('cross server can not be found for %s' % objtype)
 
+                    # 获取实体相关服务器信息(端口/ip)
+                    maps = entity_controller._shows(endpoint=common.NAME, entitys=[gm.entity, cross.entity])
+                    for v in six.itervalues(maps):
+                        if v is None:
+                            raise InvalidArgument('Get chiefs info error, not online?')
+                    chiefs = dict()
+                    chiefs.setdefault(common.CROSSSERVER,
+                                      dict(entity=cross.entity,
+                                           ports=maps.get(cross.entity).get('ports'),
+                                           local_ip=maps.get(cross.entity).get('attributes').get('local_ip')
+                                           ))
+                    chiefs.setdefault(common.GMSERVER,
+                                      dict(entity=gm.entity,
+                                           ports=maps.get(gm.entity).get('ports'),
+                                           local_ip=maps.get(gm.entity).get('attributes').get('local_ip')
+                                           ))
+            # 完整的rpc数据包
             body = dict(objtype=objtype,
                         objfile=objfile,
                         databases=databases,
                         chiefs=chiefs)
+
             with session.begin():
                 _entity = entity_controller.create(req=req, agent_id=agent_id,
                                                    endpoint=common.NAME, body=body)['data'][0]
+                # 插入实体信息
                 appentity = AppEntity(entity=_entity.get('entity'),
-                                      agent_id=_entity.get('agent_id'),
+                                      # agent_id=_entity.get('agent_id'),
                                       group_id=group_id, objtype=objtype)
                 session.add(appentity)
                 session.flush()
                 if objtype == common.GAMESERVER:
+                    # 插入area数据
                     query = model_query(session, Group, filter=Group.group_id == group_id)
                     gamearea = GameArea(area_id=_group.lastarea+1,
                                         entity=appentity.appentity,
                                         group_id=_group.group_id,
-                                        cross_id=chiefs.get(common.CROSSSERVER))
+                                        cross_id=chiefs.get(common.CROSSSERVER).get('entity'))
                     session.add(gamearea)
                     session.flush()
+                    # 更新 group lastarea属性
                     query.update({'lastarea': next_area})
 
             _result = dict(entity=_entity.get('entity'), objtype=objtype, agent_id=agent_id)
             if objtype == common.GAMESERVER:
                 _result.setdefault('area_id', next_area)
+
+            threadpool.add_thread(entity_controller.post_create_entity,
+                                  _entity.get('entity'), common.NAME, objtype=objtype)
+
             return resultutils.results(result='create %s entity success' % objtype,
                                        data=[_result, ])
 
@@ -461,8 +509,8 @@ class AppEntityReuest(BaseContorller):
                                               databases=[dict(quote_id=database.quote_id,
                                                               host=database.host,
                                                               port=database.port,
-                                                              user=database.user,
-                                                              passwd=database.passwd,
+                                                              # user=database.user,
+                                                              # passwd=database.passwd,
                                                               subtype=database.subtype,
                                                               schema='%s_%s_%s_%d' % (common.NAME,
                                                                                       objtype,
@@ -485,7 +533,9 @@ class AppEntityReuest(BaseContorller):
         session = endpoint_session()
         with session.begin():
             for database in databases:
-                session.add(AreaDatabase(quote_id=database.get('quote_id'), database_id=database.get('database_id'),
+                LOG.info('Bond entity to database %d' % database.get('database_id'))
+                session.add(AreaDatabase(quote_id=database.get('quote_id'),
+                                         # database_id=database.get('database_id'),
                                          entity=database.get('entity'), subtype=database.get('subtype'),
                                          host=database.get('host'), port=database.get('port'),
                                          user=database.get('user'), passwd=database.get('passwd'),
@@ -494,46 +544,6 @@ class AppEntityReuest(BaseContorller):
                             )
                 session.flush()
         return resultutils.results(result='bond entity %d database success' % entity)
-
-    def chiefs(self, req, body=None):
-        body = body or {}
-        chiefs = body.pop('chiefs')
-        detail = body.get('detail')
-
-        _chiefs = {}
-        session = endpoint_session(readonly=True)
-        query = model_query(session, AppEntity, filter=AppEntity.entity.in_(chiefs.value))
-
-        if detail:
-            query = query.options(joinedload(AppEntity.databases, innerjoin=False))
-            g = eventlet.spawn(entity_controller._shows, endpoint=common.NAME, entitys=chiefs.value)
-
-
-        for _entity in query:
-            if _entity.objtype in chiefs:
-                _chiefs[_entity.objtype] = dict(entity=_entity.entity,
-                                                group_id=_entity.group_id,
-                                                agent_id=_entity.agent_id)
-                if detail:
-                    _chiefs[_entity.objtype].setdefault('databases', [dict(quote_id=_database.quote_id,
-                                                                           subtype=_database.subtype,
-                                                                           host=_database.host,
-                                                                           port=_database.port,
-                                                                           user=_database.user,
-                                                                           passwd=_database.passwd)
-                                                                      for _database in _entity.databases])
-        if len(chiefs) != len(_chiefs):
-            raise InvalidArgument('chiefs entity can not be found')
-        if detail:
-            entitysinfo = g.wait()
-            for entity in _chiefs.values():
-                _entity = entity.get('entity')
-                entity.setdefault('ports', entitysinfo[_entity]['ports'])
-                entity.setdefault('attributes', entitysinfo[_entity]['attributes'])
-
-        return resultutils.results(result='show chiefs success',
-                                   data=[_chiefs, ])
-
 
 def areas_map(group_id):
     session = endpoint_session(readonly=True)
