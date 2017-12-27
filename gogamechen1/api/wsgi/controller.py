@@ -184,6 +184,7 @@ class GroupReuest(BaseContorller):
 
     def show(self, req, group_id, body=None):
         body = body or {}
+        group_id = int(group_id)
         detail = body.get('detail', False)
         session = endpoint_session(readonly=True)
         query = model_query(session, Group, filter=Group.group_id == group_id)
@@ -215,6 +216,7 @@ class GroupReuest(BaseContorller):
 
     def delete(self, req, group_id, body=None):
         body = body or {}
+        group_id = int(group_id)
         session = endpoint_session()
         query = model_query(session, Group, filter=Group.group_id == group_id)
         query.options(joinedload(Group.entitys, innerjoin=False))
@@ -226,6 +228,8 @@ class GroupReuest(BaseContorller):
                                    data=[dict(group_id=_group.group_id, name=_group.name)])
 
     def maps(self, req, group_id, body=None):
+        body = body or {}
+        group_id = int(group_id)
         maps = areas_map(group_id)
         return resultutils.results(result='get group areas map success',
                                    data=[maps, ])
@@ -276,6 +280,7 @@ class AppEntityReuest(BaseContorller):
 
     def index(self, req, group_id, objtype, body=None):
         body = body or {}
+        group_id = int(group_id)
         order = body.pop('order', None)
         desc = body.pop('desc', False)
         detail = body.pop('detail', False)
@@ -320,6 +325,7 @@ class AppEntityReuest(BaseContorller):
 
     def create(self, req, group_id, objtype, body=None):
         body = body or {}
+        group_id = int(group_id)
         jsonutils.schema_validate(body, self.CREATEAPPENTITY)
         # 安装文件信息
         objfile = body.pop('objfile', None)
@@ -366,13 +372,6 @@ class AppEntityReuest(BaseContorller):
                     return resultutils.results('create entity fail, %s duplicate in group' % objtype,
                                                resultcode=manager_common.RESULT_ERROR)
             else:
-                # 基于相同类型的实例进行复制
-                # base = dict()
-                # if same_type_entitys:
-                #     index = random.randint(0, len(same_type_entitys) - 1)
-                #     base_entity = _group.entitys[index].entity
-                #     for _database in base_entity.databases:
-                #         base.setdefault(_database.type, _database.quote_id)
                 if objtype == common.GAMESERVER:
                     # 游戏服务器需要在同组中找到gm和cross实例
                     try:
@@ -443,6 +442,8 @@ class AppEntityReuest(BaseContorller):
 
     def show(self, req, group_id, objtype, entity, body=None):
         body = body or {}
+        group_id = int(group_id)
+        entity = int(entity)
         detail = body.get('detail', False)
         session = endpoint_session(readonly=True)
         query = model_query(session, Group, filter=Group.group_id == group_id)
@@ -479,6 +480,7 @@ class AppEntityReuest(BaseContorller):
 
     def bondto(self, req, entity, body=None):
         body = body or {}
+        entity = int(entity)
         databases = body.pop('databases')
         session = endpoint_session()
         with session.begin():
