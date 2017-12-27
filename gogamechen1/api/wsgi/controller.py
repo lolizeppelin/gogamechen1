@@ -357,9 +357,9 @@ class AppEntityReuest(BaseContorller):
             return 1
 
         def dbselect(objtype, *args, **kwargs):
-            _databases = [dict(subtype=common.DATADB, database_id=1)]
+            _databases = [dict(subtype=common.DATADB, database_id=40)]
             if objtype == common.GAMESERVER:
-                _databases.append(dict(subtype=common.LOGDB, database_id=1))
+                _databases.append(dict(subtype=common.LOGDB, database_id=40))
             return _databases
 
         # 选择实例运行服务器

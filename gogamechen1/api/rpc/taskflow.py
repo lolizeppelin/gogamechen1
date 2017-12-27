@@ -44,7 +44,7 @@ class GogameCreateDatabase(Database):
         self.source = kwargs['source']
         self.subtype = kwargs['subtype']
         self.ro_user = kwargs['ro_user']
-        self.ro_passwd = kwargs['subtype']
+        self.ro_passwd = kwargs['ro_passwd']
 
 
 class GogameDatabaseCreateTask(StandardTask):
@@ -65,15 +65,15 @@ class GogameDatabaseCreateTask(StandardTask):
                                                            'bond': {'entity': self.middleware.entity,
                                                                     'endpoint': common.NAME}})['data'][0]
         # 设置返回结果
-        self.middleware.database.setdefault(self.database.subtype, dict(schema=self.database.schema,
-                                                                        database_id=self.database.database_id,
-                                                                        quote_id=dbresult.get('quote_id'),
-                                                                        host=dbresult.get('host'),
-                                                                        port=dbresult.get('port'),
-                                                                        user=self.database.user,
-                                                                        passwd=self.database.passwd,
-                                                                        ro_user=self.database.ro_user,
-                                                                        ro_passwd=self.database.ro_passwd))
+        self.middleware.databases.setdefault(self.database.subtype, dict(schema=self.database.schema,
+                                                                         database_id=self.database.database_id,
+                                                                         quote_id=dbresult.get('quote_id'),
+                                                                         host=dbresult.get('host'),
+                                                                         port=dbresult.get('port'),
+                                                                         user=self.database.user,
+                                                                         passwd=self.database.passwd,
+                                                                         ro_user=self.database.ro_user,
+                                                                         ro_passwd=self.database.ro_passwd))
 
         def _bond():
             # 本地绑定数据库记录
