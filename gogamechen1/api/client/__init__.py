@@ -122,7 +122,7 @@ class GogameChen1DBClient(GopDBClient):
         return results
 
     def appentitys(self, entitys):
-        resp, results = self.get(action=self.appentitys_path, body=dict(appentitys=entitys),
+        resp, results = self.get(action=self.appentitys_path, body=dict(entitys=entitys),
                                  timeout=15)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='get gogamechen1 entitys fail:%d' % results['resultcode'],

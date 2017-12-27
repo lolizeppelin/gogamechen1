@@ -546,8 +546,8 @@ class AppEntityReuest(BaseContorller):
                 session.flush()
         return resultutils.results(result='bond entity %d database success' % entity)
 
-    def entitys(self, body=None):
-        entitys = body.get('appentitys')
+    def entitys(self, req, body=None):
+        entitys = body.get('entitys')
         session = endpoint_session(readonly=True)
         query = model_query(session, AppEntity, filter=AppEntity.entity.in_(entitys))
         return resultutils.results(result='get app entitys success',
