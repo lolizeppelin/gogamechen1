@@ -212,11 +212,12 @@ class Application(AppEndpointBase):
 
     def create_entity(self, entity, objtype, objfile, timeout,
                       databases, chiefs):
+        timeout = timeout if timeout else 300
+        overtime = int(time.time()) + timeout
         # wait = zlibutils.async_extract(src=objfile, dst=self.apppath(entity), timeout=timeout,
         #                                fork=functools.partial(safe_fork, self.entity_user(entity),
         #                                                       self.entity_group(entity)),
         #                                exclude=self._exclude(objtype))
-        overtime = int(time.time()) + timeout
 
         def _postdo():
             # wait()
