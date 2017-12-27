@@ -292,9 +292,8 @@ class AppEntityReuest(BaseContorller):
         session = endpoint_session(readonly=True)
         columns = [AppEntity.entity,
                   AppEntity.group_id,
-                  AppEntity.name,
+                  AppEntity.status,
                   AppEntity.objtype,
-                  AppEntity.desc,
                   ]
 
         th = eventlet.spawn(areas_map, group_id)
@@ -315,8 +314,11 @@ class AppEntityReuest(BaseContorller):
                                            page_num=page_num)
         maps = th.wait()
 
-        emaps = entity_controller._shows(endpoint=common.NAME, entitys=[ column.get('entity')
-                                                                         for column in results['data']])
+        if not results['data']:
+            return results
+
+        emaps = entity_controller._shows(endpoint=common.NAME, entitys=[column.get('entity')
+                                                                        for column in results['data']])
 
         for column in results['data']:
             entity = column.get('entity')
