@@ -159,6 +159,7 @@ def create_entity(appendpoint, entity, objtype, databases,
                                       appendpoint.manager.ipnetwork.netmask))
         LOG.info('Create schema %s in %d with auth %s' % (schema, database_id, str(auth)))
         _database.append(GogameCreateDatabase(database_id=database_id, schema=schema,
+                                              subtype=subtype,
                                               host=None, port=None, **auth))
 
     app = application.Application(middleware,
@@ -168,7 +169,7 @@ def create_entity(appendpoint, entity, objtype, databases,
     book = LogBook(name='create_%s_%d' % (appendpoint.namespace, entity))
     store = dict(objfile=objfile,  chiefs=chiefs, download_timeout=timeout)
     taskflow_session = sqlite.get_taskflow_session()
-    create_flow = pipe.flow_factory(taskflow_session, applications=[app, ],
+    create_flow = pipe.flow_factory(taskflow_session, applications=[app, ], store=store,
                                     db_flow_factory=create_db_flowfactory)
     connection = Connection(taskflow_session)
     engine = load(connection, create_flow, store=store,
