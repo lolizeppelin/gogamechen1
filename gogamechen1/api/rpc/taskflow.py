@@ -58,7 +58,7 @@ class GogameDatabaseCreateTask(StandardTask):
         # 创建并绑定数据库
         auth = dict(user=self.database.user, passwd=self.database.passwd,
                     ro_user=self.database.ro_user, ro_passwd=self.database.ro_passwd,
-                    source=self.database.source),
+                    source=self.database.source)
         dbresult = appendpoint.client.schemas_create(self.database.database_id,
                                                      body={'schema': self.database.schema,
                                                            'auth': auth,
