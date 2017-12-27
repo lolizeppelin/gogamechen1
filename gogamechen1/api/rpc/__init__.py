@@ -155,7 +155,7 @@ class Application(AppEndpointBase):
 
     def _free_ports(self, entity):
         ports = self.manager.allocked_ports.get(common.NAME)[entity]
-        self.manager.free_ports(self, ports)
+        self.manager.free_ports(ports)
 
     def _get_ports(self, entity):
         return [port for port in self.entitys_map[entity]]
@@ -195,10 +195,9 @@ class Application(AppEndpointBase):
         posts = self._get_ports(entity)
         objtype = self.konwn_appentitys[entity].get('objtype')
 
-    def delete_entity(self, entity, new=False):
-        if not new:
-            if self._entity_process(entity):
-                raise
+    def delete_entity(self, entity):
+        if self._entity_process(entity):
+            raise
         LOG.info('Try delete %s entity %d' % (self.namespace, entity))
         home = self.entity_home(entity)
         if os.path.exists(home):
@@ -208,19 +207,19 @@ class Application(AppEndpointBase):
                 LOG.exception('delete error')
                 raise
             else:
-                self._free_port(entity)
+                self._free_ports(entity)
                 self.entitys_map.pop(entity)
 
     def create_entity(self, entity, objtype, objfile, timeout,
                       databases, chiefs):
-        wait = zlibutils.async_extract(src=objfile, dst=self.apppath(entity), timeout=timeout,
-                                       fork=functools.partial(safe_fork, self.entity_user(entity),
-                                                              self.entity_group(entity)),
-                                       exclude=self._exclude(objtype))
+        # wait = zlibutils.async_extract(src=objfile, dst=self.apppath(entity), timeout=timeout,
+        #                                fork=functools.partial(safe_fork, self.entity_user(entity),
+        #                                                       self.entity_group(entity)),
+        #                                exclude=self._exclude(objtype))
         overtime = int(time.time()) + timeout
 
         def _postdo():
-            wait()
+            # wait()
             if entity not in self.konwn_appentitys:
                 if int(time.time()) > overtime:
                     return
@@ -237,8 +236,8 @@ class Application(AppEndpointBase):
         chiefs = kwargs.pop('chiefs', None)
         objtype = kwargs.pop('objtype')
         databases = kwargs.pop('databases')
-        objfile = self.filemanager.get(objfile, download=False)
-        self._check(objfile, objtype)
+        # objfile = self.filemanager.get(objfile, download=False)
+        # self._check(objfile, objtype)
 
         entity = int(entity)
         with self.lock(entity, timeout=3):
