@@ -213,23 +213,22 @@ class Application(AppEndpointBase):
 
     def create_entity(self, entity, objtype, objfile, timeout,
                       databases, chiefs):
-        with self._prepare_entity_path(entity):
-            wait = zlibutils.async_extract(src=objfile, dst=self.apppath(entity), timeout=timeout,
-                                           fork=functools.partial(safe_fork, self.entity_user(entity),
-                                                                  self.entity_group(entity)),
-                                           exclude=self._exclude(objtype))
-            overtime = int(time.time()) + timeout
+        wait = zlibutils.async_extract(src=objfile, dst=self.apppath(entity), timeout=timeout,
+                                       fork=functools.partial(safe_fork, self.entity_user(entity),
+                                                              self.entity_group(entity)),
+                                       exclude=self._exclude(objtype))
+        overtime = int(time.time()) + timeout
 
-            def _postdo():
-                wait()
-                if entity not in self.konwn_appentitys:
-                    if int(time.time()) > overtime:
-                        return
-                    eventlet.sleep(0.1)
-                # init config file
-                self.flush_config(entity, databases, chiefs)
+        def _postdo():
+            wait()
+            if entity not in self.konwn_appentitys:
+                if int(time.time()) > overtime:
+                    return
+                eventlet.sleep(0.1)
+            # init config file
+            self.flush_config(entity, databases, chiefs)
 
-            threadpool.add_thread(_postdo)
+        threadpool.add_thread(_postdo)
 
     def rpc_create_entity(self, ctxt, entity, **kwargs):
         timeout = count_timeout(ctxt, kwargs)
