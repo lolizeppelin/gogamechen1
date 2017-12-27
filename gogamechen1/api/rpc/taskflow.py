@@ -135,7 +135,7 @@ class GogameAppCreate(application.AppCreateBase):
             LOG.debug(result.pformat(traceback=True))
             endpoint = self.middleware.reflection()
             # 删除实体
-            endpoint.delete_entity(self.middleware.entity)
+            endpoint.delete_entity(self.middleware.entity, new=True)
             self.middleware.set_return(self.__class__.__name__, task_common.REVERTED)
 
 

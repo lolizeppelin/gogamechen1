@@ -161,7 +161,9 @@ class Application(AppEndpointBase):
         return [port for port in self.entitys_map[entity]]
 
     def _entity_process(self, entity):
-        entityinfo = self.konwn_pids.get(entity)
+        entityinfo = self.konwn_appentitys.get(entity)
+        if not entityinfo:
+            return
         objtype = entityinfo.get('objtype')
         _pid = entityinfo.get('pid')
         if _pid:
@@ -193,9 +195,10 @@ class Application(AppEndpointBase):
         posts = self._get_ports(entity)
         objtype = self.konwn_appentitys[entity].get('objtype')
 
-    def delete_entity(self, entity):
-        if self._entity_process(entity):
-            raise
+    def delete_entity(self, entity, new=False):
+        if not new:
+            if self._entity_process(entity):
+                raise
         LOG.info('Try delete %s entity %d' % (self.namespace, entity))
         home = self.entity_home(entity)
         if os.path.exists(home):
@@ -235,7 +238,6 @@ class Application(AppEndpointBase):
         chiefs = kwargs.pop('chiefs', None)
         objtype = kwargs.pop('objtype')
         databases = kwargs.pop('databases')
-        LOG.info('create gogamechen1 with databases %s' % str(databases))
         objfile = self.filemanager.get(objfile, download=False)
         self._check(objfile, objtype)
 
