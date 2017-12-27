@@ -40,7 +40,7 @@ class GogameCreateDatabase(Database):
 
     def __init__(self, **kwargs):
         super(GogameCreateDatabase, self).__init__(backup=None, update=None, **kwargs)
-        self.databaes_id = kwargs['database_id']
+        self.database_id = kwargs['database_id']
         self.source = kwargs['source']
         self.subtype = kwargs['subtype']
         self.ro_user = kwargs['ro_user']
@@ -54,15 +54,16 @@ class GogameDatabaseCreateTask(StandardTask):
         super(GogameDatabaseCreateTask, self).__init__(middleware)
 
     def execute(self):
+        appendpoint = self.middleware.reflection()
         # 创建并绑定数据库
         auth = dict(user=self.database.user, passwd=self.database.passwd,
                     ro_user=self.database.ro_user, ro_passwd=self.database.ro_passwd,
                     source=self.database.source),
-        dbresult = self.client.schemas_create(self.database.database_id,
-                                              body={'schema': self.database.schema,
-                                                    'auth': auth,
-                                                    'bond': {'entity': self.middleware.entity,
-                                                             'endpoint': common.NAME}})['data'][0]
+        dbresult = appendpoint.client.schemas_create(self.database.database_id,
+                                                     body={'schema': self.database.schema,
+                                                           'auth': auth,
+                                                           'bond': {'entity': self.middleware.entity,
+                                                                    'endpoint': common.NAME}})['data'][0]
         # 设置返回结果
         self.middleware.database.setdefault(self.database.subtype, dict(schema=self.database.schema,
                                                                         database_id=self.database.database_id,
@@ -73,7 +74,6 @@ class GogameDatabaseCreateTask(StandardTask):
                                                                         passwd=self.database.passwd,
                                                                         ro_user=self.database.ro_user,
                                                                         ro_passwd=self.database.ro_passwd))
-        appendpoint = self.middleware.reflection()
 
         def _bond():
             # 本地绑定数据库记录
