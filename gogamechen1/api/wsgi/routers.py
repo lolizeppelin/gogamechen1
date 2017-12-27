@@ -33,13 +33,19 @@ class Routers(router.RoutersBase):
 
         group_controller = controller_return_response(controller.GroupReuest(),
                                                    controller.FAULT_MAP)
-        mapper.collection(collection_name=collection_name,
-                          resource_name=resource_name,
-                          controller=group_controller,
-                          path_prefix='/%s' % common.NAME,
-                          member_prefix='/{group_id}',
-                          collection_actions=COLLECTION_ACTIONS,
-                          member_actions=MEMBER_ACTIONS)
+        collection = mapper.collection(collection_name=collection_name,
+                                       resource_name=resource_name,
+                                       controller=group_controller,
+                                       path_prefix='/%s' % common.NAME,
+                                       member_prefix='/{group_id}',
+                                       collection_actions=COLLECTION_ACTIONS,
+                                       member_actions=MEMBER_ACTIONS)
+        collection.member.link('maps', method='GET')
+        # collection.member.link('start', method='POST')
+        # collection.member.link('stop', method='POST')
+        # collection.member.link('status', method='POST')
+        # collection.member.link('hotfix', method='POST')
+        # collection.member.link('upgrade', method='POST')
 
         resource_name = 'entity'
         collection_name = resource_name + 's'
@@ -63,6 +69,7 @@ class Routers(router.RoutersBase):
                                        collection_actions=COLLECTION_ACTIONS,
                                        member_actions=MEMBER_ACTIONS)
         # collection.member.link('databases', method='GET')
+        # collection.member.link('start', method='POST')
         # collection.member.link('stop', method='POST')
         # collection.member.link('status', method='POST')
         # collection.member.link('hotfix', method='POST')

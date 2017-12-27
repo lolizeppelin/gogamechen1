@@ -11,7 +11,8 @@ class GogameChen1DBClient(GopDBClient):
     objfile_path = '/gopgamechen1/objfiles/%s'
 
     groups_path = '/gopgamechen1/groups'
-    database_path = '/gopgamechen1/groups/%s'
+    group_path = '/gopgamechen1/groups/%s'
+    group_path_ex = '/gopgamechen1/groups/%s/%s'
 
     games_path = '/gopgamechen1/group/%s/gamesvr/entitys'
     game_path = '/gopgamechen1/group/%s/gamesvr/entity/%s'
@@ -94,6 +95,14 @@ class GogameChen1DBClient(GopDBClient):
         resp, results = self.delete(action=self.group_path % str(group_id), body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='delete gogamechen1 group fail:%d' % results['resultcode'],
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def group_maps(self, group_id, body=None):
+        resp, results = self.delete(action=self.group_path_ex % (str(group_id), 'maps'), body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='get gogamechen1 group maps fail:%d' % results['resultcode'],
                                             code=resp.status_code,
                                             resone=results['result'])
         return results

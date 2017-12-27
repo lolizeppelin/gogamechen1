@@ -132,7 +132,6 @@ class ObjtypeFileReuest(BaseContorller):
 
 objfile_controller = ObjtypeFileReuest()
 
-
 @singleton.singleton
 class GroupReuest(BaseContorller):
 
@@ -221,6 +220,10 @@ class GroupReuest(BaseContorller):
         return resultutils.results(result='delete group success',
                                    data=[dict(group_id=_group.group_id, name=_group.name)])
 
+    def maps(self, req, group_id, body=None):
+        maps = areas_map(group_id)
+        return resultutils.results(result='get group areas map success',
+                                   data=[maps, ])
 
 @singleton.singleton
 class AppEntityReuest(BaseContorller):
@@ -265,16 +268,6 @@ class AppEntityReuest(BaseContorller):
         attributes = entityinfo['attributes']
         return attributes, ports
 
-    def _areas_map(self, group_id):
-        session = endpoint_session(readonly=True)
-        query = model_query(session, GameArea, filter=GameArea.group_id == group_id)
-        maps = {}
-        for _areas in query:
-            try:
-                maps[_areas.entity].append(_areas.area_id)
-            except KeyError:
-                maps[_areas.entity] = [_areas.area_id, ]
-        return maps
 
     def index(self, req, group_id, objtype, body=None):
         body = body or {}
@@ -291,7 +284,7 @@ class AppEntityReuest(BaseContorller):
                   AppEntity.desc,
                   ]
 
-        th = eventlet.spawn(self._areas_map, group_id)
+        th = eventlet.spawn(areas_map, group_id)
 
         option = None
         if detail:
@@ -534,3 +527,15 @@ class AppEntityReuest(BaseContorller):
 
         return resultutils.results(result='show chiefs success',
                                    data=[_chiefs, ])
+
+
+def areas_map(group_id):
+    session = endpoint_session(readonly=True)
+    query = model_query(session, GameArea, filter=GameArea.group_id == group_id)
+    maps = {}
+    for _areas in query:
+        try:
+            maps[_areas.entity].append(_areas.area_id)
+        except KeyError:
+            maps[_areas.entity] = [_areas.area_id, ]
+    return maps
