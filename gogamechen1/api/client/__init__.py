@@ -7,24 +7,24 @@ from goperation.manager import common
 
 class GogameChen1DBClient(GopDBClient):
 
-    objfiles_path = '/gopgamechen1/objfiles'
-    objfile_path = '/gopgamechen1/objfiles/%s'
+    objfiles_path = '/gogamechen1/objfiles'
+    objfile_path = '/gogamechen1/objfiles/%s'
 
-    groups_path = '/gopgamechen1/groups'
-    group_path = '/gopgamechen1/groups/%s'
-    group_path_ex = '/gopgamechen1/groups/%s/%s'
+    groups_path = '/gogamechen1/groups'
+    group_path = '/gogamechen1/groups/%s'
+    group_path_ex = '/gogamechen1/groups/%s/%s'
 
-    games_path = '/gopgamechen1/group/%s/gamesvr/entitys'
-    game_path = '/gopgamechen1/group/%s/gamesvr/entity/%s'
+    games_path = '/gogamechen1/group/%s/gamesvr/entitys'
+    game_path = '/gogamechen1/group/%s/gamesvr/entity/%s'
 
-    gms_path = '/gopgamechen1/group/%s/loginsvr/entitys'
-    gm_path = '/gopgamechen1/group/%s/loginsvr/entity/%s'
+    gms_path = '/gogamechen1/group/%s/loginsvr/entitys'
+    gm_path = '/gogamechen1/group/%s/loginsvr/entity/%s'
 
-    crosss_path = '/gopgamechen1/group/%s/publicsvr/entitys'
-    cross_path = '/gopgamechen1/group/%s/publicsvr/entity/%s'
+    crosss_path = '/gogamechen1/group/%s/publicsvr/entitys'
+    cross_path = '/gogamechen1/group/%s/publicsvr/entity/%s'
 
-    bond_path = '/gopgamechen1/entity/%s'
-    chiefs_path = '/gopgamechen1/chiefs'
+    bond_path = '/gogamechen1/entity/%s'
+    chiefs_path = '/gogamechen1/chiefs'
 
     def objfiles_index(self, body=None):
         resp, results = self.get(action=self.objfiles_path, body=body)

@@ -1,4 +1,4 @@
-NAME = 'gopgamechen1'
+NAME = 'gogamechen1'
 
 
 GAMESERVER = 'gamesvr'
