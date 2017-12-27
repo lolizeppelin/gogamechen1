@@ -485,7 +485,7 @@ class AppEntityReuest(BaseContorller):
                 _result.setdefault('area_id', next_area)
 
             threadpool.add_thread(entity_controller.post_create_entity,
-                                  _entity.get('entity'), common.NAME, objtype=objtype)
+                                  _entity.get('entity'), common.NAME, objtype=objtype, group_id=group_id)
 
             return resultutils.results(result='create %s entity success' % objtype,
                                        data=[_result, ])

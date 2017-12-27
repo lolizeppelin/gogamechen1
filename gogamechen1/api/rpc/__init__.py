@@ -221,7 +221,7 @@ class Application(AppEndpointBase):
 
         def _postdo():
             # wait()
-            if entity not in self.konwn_appentitys:
+            with entity not in self.konwn_appentitys:
                 if int(time.time()) > overtime:
                     return
                 eventlet.sleep(0.1)
