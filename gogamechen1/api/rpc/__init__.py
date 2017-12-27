@@ -193,9 +193,7 @@ class Application(AppEndpointBase):
         posts = self._get_ports(entity)
         objtype = self.konwn_appentitys[entity].get('objtype')
 
-    def delete_entity(self, entity, token):
-        if token != self._entity_token(entity):
-            raise
+    def delete_entity(self, entity):
         if self._entity_process(entity):
             raise
         LOG.info('Try delete %s entity %d' % (self.namespace, entity))
@@ -300,8 +298,12 @@ class Application(AppEndpointBase):
                 return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                                   resultcode=manager_common.RESULT_ERROR,
                                                   ctxt=ctxt, result='delete database fail, entity not exist')
+            if token != self._entity_token(entity):
+                return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                                  resultcode=manager_common.RESULT_ERROR,
+                                                  ctxt=ctxt, result='delete database fail, token error')
             try:
-                self.delete_entity(entity, token)
+                self.delete_entity(entity)
                 resultcode = manager_common.RESULT_SUCCESS
                 result = 'delete %d success' % entity
             except Exception as e:
