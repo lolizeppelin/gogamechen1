@@ -231,13 +231,13 @@ class Application(AppEndpointBase):
             threadpool.add_thread(_postdo)
 
     def rpc_create_entity(self, ctxt, entity, **kwargs):
-        LOG.info('Get create gogamechen1 entity command')
         timeout = count_timeout(ctxt, kwargs)
         objfile = kwargs.pop('objfile', None)
         ports = kwargs.pop('ports', None)
         chiefs = kwargs.pop('chiefs', None)
         objtype = kwargs.pop('objtype')
         databases = kwargs.pop('databases')
+        LOG.info('create gogamechen1 with databases %s' % str(databases))
         objfile = self.filemanager.get(objfile, download=False)
         self._check(objfile, objtype)
 

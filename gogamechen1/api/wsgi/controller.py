@@ -534,15 +534,14 @@ class AppEntityReuest(BaseContorller):
         databases = body.pop('databases')
         session = endpoint_session()
         with session.begin():
-            for database in databases:
+            for subtype, database in six.iteritems(databases):
                 LOG.info('Bond entity to database %d' % database.get('database_id'))
                 session.add(AreaDatabase(quote_id=database.get('quote_id'),
                                          # database_id=database.get('database_id'),
-                                         entity=database.get('entity'), subtype=database.get('subtype'),
+                                         entity=database.get('entity'), subtype=subtype,
                                          host=database.get('host'), port=database.get('port'),
                                          user=database.get('user'), passwd=database.get('passwd'),
-                                         ro_user=database.get('ro_user'), ro_passwd=database.get('ro_passwd'),
-                                         )
+                                         ro_user=database.get('ro_user'), ro_passwd=database.get('ro_passwd'))
                             )
                 session.flush()
         return resultutils.results(result='bond entity %d database success' % entity)

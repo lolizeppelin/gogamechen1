@@ -14,6 +14,7 @@ from goperation import threadpool
 from goperation.manager.rpc.agent import sqlite
 from goperation.manager.rpc.agent.application.taskflow.middleware import EntityMiddleware
 from goperation.manager.rpc.agent.application.taskflow import application
+from goperation.manager.rpc.agent.application.taskflow.database import Database
 from goperation.manager.rpc.agent.application.taskflow.base import StandardTask
 from goperation.manager.rpc.agent.application.taskflow import pipe
 from goperation.taskflow import common as task_common
@@ -35,47 +36,60 @@ class GogameMiddle(EntityMiddleware):
         self.dberrors = []
 
 
-class GogameDatabaseCreate(StandardTask):
+class GogameCreateDatabase(Database):
 
-    def __init__(self, middleware, data):
-        self.data = data
-        super(GogameDatabaseCreate, self).__init__(middleware)
+    def __init__(self, **kwargs):
+        super(GogameCreateDatabase, self).__init__(backup=None, update=None, **kwargs)
+        self.databaes_id = kwargs['database_id']
+        self.source = kwargs['source']
+        self.subtype = kwargs['subtype']
+        self.ro_user = kwargs['ro_user']
+        self.ro_passwd = kwargs['subtype']
+
+
+class GogameDatabaseCreateTask(StandardTask):
+
+    def __init__(self, middleware, database):
+        self.database = database
+        super(GogameDatabaseCreateTask, self).__init__(middleware)
 
     def execute(self):
         # 创建并绑定数据库
-        auth = self.data.get('auth')
-        dbresult = self.client.schemas_create(self.data.get('database_id'),
-                                              body={'schema': self.data.get('schema'),
+        auth = dict(user=self.database.user, passwd=self.database.passwd,
+                    ro_user=self.database.ro_user, ro_passwd=self.database.ro_passwd,
+                    source=self.database.source),
+        dbresult = self.client.schemas_create(self.database.database_id,
+                                              body={'schema': self.database.schema,
                                                     'auth': auth,
-                                                    'bond': {'entity': self.data.get('entity'),
+                                                    'bond': {'entity': self.middleware.entity,
                                                              'endpoint': common.NAME}})['data'][0]
         # 设置返回结果
-        self.middleware.database.setdefault(self.data.get('subtype'), dict(schema=dbresult.get('schema'),
-                                                                           database_id=dbresult.get('database_id'),
-                                                                           quote_id=dbresult.get('quote_id'),
-                                                                           host=dbresult.get('host'),
-                                                                           user=auth.get('user'),
-                                                                           passwd=auth.get('passwd'),
-                                                                           ro_user=auth.get('ro_user'),
-                                                                           ro_passwd=auth.get('ro_passwd')
-                                                                           ))
+        self.middleware.database.setdefault(self.database.subtype, dict(schema=self.database.schema,
+                                                                        database_id=self.database.database_id,
+                                                                        quote_id=dbresult.get('quote_id'),
+                                                                        host=dbresult.get('host'),
+                                                                        port=dbresult.get('port'),
+                                                                        user=self.database.user,
+                                                                        passwd=self.database.passwd,
+                                                                        ro_user=self.database.ro_user,
+                                                                        ro_passwd=self.database.ro_passwd))
         appendpoint = self.middleware.reflection()
 
         def _bond():
-            # 数据库本地绑定记录
+            # 本地绑定数据库记录
             appendpoint.client.bondto(self.middleware.entity, self.middleware.databases)
 
         threadpool.add_thread(_bond)
 
     def revert(self, *args, **kwargs):
         result = kwargs.get('result') or args[0]
-        super(GogameDatabaseCreate, self).revert(result, **kwargs)
+        super(GogameDatabaseCreateTask, self).revert(result, **kwargs)
         if isinstance(result, failure.Failure):
-            LOG.error('Create schema %s on %d fail' % (self.data.get('schema'),
-                                                       self.data.get('database_id')))
+            LOG.error('Create schema %s on %d fail' % (self.database.schema,
+                                                       self.database.database_id))
             return
         # 弹出返回结果, 解绑并删除
-        dbresult = self.middleware.database.pop(self.data.get('subtype'))
+        dbresult = self.middleware.database.pop(self.database.subtype)
         schema = dbresult.get('schema')
         database_id = dbresult.get('database_id')
         unquotes = [dbresult.get('quote_id')]
@@ -85,7 +99,7 @@ class GogameDatabaseCreate(StandardTask):
                                                                body={'unquotes': unquotes})
         except Exception as e:
             self.middleware.dberrors.append(dict(database_id=database_id, schema=schema, unquotes=unquotes,
-                                                 resone='%s :%s' % (e.__class__.__name__, e.message)))
+                                                 reason='%s :%s' % (e.__class__.__name__, e.message)))
         else:
             self.middleware.set_return(self.__class__.__name__, task_common.REVERTED)
 
@@ -96,21 +110,8 @@ def create_db_flowfactory(app, store):
     entity = middleware.entity
     objtype = middleware.objtype
     uflow = uf.Flow('create_%s_%s_%d' % (common.NAME, objtype, entity))
-    appendpoint = middleware.reflection()
     for database in app.databases:
-        subtype = database.get('subtype')
-        database_id = database.get('database_id')
-        schema = '%s_%s_%s_%d' % (common.NAME, objtype, subtype, entity)
-        conf = CONF['%s.%s' % (common.NAME, objtype)]
-        # 默认认证
-        auth = dict(user=conf.get('%s_%s' % (subtype, 'user')),
-                    passwd=conf.get('%s_%s' % (subtype, 'passwd')),
-                    ro_user=conf.get('%s_%s' % (subtype, 'ro_user')),
-                    ro_passwd=conf.get('%s_%s' % (subtype, 'ro_passwd')),
-                    source='%s/%s' % (appendpoint.ipnetwork.network, appendpoint.ipnetwork.netmask))
-        uflow.add(GogameDatabaseCreate(middleware,
-                                       dict(database_id=database_id, subtype=subtype,
-                                            schema=schema, auth=auth, entity=entity)))
+        uflow.add(GogameDatabaseCreateTask(middleware, database))
     return uflow
 
 
@@ -123,10 +124,10 @@ class GogameAppCreate(application.AppCreateBase):
     def execute(self, objfile, chiefs=None):
         if self.middleware.is_success(self.__class__.__name__):
             return
-        endpoint = self.middleware.reflection()
+        appendpoint = self.middleware.reflection()
         # 创建实体
-        endpoint.create_entity(self.middleware.entity, self.middleware.objtype, objfile, self.timeout,
-                               self.middleware.databases, chiefs)
+        appendpoint.create_entity(self.middleware.entity, self.middleware.objtype, objfile, self.timeout,
+                                  self.middleware.databases, chiefs)
 
     def revert(self, result, **kwargs):
         super(GogameAppCreate, self).revert(result, **kwargs)
@@ -138,28 +139,34 @@ class GogameAppCreate(application.AppCreateBase):
             self.middleware.set_return(self.__class__.__name__, task_common.REVERTED)
 
 
-# class ConfigUpdate(application.AppUpdateBase):
-#
-#     def execute(self, chiefs=None):
-#         endpoint = self.middleware.reflection()
-#         # 调用更新配置
-#         endpoint.flush_config(self.middleware.entity, self.middleware.databases, chiefs)
-#
-#     def revert(self, result, **kwargs):
-#         super(ConfigUpdate, self).revert(result, **kwargs)
-#         if isinstance(result, failure.Failure):
-#             LOG.error('%s:%d Update config fail' % (self.middleware.objtype, self.middleware.entity))
-
-
 def create_entity(appendpoint, entity, objtype, databases,
                   chiefs, objfile, timeout):
     middleware = GogameMiddle(endpoint=appendpoint, entity=entity, objtype=objtype)
+
+    conf = CONF['%s.%s' % (common.NAME, objtype)]
+    _database = []
+    # format database to class
+    for database in databases:
+        subtype = database.get('subtype')
+        database_id = database.get('database_id')
+        schema = '%s_%s_%s_%d' % (common.NAME, objtype, subtype, entity)
+        # 默认认证
+        auth = dict(user=conf.get('%s_%s' % (subtype, 'user')),
+                    passwd=conf.get('%s_%s' % (subtype, 'passwd')),
+                    ro_user=conf.get('%s_%s' % (subtype, 'ro_user')),
+                    ro_passwd=conf.get('%s_%s' % (subtype, 'ro_passwd')),
+                    source='%s/%s' % (appendpoint.manager.ipnetwork.network,
+                                      appendpoint.manager.ipnetwork.netmask))
+        LOG.info('Create schema %s in %d with auth %s' % (schema, database_id, str(auth)))
+        _database.append(GogameCreateDatabase(database_id=database_id, schema=schema,
+                                              host=None, port=None, **auth))
+
     app = application.Application(middleware,
                                   createtask=GogameAppCreate(middleware, timeout),
-                                  databases=databases)
+                                  databases=_database)
 
     book = LogBook(name='create_%s_%d' % (appendpoint.namespace, entity))
-    store = dict(objfile=objfile,  chiefs=chiefs)
+    store = dict(objfile=objfile,  chiefs=chiefs, download_timeout=timeout)
     taskflow_session = sqlite.get_taskflow_session()
     create_flow = pipe.flow_factory(taskflow_session, applications=[app, ],
                                     db_flow_factory=create_db_flowfactory)
