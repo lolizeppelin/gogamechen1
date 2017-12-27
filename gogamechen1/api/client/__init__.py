@@ -114,7 +114,7 @@ class GogameChen1DBClient(GopDBClient):
     # -----------bond database api-----------------
     def bondto(self, entity, databases):
         resp, results = self.post(action=self.bond_path % str(entity), body=dict(databases=databases),
-                                  timout=15)
+                                  timeout=15)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='bond gogamechen1 databases fail:%d' % results['resultcode'],
                                             code=resp.status_code,
@@ -122,8 +122,8 @@ class GogameChen1DBClient(GopDBClient):
         return results
 
     def appentitys(self, entitys):
-        resp, results = self.post(action=self.appentitys_path, body=dict(entitys=entitys),
-                                  timout=15)
+        resp, results = self.get(action=self.appentitys_path, body=dict(appentitys=entitys),
+                                 timeout=15)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='get gogamechen1 entitys fail:%d' % results['resultcode'],
                                             code=resp.status_code,

@@ -58,8 +58,8 @@ class Routers(router.RoutersBase):
                            post_action='bondto')
 
         self._add_resource(mapper, game_controller,
-                   path='/%s/entitys' % common.NAME,
-                   get_action='entitys')
+                   path='/%s/appentitys' % common.NAME,
+                   get_action='appentitys')
 
         collection = mapper.collection(collection_name=collection_name,
                                        resource_name=resource_name,
