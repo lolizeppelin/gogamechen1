@@ -72,7 +72,7 @@ class GogameChen1DBClient(GopDBClient):
                                             resone=results['result'])
         return results
 
-    def group_create(self, name, desc=None):
+    def groups_create(self, name, desc=None):
         resp, results = self.post(action=self.groups_path, body=dict(name=name, desc=desc))
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='create gogamechen1 group fail:%d' % results['resultcode'],

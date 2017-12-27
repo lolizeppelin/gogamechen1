@@ -16,6 +16,7 @@ from simpleutil.utils import jsonutils
 from simpleutil.utils import singleton
 
 from simpleservice.ormdb.api import model_query
+from simpleservice.ormdb.exceptions import DBDuplicateEntry
 from simpleservice.rpc.exceptions import AMQPDestinationNotFound
 from simpleservice.rpc.exceptions import MessagingTimeout
 from simpleservice.rpc.exceptions import NoSuchMethod
@@ -84,7 +85,7 @@ class ObjtypeFileReuest(BaseContorller):
 
     def create(self, req, body=None):
         body = body or {}
-        subtype = body.pop('subtype', None)
+        subtype = utils.validate_string(body.pop('subtype', None))
         objtype = body.pop('objtype')
         version = body.pop('version', None)
         session = endpoint_session()
@@ -132,6 +133,7 @@ class ObjtypeFileReuest(BaseContorller):
 
 objfile_controller = ObjtypeFileReuest()
 
+
 @singleton.singleton
 class GroupReuest(BaseContorller):
 
@@ -167,11 +169,14 @@ class GroupReuest(BaseContorller):
     def create(self, req, body=None):
         body = body or {}
         session = endpoint_session()
-        name = body.get('name')
+        name = utils.validate_string(body.get('name'))
         desc = body.get('desc')
-        _group = Group(group=name, desc=desc)
+        _group = Group(name=name, desc=desc)
         session.add(_group)
-        session.flush()
+        try:
+            session.flush()
+        except DBDuplicateEntry:
+            raise InvalidArgument('Group name duplicate')
         return resultutils.results(result='create group success',
                                    data=[dict(group_id=_group.group_id,
                                               name=_group.name,
@@ -182,9 +187,9 @@ class GroupReuest(BaseContorller):
         detail = body.get('detail', False)
         session = endpoint_session(readonly=True)
         query = model_query(session, Group, filter=Group.group_id == group_id)
-        joins = joinedload(Group.entitys)
+        joins = joinedload(Group.entitys, innerjoin=False)
         if detail:
-            joins = joins.joinedload(AppEntity.areas)
+            joins = joins.joinedload(AppEntity.areas, innerjoin=False)
         query.options(joins)
         _group = query.one()
         group_info = dict(group_id=_group.group_id,
@@ -212,7 +217,7 @@ class GroupReuest(BaseContorller):
         body = body or {}
         session = endpoint_session()
         query = model_query(session, Group, filter=Group.group_id == group_id)
-        query.options(joinedload(Group.entitys))
+        query.options(joinedload(Group.entitys, innerjoin=False))
         _group = query.one()
         if _group.entitys:
             raise
@@ -224,6 +229,7 @@ class GroupReuest(BaseContorller):
         maps = areas_map(group_id)
         return resultutils.results(result='get group areas map success',
                                    data=[maps, ])
+
 
 @singleton.singleton
 class AppEntityReuest(BaseContorller):
@@ -267,7 +273,6 @@ class AppEntityReuest(BaseContorller):
         ports = entityinfo['ports']
         attributes = entityinfo['attributes']
         return attributes, ports
-
 
     def index(self, req, group_id, objtype, body=None):
         body = body or {}
@@ -313,7 +318,6 @@ class AppEntityReuest(BaseContorller):
             column.setdefault('areas', maps.get(column.get('entity', [])))
         return results
 
-
     def create(self, req, group_id, objtype, body=None):
         body = body or {}
         jsonutils.schema_validate(body, self.CREATEAPPENTITY)
@@ -337,8 +341,8 @@ class AppEntityReuest(BaseContorller):
         databases = dbselect(objtype, body.get('databases'))
         session = endpoint_session()
         query = model_query(session, Group, filter=Group.group_id == group_id)
-        joins = joinedload(Group.entitys)
-        joins = joins.joinedload(AppEntity.databases)
+        joins = joinedload(Group.entitys, innerjoin=False)
+        joins = joins.joinedload(AppEntity.databases, innerjoin=False)
         query = query.options(joins)
         _group = query.one()
         next_area = _group.lastarea + 1
@@ -442,9 +446,9 @@ class AppEntityReuest(BaseContorller):
         detail = body.get('detail', False)
         session = endpoint_session(readonly=True)
         query = model_query(session, Group, filter=Group.group_id == group_id)
-        joins = joinedload(Group.entitys)
+        joins = joinedload(Group.entitys, innerjoin=False)
         if detail:
-            joins = joins.joinedload(AppEntity.databases)
+            joins = joins.joinedload(AppEntity.databases, innerjoin=False)
         query = query.options(joins)
         group = query.filter(and_(AppEntity.entity == entity, AppEntity.objtype == objtype)).one()
         _entity = group.entitys[0]
@@ -499,7 +503,7 @@ class AppEntityReuest(BaseContorller):
         query = model_query(session, AppEntity, filter=AppEntity.entity.in_(chiefs.value))
 
         if detail:
-            query = query.options(joinedload(AppEntity.databases))
+            query = query.options(joinedload(AppEntity.databases, innerjoin=False))
             g = eventlet.spawn(entity_controller._shows, endpoint=common.NAME, entitys=chiefs.value)
 
 
