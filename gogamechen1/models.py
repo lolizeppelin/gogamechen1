@@ -46,7 +46,7 @@ class AreaDatabase(TableBase):
     ro_passwd = sa.Column(VARCHAR(128), default=None, nullable=False)
 
     __table_args__ = (
-        sa.UniqueConstraint('entity', 'objtype', name='type_unique'),
+        sa.UniqueConstraint('entity', 'subtype', name='type_unique'),
         InnoDBTableBase.__table_args__
     )
 
@@ -60,7 +60,7 @@ class GameArea(TableBase):
     cross_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
 
     __table_args__ = (
-        sa.Index('group_id', name='group_index'),
+        sa.Index('group_index', 'group_id'),
         sa.UniqueConstraint('area_id', 'group_id', name='area_id_unique'),
         InnoDBTableBase.__table_args__
     )
@@ -79,7 +79,7 @@ class AppEntity(TableBase):
                                  cascade='delete,delete-orphan')
 
     __table_args__ = (
-        sa.Index('agent_id', name='agent_id_unique'),
+        sa.Index('agent_id_index', 'agent_id'),
         InnoDBTableBase.__table_args__
     )
 
@@ -96,6 +96,6 @@ class Group(TableBase):
                                cascade='delete,delete-orphan')
 
     __table_args__ = (
-        sa.UniqueConstraint('group', name='group_unique'),
+        sa.UniqueConstraint('name', name='group_unique'),
         InnoDBTableBase.__table_args__
     )
