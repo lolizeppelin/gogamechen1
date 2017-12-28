@@ -75,12 +75,6 @@ class GogameDatabaseCreateTask(StandardTask):
                                                                          ro_user=self.database.ro_user,
                                                                          ro_passwd=self.database.ro_passwd))
 
-        def _bond():
-            # 本地绑定数据库记录
-            appendpoint.client.bondto(self.middleware.entity, self.middleware.databases)
-
-        threadpool.add_thread(_bond)
-
     def revert(self, *args, **kwargs):
         result = kwargs.get('result') or args[0]
         super(GogameDatabaseCreateTask, self).revert(result, **kwargs)

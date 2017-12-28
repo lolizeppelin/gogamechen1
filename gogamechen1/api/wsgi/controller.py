@@ -593,7 +593,7 @@ class AppEntityReuest(BaseContorller):
         session = endpoint_session()
         with session.begin():
             for subtype, database in six.iteritems(databases):
-                LOG.info('Bond entity to database %d' % database.get('database_id'))
+                LOG.info('Bond entity %d to database %d' % (entity, database.get('database_id')))
                 session.add(AreaDatabase(quote_id=database.get('quote_id'),
                                          database_id=database.get('database_id'),
                                          entity=entity, subtype=subtype,

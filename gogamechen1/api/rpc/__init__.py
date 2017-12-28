@@ -228,8 +228,12 @@ class Application(AppEndpointBase):
                     LOG.error('%s' % str(databases))
                     return
                 eventlet.sleep(0.1)
-            # init config file
+
+            def _bond():
+                self.client.bondto(self.middleware.entity, self.middleware.databases)
+
             LOG.info('Try bond database')
+            threadpool.add_thread(_bond)
             self.flush_config(entity, databases, chiefs)
 
         threadpool.add_thread(_postdo)
