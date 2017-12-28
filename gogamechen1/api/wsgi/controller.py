@@ -538,7 +538,7 @@ class AppEntityReuest(BaseContorller):
         attributes, ports = self._entityinfo(req=req, entity=entity)
         if not attributes:
             raise InvalidArgument('Agent offline, can not delete entity')
-        with glock.grouplock(group_id=group_id):
+        with glock.grouplock(group=group_id):
             with session.begin():
                 query = model_query(session, AppEntity, filter=and_(AppEntity.entity == entity,
                                                                     AppEntity.objtype == objtype))

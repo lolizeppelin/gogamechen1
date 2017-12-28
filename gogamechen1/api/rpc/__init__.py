@@ -179,16 +179,16 @@ class Application(AppEndpointBase):
         if not _pid:
             _pid = self._find_from_pids(entity, objtype)
         if not _pid:
-            self.konwn_database[entity]['pid'] = None
+            self.konwn_appentitys[entity]['pid'] = None
             return None
         try:
             p = psutil.Process(pid=_pid)
             info = dict(pid=p.pid, exe=p.exe(), pwd=p.cwd(), username=p.username())
             setattr(p, 'info', info)
-            self.konwn_database[entity]['pid'] = _pid
+            self.konwn_appentitys[entity]['pid'] = _pid
             return p
         except psutil.NoSuchProcess:
-            self.konwn_database[entity]['pid'] = None
+            self.konwn_appentitys[entity]['pid'] = None
             return None
 
     def flush_config(self, entity, databases, chiefs=None):
@@ -213,20 +213,23 @@ class Application(AppEndpointBase):
 
     def create_entity(self, entity, objtype, objfile, timeout,
                       databases, chiefs):
-        timeout = timeout if timeout else 300
+        timeout = timeout if timeout else 30
         overtime = int(time.time()) + timeout
         # wait = zlibutils.async_extract(src=objfile, dst=self.apppath(entity), timeout=timeout,
         #                                fork=functools.partial(safe_fork, self.entity_user(entity),
         #                                                       self.entity_group(entity)),
         #                                exclude=self._exclude(objtype))
-
         def _postdo():
             # wait()
-            with entity not in self.konwn_appentitys:
+            while entity not in self.konwn_appentitys:
                 if int(time.time()) > overtime:
+                    LOG.error('Get entity %d from konwn appentity fail, database not bond' % entity)
+                    LOG.error('%s' % str(chiefs))
+                    LOG.error('%s' % str(databases))
                     return
                 eventlet.sleep(0.1)
             # init config file
+            LOG.info('Try bond database')
             self.flush_config(entity, databases, chiefs)
 
         threadpool.add_thread(_postdo)
@@ -273,6 +276,7 @@ class Application(AppEndpointBase):
                                           result=result)
 
     def rpc_post_create_entity(self, ctxt, entity, **kwargs):
+        LOG.info('Get post create command with %s' % str(kwargs))
         self.konwn_appentitys.setdefault(entity, dict(objtype=kwargs.pop('objtype'),
                                                       group_id=kwargs.pop('group_id'),
                                                       pid=None))
