@@ -35,7 +35,7 @@ class ObjtypeFile(TableBase):
 class AreaDatabase(TableBase):
     quote_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
     database_id = sa.Column(INTEGER(unsigned=True), nullable=False)
-    entity = sa.Column(sa.ForeignKey('appentitys.entity', ondelete="RESTRICT", onupdate='RESTRICT'),
+    entity = sa.Column(sa.ForeignKey('appentitys.entity', ondelete="CASCADE", onupdate='RESTRICT'),
                        nullable=False)
     subtype = sa.Column(VARCHAR(64), nullable=False)
     host = sa.Column(VARCHAR(200), default=None, nullable=False)

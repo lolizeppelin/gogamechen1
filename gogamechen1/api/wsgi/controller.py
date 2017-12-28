@@ -32,6 +32,7 @@ from goperation.manager.wsgi.file.controller import FileReuest
 from goperation.manager.wsgi.exceptions import RpcPrepareError
 from goperation.manager.wsgi.exceptions import RpcResultError
 
+from gopdb import common as dbcommon
 from gopdb.api.wsgi.controller import SchemaReuest
 
 from gogamechen1 import common
@@ -548,8 +549,16 @@ class AppEntityReuest(BaseContorller):
                 _entity = query.one()
                 if _entity.status == common.OK:
                     raise InvalidArgument('Entity is active, unactive before delete it')
-                # esure delete
+                if objtype == common.GMSERVER:
+                    if model_count_with_key(session, AppEntity, filter=AppEntity.group_id == group_id) > 1:
+                        raise InvalidArgument('You must delete other objtype entity before delete gm')
+                elif objtype == common.CROSSSERVER:
+                    if model_count_with_key(session, GameArea, filter=GameArea.cross_id == _entity.entity):
+                        raise InvalidArgument('Cross server are reflected')
+
+                # esure database delete
                 if clean == 'delete':
+                    LOG.warning('Clean option is delete, can not rollback when fail')
                     for _database in _entity.databases:
                         schema = '%s_%s_%s_%d' % (common.NAME, objtype, _database.subtype, entity)
                         quotes = schema_controller.show(req=req, database_id=_database.database_id,
@@ -559,11 +568,12 @@ class AppEntityReuest(BaseContorller):
                             result = 'delete %s:%d fail' %  (objtype, entity)
                             reason = ': database [%d].%s quote: %s' % (_database.database_id, schema, str(quotes))
                             return resultutils.results(result=(result + reason))
-                        LOG.info('Quotes check success for %s' % schema)
+                        LOG.info('Delete quotes check success for %s' % schema)
                 # clean database
+                rollbacks = []
                 for _database in _entity.databases:
+                    schema = '%s_%s_%s_%d' % (common.NAME, objtype, _database.subtype, entity)
                     if clean == 'delete':
-                        schema = '%s_%s_%s_%d' % (common.NAME, objtype, _database.subtype, entity)
                         LOG.warning('Delete schema %s from %d' % (schema, _database.database_id))
                         try:
                             schema_controller.delete(req=req, database_id=_database.database_id,
@@ -573,20 +583,38 @@ class AppEntityReuest(BaseContorller):
                     elif clean == 'unquote':
                         LOG.info('Try unquote %d' % _database.quote_id)
                         try:
-                            schema_controller.unquote(req=req, quote_id=_database.quote_id)
+                            quote = schema_controller.unquote(req=req, quote_id=_database.quote_id)['data'][0]
+                            if quote.get('database_id') != _database.database_id:
+                                LOG.critical('quote %d with database %d, not %d' % (_database.quote_id,
+                                                                                    quote.get('database_id'),
+                                                                                    _database.database_id))
+                                raise RuntimeError('Data error, quote database not the same')
+                            rollbacks.append(dict(database_id=_database.database_id,
+                                                  quote_id=_database.quote_id, schema=schema))
                         except Exception:
-                            LOG.error('Unquote %d fail' % _database.quote_id)
-
-                if objtype == common.GMSERVER:
-                    if model_count_with_key(session, AppEntity, filter=AppEntity.group_id == group_id) > 1:
-                        raise InvalidArgument('You must delete other objtype entity before delete gm')
-                elif objtype == common.CROSSSERVER:
-                    if model_count_with_key(session, GameArea, filter=GameArea.cross_id == _entity.entity):
-                        raise InvalidArgument('Cross server are reflected')
+                            LOG.error('Unquote %d fail, try rollback' % _database.quote_id)
                 token = uuidutils.generate_uuid()
                 LOG.info('Send delete command with token %s' % token)
-                entity_controller.delete(req, common.NAME, entity=entity, body=dict(token=token))
-                _entity.delete()
+                try:
+                    entity_controller.delete(req, common.NAME, entity=entity, body=dict(token=token))
+                except Exception:
+                    # roll back unquote
+                    def _rollback():
+                        for back in rollbacks:
+                            database_id=back.get('database_id')
+                            schema=back.get('schema')
+                            quote_id=back.get('quote_id')
+                            body = dict(quote_id=quote_id,
+                                        entity=entity)
+                            body.setdefault(dbcommon.ENDPOINTKEY, common.NAME)
+                            try:
+                                schema_controller.bond(req, database_id=database_id, schema=schema, body=body)
+                            except Exception:
+                                LOG.error('rollback entity %d quote %d.%s.%d fail' %
+                                          (entity, database_id, schema, quote_id))
+                    threadpool.add_thread(_rollback)
+                    raise
+                query.delete()
         return resultutils.results(result='delete %s:%d success' % (objtype, entity),
                                    data=[dict(entity=entity, objtype=objtype,
                                               ports=ports, attributes=attributes)])
@@ -611,6 +639,8 @@ class AppEntityReuest(BaseContorller):
 
     def entitys(self, req, body=None):
         entitys = body.get('entitys')
+        if not entitys:
+            return resultutils.results(result='not any app entitys found')
         session = endpoint_session(readonly=True)
         query = model_query(session, AppEntity, filter=AppEntity.entity.in_(entitys))
         return resultutils.results(result='get app entitys success',
