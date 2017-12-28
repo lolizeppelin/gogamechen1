@@ -34,7 +34,7 @@ class ObjtypeFile(TableBase):
 
 class AreaDatabase(TableBase):
     quote_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
-    # databae_id = sa.Column(INTEGER(unsigned=True), nullable=False)
+    databae_id = sa.Column(INTEGER(unsigned=True), nullable=False)
     entity = sa.Column(sa.ForeignKey('appentitys.entity', ondelete="RESTRICT", onupdate='RESTRICT'),
                        nullable=False)
     subtype = sa.Column(VARCHAR(64), nullable=False)

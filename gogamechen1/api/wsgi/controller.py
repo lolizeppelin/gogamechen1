@@ -1,7 +1,5 @@
 # -*- coding:utf-8 -*-
-import re
 import six
-import random
 import eventlet
 import webob.exc
 from six.moves import zip
@@ -14,9 +12,11 @@ from sqlalchemy.sql import and_
 from simpleutil.common.exceptions import InvalidArgument
 from simpleutil.log import log as logging
 from simpleutil.utils import jsonutils
+from simpleutil.utils import uuidutils
 from simpleutil.utils import singleton
 
 from simpleservice.ormdb.api import model_query
+from simpleservice.ormdb.api import model_count_with_key
 from simpleservice.ormdb.exceptions import DBDuplicateEntry
 from simpleservice.rpc.exceptions import AMQPDestinationNotFound
 from simpleservice.rpc.exceptions import MessagingTimeout
@@ -31,6 +31,8 @@ from goperation.manager.wsgi.entity.controller import EntityReuest
 from goperation.manager.wsgi.file.controller import FileReuest
 from goperation.manager.wsgi.exceptions import RpcPrepareError
 from goperation.manager.wsgi.exceptions import RpcResultError
+
+from gopdb.api.wsgi.controller import SchemaReuest
 
 from gogamechen1 import common
 from gogamechen1 import utils
@@ -60,6 +62,7 @@ FAULT_MAP = {InvalidArgument: webob.exc.HTTPClientError,
 
 entity_controller = EntityReuest()
 file_controller = FileReuest()
+schema_controller = SchemaReuest()
 
 
 @singleton.singleton
@@ -527,6 +530,61 @@ class AppEntityReuest(BaseContorller):
 
     def delete(self, req, group_id, objtype, entity, body=None):
         body = body or {}
+        clean = body.get('clean', 'unquote')
+        group_id = int(group_id)
+        entity = int(entity)
+        session = endpoint_session()
+        glock = get_gamelock()
+        attributes, ports = self._entityinfo(req=req, entity=entity)
+        if not attributes:
+            raise InvalidArgument('Agent offline, can not delete entity')
+        with glock.grouplock(group_id=group_id):
+            with session.begin():
+                query = model_query(session, AppEntity, filter=and_(AppEntity.entity == entity,
+                                                                    AppEntity.objtype == objtype))
+                query.options(joinedload(AppEntity.databases, innerjoin=False))
+                _entity = query.one()
+                if _entity.status == common.OK:
+                    raise InvalidArgument('Entity is active, unactive before delete it')
+                # esure delete
+                if clean == 'delete':
+                    for _database in _entity.databases:
+                        schema = '%s_%s_%s_%d' % (common.NAME, objtype, _database.subtype, entity)
+                        quotes = schema_controller.show(req=req, database_id=_database.database_id,
+                                                        schema=schema,
+                                                        body={'quotes': True})['data'][0]['quotes']
+                        if set(quotes) != set([_database.quote_id]):
+                            result = 'delete %s:%d fail' %  (objtype, entity)
+                            reason = ': database [%d].%s quote: %s' % (_database.database_id, schema, str(quotes))
+                            return resultutils.results(result=(result + reason))
+                # clean database
+                for _database in _entity.databases:
+                    if clean == 'delete':
+                        schema = '%s_%s_%s_%d' % (common.NAME, objtype, _database.subtype, entity)
+                        LOG.warning('Delete schema %s from %d' % (schema, _database.database_id))
+                        try:
+                            schema_controller.delete(req=req, database_id=_database.database_id,
+                                                     schema=schema, body={'unquotes': [_database.quote_id]})
+                        except Exception:
+                            LOG.error('Delete %s from %d fail' % (schema, _database.database_id))
+                    elif clean == 'unquote':
+                        try:
+                            schema_controller.unquote(req=req, quote_id=_database.quote_id)
+                        except Exception:
+                            LOG.error('Unquote %d fail' % _database.quote_id)
+
+                if objtype == common.GMSERVER:
+                    if model_count_with_key(session, AppEntity, filter=AppEntity.group_id == group_id) > 1:
+                        raise InvalidArgument('You must delete other objtype entity before delete gm')
+                elif objtype == common.CROSSSERVER:
+                    if model_count_with_key(session, GameArea, filter=GameArea.cross_id == _entity.entity):
+                        raise InvalidArgument('Cross server are reflected')
+                token = uuidutils.generate_uuid()
+                LOG.info('Send delete command with token %s' % token)
+                entity_controller.delete(req, common.NAME, entity=entity, body=dict(token=token))
+        return resultutils.results(result='delete %s:%d success' % (objtype, entity),
+                                   data=[dict(entity=entity, objtype=objtype,
+                                              ports=ports, attributes=attributes)])
 
     def bondto(self, req, entity, body=None):
         body = body or {}
@@ -537,8 +595,8 @@ class AppEntityReuest(BaseContorller):
             for subtype, database in six.iteritems(databases):
                 LOG.info('Bond entity to database %d' % database.get('database_id'))
                 session.add(AreaDatabase(quote_id=database.get('quote_id'),
-                                         # database_id=database.get('database_id'),
-                                         entity=database.get('entity'), subtype=subtype,
+                                         database_id=database.get('database_id'),
+                                         entity=entity, subtype=subtype,
                                          host=database.get('host'), port=database.get('port'),
                                          user=database.get('user'), passwd=database.get('passwd'),
                                          ro_user=database.get('ro_user'), ro_passwd=database.get('ro_passwd'))

@@ -104,6 +104,7 @@ class Application(AppEndpointBase):
                 group_id = entityinfo.get('group_id')
                 if _entity in self.konwn_appentitys:
                     raise RuntimeError('App Entity %d Duplicate' % _entity)
+                LOG.info('Entity %d type %s, group %d' % (_entity, objtype, group_id))
                 self.konwn_appentitys.setdefault(_entity, dict(objtype=objtype,group_id=group_id,
                                                                pid=None))
         # find entity pid
@@ -269,10 +270,7 @@ class Application(AppEndpointBase):
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           ctxt=ctxt,
                                           resultcode=resultcode,
-                                          result=result,
-                                          details=[dict(detail_id=entity,
-                                                   resultcode=resultcode,
-                                                   result='wait %s start' % objtype)])
+                                          result=result)
 
     def rpc_post_create_entity(self, ctxt, entity, **kwargs):
         self.konwn_appentitys.setdefault(entity, dict(objtype=kwargs.pop('objtype'),
@@ -293,7 +291,6 @@ class Application(AppEndpointBase):
             eventlet.sleep(1)
             timeout -= 1
         timeout = min(1, timeout)
-        details = []
         with self.lock(entity, timeout):
             if entity not in set(self.entitys):
                 return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
@@ -311,14 +308,10 @@ class Application(AppEndpointBase):
                 resultcode = manager_common.RESULT_ERROR
                 result = 'delete %d fail with %s:%s' % (entity, e.__class__.__name__,
                                                         str(e.message) if hasattr(e, 'message') else 'unknown err msg')
-        details.append(dict(detail_id=entity,
-                            resultcode=resultcode,
-                            result=result))
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           ctxt=ctxt,
                                           resultcode=resultcode,
-                                          result=result,
-                                          details=details)
+                                          result=result)
 
     def rpc_start_entity(self, ctxt, entity, **kwargs):
         pass
