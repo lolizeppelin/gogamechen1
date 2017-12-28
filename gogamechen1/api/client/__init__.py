@@ -159,9 +159,9 @@ class GogameChen1DBClient(GopDBClient):
     def game_update(self, group_id, entity, detail=False):
         raise NotImplementedError
 
-    def game_delete(self, group_id, entity, detail=False):
+    def game_delete(self, group_id, entity, clean='unquote'):
         resp,results = self.delete(action=self.game_path % (str(group_id), str(entity)),
-                                 body=dict(detail=detail))
+                                 body=dict(clean=clean))
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='delete gogamechen1 gameserver fail:%d' % results['resultcode'],
                                             code=resp.status_code,
@@ -197,9 +197,9 @@ class GogameChen1DBClient(GopDBClient):
     def gm_update(self, group_id, entity, detail=False):
         raise NotImplementedError
 
-    def gm_delete(self, group_id, entity, detail=False):
+    def gm_delete(self, group_id, entity, clean='unquote'):
         resp,results = self.delete(action=self.gm_path % (str(group_id), str(entity)),
-                                 body=dict(detail=detail))
+                                 body=dict(clean=clean))
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='delete gogamechen1 gmserver fail:%d' % results['resultcode'],
                                             code=resp.status_code,
@@ -236,9 +236,9 @@ class GogameChen1DBClient(GopDBClient):
     def cross_update(self, group_id, entity, detail=False):
         raise NotImplementedError
 
-    def cross_delete(self, group_id, entity, detail=False):
+    def cross_delete(self, group_id, entity, clean='unquote'):
         resp,results = self.delete(action=self.cross_path % (str(group_id), str(entity)),
-                                 body=dict(detail=detail))
+                                 body=dict(clean=clean))
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='delete gogamechen1 gmserver fail:%d' % results['resultcode'],
                                             code=resp.status_code,

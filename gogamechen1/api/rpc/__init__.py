@@ -210,6 +210,7 @@ class Application(AppEndpointBase):
             else:
                 self._free_ports(entity)
                 self.entitys_map.pop(entity)
+                systemutils.drop_user(self.entity_user(entity))
 
     def create_entity(self, entity, objtype, objfile, timeout,
                       databases, chiefs):

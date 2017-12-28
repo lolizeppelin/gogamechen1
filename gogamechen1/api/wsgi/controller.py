@@ -580,6 +580,8 @@ class AppEntityReuest(BaseContorller):
                                                      schema=schema, body={'unquotes': [_database.quote_id]})
                         except Exception:
                             LOG.error('Delete %s from %d fail' % (schema, _database.database_id))
+                            if LOG.isEnabledFor(logging.DEBUG):
+                                LOG.exception('Delete schema fail')
                     elif clean == 'unquote':
                         LOG.info('Try unquote %d' % _database.quote_id)
                         try:
