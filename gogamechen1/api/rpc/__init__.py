@@ -228,12 +228,9 @@ class Application(AppEndpointBase):
                     LOG.error('%s' % str(databases))
                     return
                 eventlet.sleep(0.1)
-
-            def _bond():
-                self.client.bondto(self.middleware.entity, self.middleware.databases)
-
             LOG.info('Try bond database')
-            threadpool.add_thread(_bond)
+            self.client.bondto(entity, databases)
+            LOG.info('Try bond database success, flush config')
             self.flush_config(entity, databases, chiefs)
 
         threadpool.add_thread(_postdo)
@@ -264,7 +261,7 @@ class Application(AppEndpointBase):
                                                           ctxt=ctxt,
                                                           resultcode=manager_common.RESULT_ERROR,
                                                           result=str(middleware))
-                    self.konwn_appentitys.setdefault(entity, dict(objtype=objtype, pid=None))
+                    # self.konwn_appentitys.setdefault(entity, dict(objtype=objtype, pid=None))
                     def _port_notity():
                         """notify port bond"""
                         self.client.ports_add(agent_id=self.manager.agent_id,

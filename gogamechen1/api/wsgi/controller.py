@@ -531,6 +531,8 @@ class AppEntityReuest(BaseContorller):
     def delete(self, req, group_id, objtype, entity, body=None):
         body = body or {}
         clean = body.get('clean', 'unquote')
+        if clean not in ('delete', 'unquote'):
+            raise InvalidArgument('clean option value error')
         group_id = int(group_id)
         entity = int(entity)
         session = endpoint_session()
@@ -557,6 +559,7 @@ class AppEntityReuest(BaseContorller):
                             result = 'delete %s:%d fail' %  (objtype, entity)
                             reason = ': database [%d].%s quote: %s' % (_database.database_id, schema, str(quotes))
                             return resultutils.results(result=(result + reason))
+                        LOG.info('Quotes check success for %s' % schema)
                 # clean database
                 for _database in _entity.databases:
                     if clean == 'delete':
@@ -568,6 +571,7 @@ class AppEntityReuest(BaseContorller):
                         except Exception:
                             LOG.error('Delete %s from %d fail' % (schema, _database.database_id))
                     elif clean == 'unquote':
+                        LOG.info('Try unquote %d' % _database.quote_id)
                         try:
                             schema_controller.unquote(req=req, quote_id=_database.quote_id)
                         except Exception:
@@ -582,6 +586,7 @@ class AppEntityReuest(BaseContorller):
                 token = uuidutils.generate_uuid()
                 LOG.info('Send delete command with token %s' % token)
                 entity_controller.delete(req, common.NAME, entity=entity, body=dict(token=token))
+                _entity.delete()
         return resultutils.results(result='delete %s:%d success' % (objtype, entity),
                                    data=[dict(entity=entity, objtype=objtype,
                                               ports=ports, attributes=attributes)])
