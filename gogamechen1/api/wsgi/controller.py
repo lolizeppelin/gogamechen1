@@ -12,6 +12,7 @@ from sqlalchemy.sql import and_
 from simpleutil.common.exceptions import InvalidArgument
 from simpleutil.log import log as logging
 from simpleutil.utils import jsonutils
+from simpleutil.utils import argutils
 from simpleutil.utils import uuidutils
 from simpleutil.utils import singleton
 
@@ -23,9 +24,11 @@ from simpleservice.rpc.exceptions import MessagingTimeout
 from simpleservice.rpc.exceptions import NoSuchMethod
 
 from goperation import threadpool
+from goperation.utils import safe_func_wrapper
 from goperation.manager import common as manager_common
 from goperation.manager.exceptions import CacheStoneError
 from goperation.manager.utils import resultutils
+from goperation.manager.utils import targetutils
 from goperation.manager.wsgi.contorller import BaseContorller
 from goperation.manager.wsgi.entity.controller import EntityReuest
 from goperation.manager.wsgi.file.controller import FileReuest
@@ -64,6 +67,18 @@ FAULT_MAP = {InvalidArgument: webob.exc.HTTPClientError,
 entity_controller = EntityReuest()
 file_controller = FileReuest()
 schema_controller = SchemaReuest()
+
+
+def areas_map(group_id):
+    session = endpoint_session(readonly=True)
+    query = model_query(session, GameArea, filter=GameArea.group_id == group_id)
+    maps = {}
+    for _areas in query:
+        try:
+            maps[_areas.entity].append(_areas.area_id)
+        except KeyError:
+            maps[_areas.entity] = [_areas.area_id, ]
+    return maps
 
 
 @singleton.singleton
@@ -280,7 +295,7 @@ class AppEntityReuest(BaseContorller):
 
     def _entityinfo(self, req, entity):
         entityinfo = entity_controller.show(req=req, entity=entity,
-                                         endpoint=common.NAME, body={'ports': True})['data'][0]
+                                            endpoint=common.NAME, body={'ports': True})['data'][0]
         ports = entityinfo['ports']
         attributes = entityinfo['attributes']
         return attributes, ports
@@ -295,10 +310,10 @@ class AppEntityReuest(BaseContorller):
 
         session = endpoint_session(readonly=True)
         columns = [AppEntity.entity,
-                  AppEntity.group_id,
-                  AppEntity.status,
-                  AppEntity.objtype,
-                  ]
+                   AppEntity.group_id,
+                   AppEntity.agent_id,
+                   AppEntity.status,
+                   AppEntity.objtype]
 
         th = eventlet.spawn(areas_map, group_id)
 
@@ -314,15 +329,15 @@ class AppEntityReuest(BaseContorller):
                                            order=order, desc=desc,
                                            option=option,
                                            filter=and_(AppEntity.group_id == group_id,
-                                                            AppEntity.objtype == objtype),
+                                                       AppEntity.objtype == objtype),
                                            page_num=page_num)
         maps = th.wait()
 
         if not results['data']:
             return results
 
-        emaps = entity_controller._shows(endpoint=common.NAME, entitys=[column.get('entity')
-                                                                        for column in results['data']])
+        emaps = entity_controller._shows(endpoint=common.NAME,
+                                         entitys=[column.get('entity') for column in results['data']])
 
         for column in results['data']:
             entity = column.get('entity')
@@ -335,7 +350,10 @@ class AppEntityReuest(BaseContorller):
                                                     host=database.host, port=database.port,
                                                     ))
             column.setdefault('areas', maps.get(column.get('entity', [])))
-            column['agent_id'] = entityinfo.get('agent_id')
+            # column['agent_id'] = entityinfo.get('agent_id')
+            if column['agent_id'] != entityinfo.get('agent_id'):
+                raise RuntimeError('Entity agent id %d not the same as %d' % (column['agent_id'],
+                                                                              entityinfo.get('agent_id')))
             column['ports'] = entityinfo.get('ports')
             attributes = entityinfo.get('attributes')
             if attributes:
@@ -468,7 +486,7 @@ class AppEntityReuest(BaseContorller):
                                                    endpoint=common.NAME, body=body)['data'][0]
                 # 插入实体信息
                 appentity = AppEntity(entity=_entity.get('entity'),
-                                      # agent_id=_entity.get('agent_id'),
+                                      agent_id=agent_id,
                                       group_id=group_id, objtype=objtype)
                 session.add(appentity)
                 session.flush()
@@ -509,7 +527,9 @@ class AppEntityReuest(BaseContorller):
         _entity = group.entitys[0]
         attributes, ports = self._entityinfo(req, entity)
         return resultutils.results(result='show %s areas success' % objtype,
-                                   data=[dict(entity=_entity.entity, objtype=objtype,
+                                   data=[dict(entity=_entity.entity,
+                                              agent_id=_entity.agent_id,
+                                              objtype=objtype, group_id=_entity.group_id,
                                               status=_entity.status,
                                               areas=[area.area_id for area in _entity.areas],
                                               databases=[dict(quote_id=database.quote_id,
@@ -603,17 +623,16 @@ class AppEntityReuest(BaseContorller):
                     # roll back unquote
                     def _rollback():
                         for back in rollbacks:
-                            database_id=back.get('database_id')
-                            schema=back.get('schema')
-                            quote_id=back.get('quote_id')
-                            body = dict(quote_id=quote_id,
-                                        entity=entity)
+                            __database_id = back.get('database_id')
+                            __schema = back.get('schema')
+                            __quote_id = back.get('quote_id')
+                            body = dict(quote_id=__quote_id, entity=entity)
                             body.setdefault(dbcommon.ENDPOINTKEY, common.NAME)
                             try:
-                                schema_controller.bond(req, database_id=database_id, schema=schema, body=body)
+                                schema_controller.bond(req, database_id=__database_id, schema=__schema, body=body)
                             except Exception:
                                 LOG.error('rollback entity %d quote %d.%s.%d fail' %
-                                          (entity, database_id, schema, quote_id))
+                                          (entity, __database_id, schema, __quote_id))
                     threadpool.add_thread(_rollback)
                     raise
                 query.delete()
@@ -650,14 +669,41 @@ class AppEntityReuest(BaseContorller):
                                               group_id=_entity.group_id,
                                               objtype=_entity.objtype) for _entity in query])
 
+    def _async_bluck_rpc(self, action, group_id, objtype, entity, body):
+        body = body or {}
+        entitys = argutils.map_to_int(entity)
+        asyncrequest = self.create_asyncrequest(body)
+        target = targetutils.target_endpoint(common.NAME)
+        session = endpoint_session(readonly=True)
+        query = model_query(session, AppEntity, filter=and_(AppEntity.group_id == group_id,
+                                                            AppEntity.objtype == objtype))
+        agents = set()
+        count = 0
+        for _entity in query:
+            if _entity.entity in entitys:
+                if action != 'stop' and _entity.status != common.OK:
+                    raise InvalidArgument('Entity %d status not ok' % _entity.entity)
+                agents.add(_entity.agent_id)
+                count += 1
+        if count != len(entitys):
+            raise InvalidArgument('No entitys found')
 
-def areas_map(group_id):
-    session = endpoint_session(readonly=True)
-    query = model_query(session, GameArea, filter=GameArea.group_id == group_id)
-    maps = {}
-    for _areas in query:
-        try:
-            maps[_areas.entity].append(_areas.area_id)
-        except KeyError:
-            maps[_areas.entity] = [_areas.area_id, ]
-    return maps
+        rpc_ctxt = dict(agents=list(agents))
+        rpc_method = '%s_entitys' % action
+        rpc_args = dict(entitys=entitys)
+        rpc_args.update(body)
+        def wapper():
+            self.send_asyncrequest(asyncrequest, target,
+                                   rpc_ctxt, rpc_method, rpc_args)
+        threadpool.add_thread(safe_func_wrapper, wapper, LOG)
+        return resultutils.results(result='%s gogamechen1 entitys spawning',
+                                   data=[asyncrequest.to_dict()])
+
+    def start(self, req, group_id, objtype, entity, body):
+        return self._async_bluck_rpc('start', group_id, objtype, entity, body)
+
+    def stop(self, req, group_id, objtype, entity, body):
+        return self._async_bluck_rpc('start', group_id, objtype, entity, body)
+
+    def status(self, req, group_id, objtype, entity, body):
+        return self._async_bluck_rpc('start', group_id, objtype, entity, body)

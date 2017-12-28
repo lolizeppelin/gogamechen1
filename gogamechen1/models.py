@@ -68,7 +68,7 @@ class GameArea(TableBase):
 
 class AppEntity(TableBase):
     entity = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
-    # agent_id = sa.Column(INTEGER(unsigned=True), nullable=False)
+    agent_id = sa.Column(INTEGER(unsigned=True), nullable=False)
     group_id = sa.Column(sa.ForeignKey('groups.group_id', ondelete="RESTRICT", onupdate='RESTRICT'),
                          nullable=False)
     objtype = sa.Column(VARCHAR(64), nullable=False)

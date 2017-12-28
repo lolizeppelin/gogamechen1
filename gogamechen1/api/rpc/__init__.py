@@ -10,7 +10,7 @@ import functools
 from collections import namedtuple
 
 from simpleutil.utils import uuidutils
-from simpleutil.utils import jsonutils
+from simpleutil.utils import argutils
 from simpleutil.utils import singleton
 from simpleutil.utils import systemutils
 from simpleutil.log import log as logging
@@ -320,11 +320,28 @@ class Application(AppEndpointBase):
                                           resultcode=resultcode,
                                           result=result)
 
-    def rpc_start_entity(self, ctxt, entity, **kwargs):
-        pass
+    def rpc_start_entitys(self, ctxt, entitys, **kwargs):
+        entitys = argutils.map_to_int(entitys) & set(self.entitys)
+        if not entitys:
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='start entitys fail, no entitys found')
 
-    def rpc_stop_entity(self, ctxt, entity, **kwargs):
-        pass
+    def rpc_stop_entitys(self, ctxt, entitys, **kwargs):
+        entitys = argutils.map_to_int(entitys) & set(self.entitys)
+        if not entitys:
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='stop entitys fail, no entitys found')
 
-    def rpc_status_entity(self, ctxt, entity, **kwargs):
-        p = self._entity_process(entity)
+
+    def rpc_status_entitys(self, ctxt, entitys, **kwargs):
+        entitys = argutils.map_to_int(entitys) & set(self.entitys)
+        if not entitys:
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='status entitys fail, no entitys found')
+
