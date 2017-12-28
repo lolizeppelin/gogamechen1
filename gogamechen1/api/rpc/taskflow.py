@@ -169,11 +169,12 @@ def create_entity(appendpoint, entity, objtype, databases,
 
     try:
         engine.run()
-        return middleware
     except Exception:
-        LOG.error('create middleware result %s' % str(middleware))
-        raise
+        if LOG.isEnabledFor(logging.DEBUG):
+            LOG.exception('Task execute fail')
+        # raise
     finally:
         connection.destroy_logbook(book.uuid)
         for dberror in middleware.dberrors:
             LOG.error(str(dberror))
+    return middleware

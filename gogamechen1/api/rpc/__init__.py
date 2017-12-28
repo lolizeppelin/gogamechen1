@@ -258,11 +258,11 @@ class Application(AppEndpointBase):
                     middleware = taskflow.create_entity(self, entity, objtype, databases,
                                                         chiefs, objfile, timeout)
                     if not middleware.success:
+                        LOG.error('create middleware result %s' % str(middleware))
                         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                                           ctxt=ctxt,
                                                           resultcode=manager_common.RESULT_ERROR,
                                                           result=str(middleware))
-                    # self.konwn_appentitys.setdefault(entity, dict(objtype=objtype, pid=None))
                     def _port_notity():
                         """notify port bond"""
                         self.client.ports_add(agent_id=self.manager.agent_id,
