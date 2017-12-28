@@ -520,7 +520,7 @@ class AppEntityReuest(BaseContorller):
                                                               subtype=database.subtype,
                                                               schema='%s_%s_%s_%d' % (common.NAME,
                                                                                       objtype,
-                                                                                      database.type,
+                                                                                      database.subtype,
                                                                                       entity)
                                                               )
                                                          for database in _entity.databases],

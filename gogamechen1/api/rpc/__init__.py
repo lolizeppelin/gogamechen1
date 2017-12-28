@@ -209,7 +209,8 @@ class Application(AppEndpointBase):
                 raise
             else:
                 self._free_ports(entity)
-                self.entitys_map.pop(entity)
+                self.entitys_map.pop(entity, None)
+                self.konwn_appentitys.pop(entity, None)
                 systemutils.drop_user(self.entity_user(entity))
 
     def create_entity(self, entity, objtype, objfile, timeout,
@@ -229,7 +230,7 @@ class Application(AppEndpointBase):
                     LOG.error('%s' % str(databases))
                     return
                 eventlet.sleep(0.1)
-            LOG.info('Try bond database')
+            LOG.info('Try bond database %s' % databases)
             self.client.bondto(entity, databases)
             LOG.info('Try bond database success, flush config')
             self.flush_config(entity, databases, chiefs)
