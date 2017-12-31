@@ -37,6 +37,7 @@ from goperation.manager.wsgi.exceptions import RpcResultError
 
 from gopdb import common as dbcommon
 from gopdb.api.wsgi.controller import SchemaReuest
+from gopdb.api.wsgi.controller import DatabaseReuest
 
 from gogamechen1 import common
 from gogamechen1 import utils
@@ -67,6 +68,7 @@ FAULT_MAP = {InvalidArgument: webob.exc.HTTPClientError,
 entity_controller = EntityReuest()
 file_controller = FileReuest()
 schema_controller = SchemaReuest()
+database_controller = DatabaseReuest()
 
 
 def areas_map(group_id):
@@ -265,6 +267,8 @@ class AppEntityReuest(BaseContorller):
                                     'properties': {'version': {'type': 'string'},
                                                    'subtype': {'type': 'string'}},
                                     'description': '需要下载的文件信息'},
+
+
                         'agent_id': {'type': 'integer', 'minimum': 1,
                                      'description': '程序安装的目标机器'},
                         'cross_id': {'type': 'integer', 'minimum': 1,
@@ -299,6 +303,49 @@ class AppEntityReuest(BaseContorller):
         ports = entityinfo['ports']
         attributes = entityinfo['attributes']
         return attributes, ports
+
+
+    def _agentselect(self, req, objtype, **kwargs):
+        """服务器自动选择"""
+        if kwargs.get('agent_id'):
+            return kwargs.get('agent_id')
+        zone = kwargs.get('zone', 'all')
+        includes = ['zone=%s' % zone, 'disk>=500', 'free>=200', 'cpu>=2']
+        weighters = [{'cputime': 5},
+                     {'cpu': -1},
+                     {'free': 200},
+                     {'left': 500},
+                     {'process': None}]
+        agents = self.chioces(common.NAME, includes=includes, weighters=weighters)
+        LOG.info('Auto select agent %d' % agents[0])
+        return agents[0]
+
+    def _dbselect(self, req, objtype, **kwargs):
+        """数据库自动选择"""
+        if kwargs.get('databases'):
+            return kwargs.get('databases')
+        zone = kwargs.get('zone', 'all')
+        body = dict(affinitys=common.AFFINITYS[objtype].values(),
+                    dbtype='mysql', zone=zone)
+        impl = kwargs.pop('impl')
+        _databases = []
+        chioces = database_controller.select(req, impl, body)
+        for chioce in chioces:
+            affinity = chioce['affinity']
+            databases = chioce['databases']
+            if affinity & common.AFFINITYS[objtype][common.DATADB] and databases:
+                _databases.append(dict(subtype=common.DATADB,
+                                       database_id=databases[0].get('database_id')))
+                break
+        if objtype == common.GAMESERVER:
+            for chioce in chioces:
+                affinity = chioce['affinity']
+                databases = chioce['databases']
+                if affinity & common.AFFINITYS[objtype][common.LOGDB] and databases:
+                    _databases.append(dict(subtype=common.LOGDB,
+                                           database_id=databases[0].get('database_id')))
+                break
+        return _databases
 
     def index(self, req, group_id, objtype, body=None):
         body = body or {}
@@ -336,8 +383,8 @@ class AppEntityReuest(BaseContorller):
         if not results['data']:
             return results
 
-        emaps = entity_controller._shows(endpoint=common.NAME,
-                                         entitys=[column.get('entity') for column in results['data']])
+        emaps = entity_controller.shows(endpoint=common.NAME,
+                                        entitys=[column.get('entity') for column in results['data']])
 
         for column in results['data']:
             entity = column.get('entity')
@@ -374,20 +421,12 @@ class AppEntityReuest(BaseContorller):
         objfile = body.pop('objfile', None)
         if objfile:
             objfile = objfile_controller.find(objtype, objfile.get('subtype'), objfile.get('version'))
-
-        def appselect(*args, **kwargs):
-            return 2
-
-        def dbselect(objtype, *args, **kwargs):
-            _databases = [dict(subtype=common.DATADB, database_id=1)]
-            if objtype == common.GAMESERVER:
-                _databases.append(dict(subtype=common.LOGDB, database_id=1))
-            return _databases
-
+        LOG.info('Try find agent and database for entity')
         # 选择实例运行服务器
-        agent_id = appselect(objtype, body.get('agent_id'))
+        agent_id = self._agentselect(req, objtype, **body)
         # 选择实例运行数据库
-        databases = dbselect(objtype, body.get('databases'))
+        databases = self._dbselect(req, objtype, **body)
+        LOG.info('Find agent and database for entity success')
         session = endpoint_session()
         query = model_query(session, Group, filter=Group.group_id == group_id)
         joins = joinedload(Group.entitys, innerjoin=False)
@@ -460,7 +499,7 @@ class AppEntityReuest(BaseContorller):
                         raise InvalidArgument('cross server can not be found for %s' % objtype)
 
                     # 获取实体相关服务器信息(端口/ip)
-                    maps = entity_controller._shows(endpoint=common.NAME, entitys=[gm.entity, cross.entity])
+                    maps = entity_controller.shows(endpoint=common.NAME, entitys=[gm.entity, cross.entity])
                     for v in six.itervalues(maps):
                         if v is None:
                             raise InvalidArgument('Get chiefs info error, not online?')
