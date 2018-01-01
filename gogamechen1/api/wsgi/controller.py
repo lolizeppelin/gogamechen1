@@ -267,8 +267,6 @@ class AppEntityReuest(BaseContorller):
                                     'properties': {'version': {'type': 'string'},
                                                    'subtype': {'type': 'string'}},
                                     'description': '需要下载的文件信息'},
-
-
                         'agent_id': {'type': 'integer', 'minimum': 1,
                                      'description': '程序安装的目标机器'},
                         'cross_id': {'type': 'integer', 'minimum': 1,
@@ -304,13 +302,15 @@ class AppEntityReuest(BaseContorller):
         attributes = entityinfo['attributes']
         return attributes, ports
 
-
     def _agentselect(self, req, objtype, **kwargs):
         """服务器自动选择"""
         if kwargs.get('agent_id'):
             return kwargs.get('agent_id')
         zone = kwargs.get('zone', 'all')
         includes = ['zone=%s' % zone, 'disk>=500', 'free>=200', 'cpu>=2']
+        if objtype != common.CROSSSERVER:
+            # 非crossserver要求存在外网ip
+            includes.append('external_ips!=None')
         weighters = [{'cputime': 5},
                      {'cpu': -1},
                      {'free': 200},
@@ -325,10 +325,12 @@ class AppEntityReuest(BaseContorller):
         if kwargs.get('databases'):
             return kwargs.get('databases')
         zone = kwargs.get('zone', 'all')
+        # 指定亲和性
         body = dict(affinitys=common.AFFINITYS[objtype].values(),
                     dbtype='mysql', zone=zone)
         impl = kwargs.pop('impl')
         _databases = []
+        # 返回排序好的可选数据库
         chioces = database_controller.select(req, impl, body)
         for chioce in chioces:
             affinity = chioce['affinity']
@@ -346,6 +348,27 @@ class AppEntityReuest(BaseContorller):
                                            database_id=databases[0].get('database_id')))
                 break
         return _databases
+
+    def _validate_databases(self, objtype, databases):
+        datadb = 0
+        logdb = 0
+        for database in databases:
+            if database.get('subtype') == common.DATADB:
+                datadb += 1
+            elif database.get('subtype') == common.LOGDB:
+                logdb += 1
+            else:
+                raise InvalidArgument('Database subtype %s unkonwn' % database.get('subtype'))
+        if objtype == common.GAMESERVER:
+            if datadb == 1 and logdb == 1:
+                pass
+            else:
+                raise InvalidArgument('%s datadb %d, logdb %d' % (objtype, datadb, logdb))
+        else:
+            if datadb == 1 and logdb == 0:
+                pass
+            else:
+                raise InvalidArgument('%s datadb %d, logdb %d' % (objtype, datadb, logdb))
 
     def index(self, req, group_id, objtype, body=None):
         body = body or {}
@@ -417,6 +440,8 @@ class AppEntityReuest(BaseContorller):
         body = body or {}
         group_id = int(group_id)
         jsonutils.schema_validate(body, self.CREATEAPPENTITY)
+        # 找cross服务, gameserver专用
+        cross_id = body.pop('cross_id', None)
         # 安装文件信息
         objfile = body.pop('objfile', None)
         if objfile:
@@ -426,6 +451,8 @@ class AppEntityReuest(BaseContorller):
         agent_id = self._agentselect(req, objtype, **body)
         # 选择实例运行数据库
         databases = self._dbselect(req, objtype, **body)
+        # 校验数据库信息
+        self._validate_databases(objtype, databases)
         LOG.info('Find agent and database for entity success')
         session = endpoint_session()
         query = model_query(session, Group, filter=Group.group_id == group_id)
@@ -463,8 +490,6 @@ class AppEntityReuest(BaseContorller):
                     except KeyError as e:
                         return resultutils.results('create entity fail, can not find my chief: %s' % e.message,
                                                    resultcode=manager_common.RESULT_ERROR)
-                    # 找cross服务
-                    cross_id = body.get('cross_id')
                     # 如果指定了cross实例id
                     if cross_id:
                         # 判断cross实例id是否在当前组中
@@ -494,7 +519,6 @@ class AppEntityReuest(BaseContorller):
                                 if cross_id == _cross.entity:
                                     cross = _cross
                                     break
-
                     if not cross:
                         raise InvalidArgument('cross server can not be found for %s' % objtype)
 
