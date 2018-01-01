@@ -299,8 +299,8 @@ class AppEntityReuest(BaseContorller):
         entityinfo = entity_controller.show(req=req, entity=entity,
                                             endpoint=common.NAME, body={'ports': True})['data'][0]
         ports = entityinfo['ports']
-        attributes = entityinfo['attributes']
-        return attributes, ports
+        metadata = entityinfo['metadata']
+        return metadata, ports
 
     def _agentselect(self, req, objtype, **kwargs):
         """服务器自动选择"""
@@ -425,10 +425,10 @@ class AppEntityReuest(BaseContorller):
                 raise RuntimeError('Entity agent id %d not the same as %d' % (column['agent_id'],
                                                                               entityinfo.get('agent_id')))
             column['ports'] = entityinfo.get('ports')
-            attributes = entityinfo.get('attributes')
-            if attributes:
-                local_ip = attributes.get('local_ip')
-                external_ips = attributes.get('external_ips')
+            metadata = entityinfo.get('metadata')
+            if metadata:
+                local_ip = metadata.get('local_ip')
+                external_ips = metadata.get('external_ips')
             else:
                 local_ip = external_ips = None
             column['local_ip'] = local_ip
@@ -531,12 +531,12 @@ class AppEntityReuest(BaseContorller):
                     chiefs.setdefault(common.CROSSSERVER,
                                       dict(entity=cross.entity,
                                            ports=maps.get(cross.entity).get('ports'),
-                                           local_ip=maps.get(cross.entity).get('attributes').get('local_ip')
+                                           local_ip=maps.get(cross.entity).get('metadata').get('local_ip')
                                            ))
                     chiefs.setdefault(common.GMSERVER,
                                       dict(entity=gm.entity,
                                            ports=maps.get(gm.entity).get('ports'),
-                                           local_ip=maps.get(gm.entity).get('attributes').get('local_ip')
+                                           local_ip=maps.get(gm.entity).get('metadata').get('local_ip')
                                            ))
             # 完整的rpc数据包
             body = dict(objtype=objtype,
@@ -588,7 +588,7 @@ class AppEntityReuest(BaseContorller):
         query = query.options(joins)
         group = query.filter(and_(AppEntity.entity == entity, AppEntity.objtype == objtype)).one()
         _entity = group.entitys[0]
-        attributes, ports = self._entityinfo(req, entity)
+        metadata, ports = self._entityinfo(req, entity)
         return resultutils.results(result='show %s areas success' % objtype,
                                    data=[dict(entity=_entity.entity,
                                               agent_id=_entity.agent_id,
@@ -607,7 +607,7 @@ class AppEntityReuest(BaseContorller):
                                                                                       entity)
                                                               )
                                                          for database in _entity.databases],
-                                              attributes=attributes, ports=ports)])
+                                              metadata=metadata, ports=ports)])
 
     def update(self, req, group_id, objtype, entity, body=None):
             pass
@@ -621,8 +621,8 @@ class AppEntityReuest(BaseContorller):
         entity = int(entity)
         session = endpoint_session()
         glock = get_gamelock()
-        attributes, ports = self._entityinfo(req=req, entity=entity)
-        if not attributes:
+        metadata, ports = self._entityinfo(req=req, entity=entity)
+        if not metadata:
             raise InvalidArgument('Agent offline, can not delete entity')
         with glock.grouplock(group=group_id):
             with session.begin():
@@ -701,7 +701,7 @@ class AppEntityReuest(BaseContorller):
                 query.delete()
         return resultutils.results(result='delete %s:%d success' % (objtype, entity),
                                    data=[dict(entity=entity, objtype=objtype,
-                                              ports=ports, attributes=attributes)])
+                                              ports=ports, metadata=metadata)])
 
     def bondto(self, req, entity, body=None):
         body = body or {}
