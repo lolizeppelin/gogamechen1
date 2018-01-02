@@ -249,12 +249,37 @@ class GroupReuest(BaseContorller):
         return resultutils.results(result='delete group success',
                                    data=[dict(group_id=_group.group_id, name=_group.name)])
 
+    def chiefs(self, req, group_id, body=None):
+        body = body or {}
+        group_id = int(group_id)
+        session = endpoint_session(readonly=True)
+        query = model_query(session, Group, filter=and_(Group.group_id == group_id,
+                                                        AppEntity.objtype.in_([common.GMSERVER, common.CROSSSERVER])))
+        query.options(joinedload(Group.entitys, innerjoin=False))
+        _group = query.one()
+        chiefs = []
+        entitys = set()
+        for entity in _group.entitys:
+            entitys.add(entity.entity)
+        emaps = entity_controller.shows(common.NAME, entitys=entitys, ports=True, metadata=True)
+        for entity in _group.entitys:
+            entityinfo = emaps.get(entity.entity)
+            metadata = entityinfo.get('metadata')
+            ports = entityinfo.get('ports')
+            chiefs.append(dict(entity=entity.entity,
+                               ports=ports,
+                               local_ip=metadata.get('local_ip'),
+                               external_ips=metadata.get('external_ips'))
+                          )
+        return resultutils.results(result='get group chiefs success',
+                                   data=chiefs)
+
     def maps(self, req, group_id, body=None):
         body = body or {}
         group_id = int(group_id)
         maps = areas_map(group_id)
         return resultutils.results(result='get group areas map success',
-                                   data=[maps, ])
+                                   data=[dict(entity=k, areas=v) for k, v in maps])
 
 
 @singleton.singleton
@@ -307,7 +332,9 @@ class AppEntityReuest(BaseContorller):
         if kwargs.get('agent_id'):
             return kwargs.get('agent_id')
         zone = kwargs.get('zone', 'all')
-        includes = ['zone=%s' % zone, 'disk>=500', 'free>=200', 'cpu>=2']
+        includes = ['metadata.zone=%s' % zone,
+                    'metadata.agent_type=application',
+                    'disk>=500', 'free>=200', 'cpu>=2']
         if objtype != common.CROSSSERVER:
             # 非crossserver要求存在外网ip
             includes.append('external_ips!=None')
@@ -734,26 +761,30 @@ class AppEntityReuest(BaseContorller):
 
     def _async_bluck_rpc(self, action, group_id, objtype, entity, body):
         body = body or {}
-        entitys = argutils.map_to_int(entity)
+        if entity == 'all':
+            entitys = 'all'
+        else:
+            entitys = argutils.map_to_int(entity)
         asyncrequest = self.create_asyncrequest(body)
         target = targetutils.target_endpoint(common.NAME)
         session = endpoint_session(readonly=True)
         query = model_query(session, AppEntity, filter=and_(AppEntity.group_id == group_id,
                                                             AppEntity.objtype == objtype))
         agents = set()
-        count = 0
+        _entitys = set()
         for _entity in query:
-            if _entity.entity in entitys:
+            if entitys == 'all' or _entity.entity in entitys:
                 if action != 'stop' and _entity.status != common.OK:
                     raise InvalidArgument('Entity %d status not ok' % _entity.entity)
                 agents.add(_entity.agent_id)
-                count += 1
-        if count != len(entitys):
-            raise InvalidArgument('No entitys found')
+                _entitys.add(_entity.entity)
+
+        if entitys!= 'all' and len(_entitys) != len(entitys):
+            raise InvalidArgument('Some entitys not found')
 
         rpc_ctxt = dict(agents=list(agents))
         rpc_method = '%s_entitys' % action
-        rpc_args = dict(entitys=entitys)
+        rpc_args = dict(entitys=list(_entitys))
         rpc_args.update(body)
         def wapper():
             self.send_asyncrequest(asyncrequest, target,

@@ -111,6 +111,14 @@ class GogameChen1DBClient(GopDBClient):
                                             resone=results['result'])
         return results
 
+    def group_chiefs(self, group_id, body=None):
+        resp, results = self.get(action=self.group_path_ex % (str(group_id), 'chiefs'), body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='get gogamechen1 group chiefs fail:%d' % results['resultcode'],
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
     # -----------bond database api-----------------
     def bondto(self, entity, databases):
         resp, results = self.post(action=self.bond_path % str(entity), body=dict(databases=databases),

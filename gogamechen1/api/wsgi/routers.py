@@ -41,6 +41,7 @@ class Routers(router.RoutersBase):
                                        collection_actions=COLLECTION_ACTIONS,
                                        member_actions=MEMBER_ACTIONS)
         collection.member.link('maps', method='GET')
+        collection.member.link('chiefs', method='GET')
         # collection.member.link('start', method='POST')
         # collection.member.link('stop', method='POST')
         # collection.member.link('status', method='POST')

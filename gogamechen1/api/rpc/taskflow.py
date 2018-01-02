@@ -2,7 +2,6 @@
 from simpleutil.config import cfg
 from simpleutil.log import log as logging
 
-from simpleflow.task import Task
 from simpleflow.api import load
 from simpleflow.types import failure
 from simpleflow.storage import Connection
@@ -10,7 +9,6 @@ from simpleflow.patterns import unordered_flow as uf
 from simpleflow.storage.middleware import LogBook
 from simpleflow.engines.engine import ParallelActionEngine
 
-from goperation import threadpool
 from goperation.manager.rpc.agent import sqlite
 from goperation.manager.rpc.agent.application.taskflow.middleware import EntityMiddleware
 from goperation.manager.rpc.agent.application.taskflow import application
@@ -59,8 +57,11 @@ class GogameDatabaseCreateTask(StandardTask):
         auth = dict(user=self.database.user, passwd=self.database.passwd,
                     ro_user=self.database.ro_user, ro_passwd=self.database.ro_passwd,
                     source=self.database.source)
+        # 亲和性数值
+        affinity = common.AFFINITYS[self.middleware.objtype][self.database.subtype]
         dbresult = appendpoint.client.schemas_create(self.database.database_id,
                                                      body={'schema': self.database.schema,
+                                                           'affinity': affinity,
                                                            'auth': auth,
                                                            'bond': {'entity': self.middleware.entity,
                                                                     'endpoint': common.NAME}})['data'][0]

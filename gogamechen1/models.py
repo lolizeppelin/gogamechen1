@@ -79,7 +79,8 @@ class AppEntity(TableBase):
                                  cascade='delete,delete-orphan')
 
     __table_args__ = (
-        # sa.Index('agent_id_index', 'agent_id'),
+        sa.Index('agent_id_index', 'agent_id'),
+        sa.Index('objtype_index', 'objtype'),
         InnoDBTableBase.__table_args__
     )
 
