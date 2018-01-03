@@ -81,7 +81,7 @@ class AppEntity(TableBase):
 
     __table_args__ = (
         sa.Index('agent_id_index', 'agent_id'),
-        sa.Index('objtype_index', 'objtype'),
+        sa.Index('group_id_index', 'group_id'),
         InnoDBTableBase.__table_args__
     )
 

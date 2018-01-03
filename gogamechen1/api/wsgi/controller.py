@@ -348,6 +348,8 @@ class AppEntityReuest(BaseContorller):
                      {'left': 500},
                      {'process': None}]
         agents = self.chioces(common.NAME, includes=includes, weighters=weighters)
+        if not agents:
+            raise InvalidArgument('Auto select agent fail')
         LOG.info('Auto select agent %d' % agents[0])
         return agents[0]
 
@@ -363,6 +365,8 @@ class AppEntityReuest(BaseContorller):
         _databases = []
         # 返回排序好的可选数据库
         chioces = database_controller.select(req, impl, body)
+        if not chioces:
+            raise InvalidArgument('Auto selete database fail')
         for chioce in chioces:
             affinity = chioce['affinity']
             databases = chioce['databases']
@@ -800,7 +804,7 @@ class AppEntityReuest(BaseContorller):
         entitys = argutils.map_to_int(entitys)
         session = endpoint_session(readonly=True)
         query = model_query(session, AppEntity, filter=AppEntity.entity.in_(entitys))
-        query = query.options(joinedload(GameArea, innerjoin=False))
+        query = query.options(joinedload(AppEntity.areas, innerjoin=False))
         return resultutils.results(result='get app entitys success',
                                    data=[dict(entity=_entity.entity,
                                               group_id=_entity.group_id,
