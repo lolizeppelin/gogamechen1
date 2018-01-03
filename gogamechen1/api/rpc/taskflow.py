@@ -43,7 +43,8 @@ class GogameCreateDatabase(Database):
         self.subtype = kwargs['subtype']
         self.ro_user = kwargs['ro_user']
         self.ro_passwd = kwargs['ro_passwd']
-
+        self.character_set = kwargs['character_set']
+        self.collation_type = kwargs['collation_type']
 
 class GogameDatabaseCreateTask(StandardTask):
 
@@ -66,15 +67,18 @@ class GogameDatabaseCreateTask(StandardTask):
                                                            'bond': {'entity': self.middleware.entity,
                                                                     'endpoint': common.NAME}})['data'][0]
         # 设置返回结果
-        self.middleware.databases.setdefault(self.database.subtype, dict(schema=self.database.schema,
-                                                                         database_id=self.database.database_id,
-                                                                         quote_id=dbresult.get('quote_id'),
-                                                                         host=dbresult.get('host'),
-                                                                         port=dbresult.get('port'),
-                                                                         user=self.database.user,
-                                                                         passwd=self.database.passwd,
-                                                                         ro_user=self.database.ro_user,
-                                                                         ro_passwd=self.database.ro_passwd))
+        self.middleware.databases.setdefault(self.database.subtype,
+                                             dict(schema=self.database.schema,
+                                                  database_id=self.database.database_id,
+                                                  quote_id=dbresult.get('quote_id'),
+                                                  host=dbresult.get('host'),
+                                                  port=dbresult.get('port'),
+                                                  user=self.database.user,
+                                                  passwd=self.database.passwd,
+                                                  ro_user=self.database.ro_user,
+                                                  ro_passwd=self.database.ro_passwd,
+                                                  character_set=self.database.character_set,
+                                                  collation_type=self.database.collation_type))
 
     def revert(self, *args, **kwargs):
         result = kwargs.get('result') or args[0]
@@ -144,10 +148,11 @@ def create_entity(appendpoint, entity, objtype, databases,
         database_id = database.get('database_id')
         schema = '%s_%s_%s_%d' % (common.NAME, objtype, subtype, entity)
         # 默认认证
-        auth = dict(user=conf.get('%s_%s' % (subtype, 'user')),
-                    passwd=conf.get('%s_%s' % (subtype, 'passwd')),
-                    ro_user=conf.get('%s_%s' % (subtype, 'ro_user')),
-                    ro_passwd=conf.get('%s_%s' % (subtype, 'ro_passwd')),
+        postfix = '-%d' % entity
+        auth = dict(user=conf.get('%s_%s' % (subtype, 'user')) + postfix,
+                    passwd=conf.get('%s_%s' % (subtype, 'passwd')) + postfix,
+                    ro_user=conf.get('%s_%s' % (subtype, 'ro_user')) + postfix,
+                    ro_passwd=conf.get('%s_%s' % (subtype, 'ro_passwd')) + postfix,
                     source='%s/%s' % (appendpoint.manager.ipnetwork.network,
                                       appendpoint.manager.ipnetwork.netmask))
         LOG.info('Create schema %s in %d with auth %s' % (schema, database_id, str(auth)))
@@ -173,7 +178,6 @@ def create_entity(appendpoint, entity, objtype, databases,
     except Exception:
         if LOG.isEnabledFor(logging.DEBUG):
             LOG.exception('Task execute fail')
-        # raise
     finally:
         connection.destroy_logbook(book.uuid)
         for dberror in middleware.dberrors:

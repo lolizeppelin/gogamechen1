@@ -70,8 +70,9 @@ class Routers(router.RoutersBase):
                                        collection_actions=COLLECTION_ACTIONS,
                                        member_actions=MEMBER_ACTIONS)
         collection.member.link('start', method='POST')
-        # collection.member.link('stop', method='POST')
-        # collection.member.link('status', method='POST')
+        collection.member.link('stop', method='POST')
+        collection.member.link('status', method='POST')
+        collection.member.link('opentime', method='PUT')
         # collection.member.link('hotfix', method='POST')
         # collection.member.link('upgrade', method='POST')
 

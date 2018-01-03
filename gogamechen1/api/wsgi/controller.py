@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 import six
+import time
 import eventlet
 import webob.exc
 from six.moves import zip
@@ -26,6 +27,8 @@ from simpleservice.rpc.exceptions import NoSuchMethod
 from goperation import threadpool
 from goperation.utils import safe_func_wrapper
 from goperation.manager import common as manager_common
+from goperation.manager.api import get_client
+from goperation.manager.api import rpcfinishtime
 from goperation.manager.exceptions import CacheStoneError
 from goperation.manager.utils import resultutils
 from goperation.manager.utils import targetutils
@@ -302,6 +305,7 @@ class AppEntityReuest(BaseContorller):
                                                 'properties': {
                                                     'subtype': {'type': 'string',
                                                                 'description': '数据类型(业务日志/业务数据)'},
+                                                    'character_set':  {'type': 'string'},
                                                     'database_id': {'type': 'integer', 'minimum': 1,
                                                                     'description': '目标数据库'}}}}}
                        }
@@ -409,6 +413,7 @@ class AppEntityReuest(BaseContorller):
         columns = [AppEntity.entity,
                    AppEntity.group_id,
                    AppEntity.agent_id,
+                   AppEntity.opentime,
                    AppEntity.status,
                    AppEntity.objtype]
 
@@ -446,8 +451,7 @@ class AppEntityReuest(BaseContorller):
                     column['databases'].append(dict(quote_id=database.quote_id, subtype=database.subtype,
                                                     host=database.host, port=database.port,
                                                     ))
-            column.setdefault('areas', maps.get(column.get('entity', [])))
-            # column['agent_id'] = entityinfo.get('agent_id')
+            column.setdefault('areas', maps.get(entity, []))
             if column['agent_id'] != entityinfo.get('agent_id'):
                 raise RuntimeError('Entity agent id %d not the same as %d' % (column['agent_id'],
                                                                               entityinfo.get('agent_id')))
@@ -469,6 +473,8 @@ class AppEntityReuest(BaseContorller):
         jsonutils.schema_validate(body, self.CREATEAPPENTITY)
         # 找cross服务, gameserver专用
         cross_id = body.pop('cross_id', None)
+        # 开服时间, gameserver专用
+        opentime = body.pop('opentime', None)
         # 安装文件信息
         objfile = body.pop('objfile', None)
         if objfile:
@@ -577,7 +583,8 @@ class AppEntityReuest(BaseContorller):
                 # 插入实体信息
                 appentity = AppEntity(entity=_entity.get('entity'),
                                       agent_id=agent_id,
-                                      group_id=group_id, objtype=objtype)
+                                      group_id=group_id, objtype=objtype,
+                                      opentime=opentime)
                 session.add(appentity)
                 session.flush()
                 if objtype == common.GAMESERVER:
@@ -597,7 +604,9 @@ class AppEntityReuest(BaseContorller):
                 _result.setdefault('area_id', next_area)
 
             threadpool.add_thread(entity_controller.post_create_entity,
-                                  _entity.get('entity'), common.NAME, objtype=objtype, group_id=group_id)
+                                  _entity.get('entity'), common.NAME, objtype=objtype,
+                                  opentime=opentime,
+                                  group_id=group_id, areas=[next_area,])
 
             return resultutils.results(result='create %s entity success' % objtype,
                                        data=[_result, ])
@@ -620,6 +629,7 @@ class AppEntityReuest(BaseContorller):
                                    data=[dict(entity=_entity.entity,
                                               agent_id=_entity.agent_id,
                                               objtype=objtype, group_id=_entity.group_id,
+                                              opentime=_entity.opentime,
                                               status=_entity.status,
                                               areas=[area.area_id for area in _entity.areas],
                                               databases=[dict(quote_id=database.quote_id,
@@ -730,6 +740,41 @@ class AppEntityReuest(BaseContorller):
                                    data=[dict(entity=entity, objtype=objtype,
                                               ports=ports, metadata=metadata)])
 
+    def opentime(self, req, group_id, objtype, entity, body=None):
+        body = body or {}
+        group_id = int(group_id)
+        entity = int(entity)
+        if objtype != common.GAMESERVER:
+            raise InvalidArgument('Api just for %s' % common.GAMESERVER)
+        opentime = int(body.pop('opentime'))
+        if opentime < 0 or opentime >= int(time.time()) + 86400*15:
+            raise InvalidArgument('opentime value error')
+        session = endpoint_session()
+        with session.begin():
+            query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
+            _entity = query.one()
+            if _entity.objtype != objtype:
+                raise InvalidArgument('Entity is not %s' % objtype)
+            if _entity.group_id != group_id:
+                raise InvalidArgument('Entity group %d not match  %d' % (_entity.group_id, group_id))
+            entityinfo = entity_controller.show(req=req, entity=entity,
+                                                endpoint=common.NAME, body={'ports': False})['data'][0]
+            agent_id = entityinfo['agent_id']
+            metadata = entityinfo['metadata']
+            target = targetutils.target_agent_by_string(metadata.get('agent_type'),
+                                                        metadata.get('host'))
+            target.namespace = common.NAME
+            rpc = get_client()
+            rpc_ret = rpc.call(target, ctxt={'finishtime': rpcfinishtime(),
+                                             'agents': [agent_id, ]},
+                                  msg={'method': 'opentime_entity', 'args': dict(entity=entity,
+                                                                                 opentime=opentime)})
+            if not rpc_ret:
+                raise RpcResultError('change entity opentime result is None')
+            if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
+                raise RpcResultError('change entity opentime fail %s' % rpc_ret.get('result'))
+        return resultutils.results(result='change entity opentime' % entity)
+
     def bondto(self, req, entity, body=None):
         body = body or {}
         entity = int(entity)
@@ -752,11 +797,15 @@ class AppEntityReuest(BaseContorller):
         entitys = body.get('entitys')
         if not entitys:
             return resultutils.results(result='not any app entitys found')
+        entitys = argutils.map_to_int(entitys)
         session = endpoint_session(readonly=True)
         query = model_query(session, AppEntity, filter=AppEntity.entity.in_(entitys))
+        query = query.options(joinedload(GameArea, innerjoin=False))
         return resultutils.results(result='get app entitys success',
                                    data=[dict(entity=_entity.entity,
                                               group_id=_entity.group_id,
+                                              opentime=_entity.opentime,
+                                              areas=[area.area_id for area in _entity.areas],
                                               objtype=_entity.objtype) for _entity in query])
 
     def _async_bluck_rpc(self, action, group_id, objtype, entity, body):

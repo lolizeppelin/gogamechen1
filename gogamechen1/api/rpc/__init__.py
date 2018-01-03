@@ -1,15 +1,12 @@
 import os
 import time
 import shutil
-import re
+import json
 import contextlib
+import functools
 import eventlet
 import psutil
-import functools
 
-from collections import namedtuple
-
-from simpleutil.utils import uuidutils
 from simpleutil.utils import argutils
 from simpleutil.utils import singleton
 from simpleutil.utils import systemutils
@@ -17,8 +14,7 @@ from simpleutil.log import log as logging
 from simpleutil.config import cfg
 
 from simpleutil.utils import zlibutils
-
-from simpleservice.loopingcall import IntervalLoopinTask
+from simpleutil.utils.systemutils import posix
 
 from goperation import threadpool
 from goperation.utils import safe_fork
@@ -29,12 +25,15 @@ from goperation.manager.rpc.agent.application.base import AppEndpointBase
 
 from goperation.manager.utils import resultutils
 from goperation.manager.utils import validateutils
+from goperation.manager.rpc.exceptions import RpcCtxtException
 from goperation.manager.rpc.exceptions import RpcTargetLockException
 
 
 from gogamechen1 import common
 from gogamechen1 import utils
 
+from gogamechen1.api import gconfig
+from gogamechen1.api import gfile
 from gogamechen1.api.client import GogameChen1DBClient
 from gogamechen1.api.rpc.config import gameserver_group
 from gogamechen1.api.rpc.config import crossserver_group
@@ -58,7 +57,7 @@ def count_timeout(ctxt, kwargs):
     deadline = ctxt.get('deadline')
     timeout = kwargs.pop('timeout', None)
     if deadline is None:
-        return timeout
+        return timeout if timeout is not None else 600
     deadline = deadline - int(time.time())
     if timeout is None:
         return deadline
@@ -102,10 +101,13 @@ class Application(AppEndpointBase):
                 _entity = entityinfo.get('entity')
                 objtype = entityinfo.get('objtype')
                 group_id = entityinfo.get('group_id')
+                areas = entityinfo.get('areas')
+                opentime= entityinfo.get('opentime')
                 if _entity in self.konwn_appentitys:
                     raise RuntimeError('App Entity %d Duplicate' % _entity)
                 LOG.info('Entity %d type %s, group %d' % (_entity, objtype, group_id))
-                self.konwn_appentitys.setdefault(_entity, dict(objtype=objtype,group_id=group_id,
+                self.konwn_appentitys.setdefault(_entity, dict(objtype=objtype, group_id=group_id,
+                                                               areas=areas, opentime=opentime,
                                                                pid=None))
         # find entity pid
         for entity in self.entitys:
@@ -143,14 +145,16 @@ class Application(AppEndpointBase):
     def _allocate_port(self, entity, objtype, ports):
         if isinstance(ports, (int, long, type(None))):
             ports = [ports]
-        if objtype == common.GAMESERVER:
-            if len(ports) == 1:
-                ports.append(None)
-            if len(ports) != 2:
-                raise ValueError('%s need to ports' % common.GMSERVER)
-        else:
-            if len(ports) > 1:
-                raise ValueError('Too many ports')
+        # if objtype == common.GMSERVER:
+        #     if len(ports) == 1:
+        #         ports.append(None)
+        #     if len(ports) != 2:
+        #         raise ValueError('%s need to ports' % common.GMSERVER)
+        # else:
+        #     if len(ports) > 1:
+        #         raise ValueError('Too many ports')
+        if len(ports) > 1:
+            raise ValueError('Too many ports')
         with self.manager.frozen_ports(common.NAME, entity, ports=ports) as ports:
             yield list(ports)
 
@@ -191,14 +195,28 @@ class Application(AppEndpointBase):
             self.konwn_appentitys[entity]['pid'] = None
             return None
 
-    def flush_config(self, entity, databases, chiefs=None):
+
+    def flush_config(self, entity, databases=None,
+                     opentime=None, chiefs=None):
         eventlet.sleep(0.01)
-        posts = self._get_ports(entity)
         objtype = self.konwn_appentitys[entity].get('objtype')
+        areas = self.konwn_appentitys[entity].get('areas')
+        cfile = self._objconf(entity, objtype)
+        posts = self._get_ports(entity)
+        databases = gconfig.format_databases(objtype, cfile, databases)
+        chiefs = gconfig.format_chiefs(objtype, cfile, chiefs)
+        opentime = gconfig.format_opentime(objtype, cfile, opentime)
+        confobj = gconfig.make(objtype, self.logpath(entity),
+                               self.manager.local_ip, posts,
+                               entity, areas,
+                               databases, opentime, chiefs)
+        LOG.info('Make config for %s.%d success' % (objtype, entity))
+        with open(cfile, 'wb') as f:
+            json.dump(confobj, f, indent=4)
 
     def delete_entity(self, entity):
         if self._entity_process(entity):
-            raise
+            raise ValueError('Entity is running')
         LOG.info('Try delete %s entity %d' % (self.namespace, entity))
         home = self.entity_home(entity)
         if os.path.exists(home):
@@ -217,12 +235,12 @@ class Application(AppEndpointBase):
                       databases, chiefs):
         timeout = timeout if timeout else 30
         overtime = int(time.time()) + timeout
-        # wait = zlibutils.async_extract(src=objfile, dst=self.apppath(entity), timeout=timeout,
-        #                                fork=functools.partial(safe_fork, self.entity_user(entity),
-        #                                                       self.entity_group(entity)),
-        #                                exclude=self._exclude(objtype))
+        wait = zlibutils.async_extract(src=objfile, dst=self.apppath(entity), timeout=timeout,
+                                       fork=functools.partial(safe_fork, self.entity_user(entity),
+                                                              self.entity_group(entity)),
+                                       exclude=self._exclude(objtype))
         def _postdo():
-            # wait()
+            wait()
             while entity not in self.konwn_appentitys:
                 if int(time.time()) > overtime:
                     LOG.error('Get entity %d from konwn appentity fail, database not bond' % entity)
@@ -230,12 +248,43 @@ class Application(AppEndpointBase):
                     LOG.error('%s' % str(databases))
                     return
                 eventlet.sleep(0.1)
+            opentime = self.konwn_appentitys[entity].get('opentime')
             LOG.info('Try bond database %s' % databases)
             self.client.bondto(entity, databases)
             LOG.info('Try bond database success, flush config')
-            self.flush_config(entity, databases, chiefs)
+            self.flush_config(entity, databases, opentime, chiefs)
 
         threadpool.add_thread(_postdo)
+
+    def start_entity(self, entity, **kwargs):
+        objtype = self.konwn_appentitys[entity].get('objtype')
+        user = self.entity_user(entity)
+        group = self.entity_group(entity)
+        pwd = self.apppath(entity)
+        logfile = os.path.join(self.logpath(entity), '%s.log.%d' %
+                               (objtype, int(time.time())))
+        EXEC = os.path.join(pwd, os.path.join('bin', objtype))
+        if not os.path.exists(EXEC):
+            raise ValueError('Execute targe %s not exist' % EXEC)
+        args = [EXEC, ]
+        pid = safe_fork(user=user, group=group)
+        if pid == 0:
+            ppid = os.fork()
+            # fork twice
+            if ppid == 0:
+                os.closerange(3, systemutils.MAXFD)
+                os.chdir(pwd)
+                with open(logfile, 'ab') as f:
+                    os.dup2(f.fileno(), 1)
+                    os.dup2(f.fileno(), 2)
+                os.execv(EXEC, args)
+            else:
+                os._exit(0)
+        else:
+            posix.wait(pid)
+
+    def stop(self, entity):
+        pass
 
     def rpc_create_entity(self, ctxt, entity, **kwargs):
         timeout = count_timeout(ctxt, kwargs)
@@ -244,8 +293,8 @@ class Application(AppEndpointBase):
         chiefs = kwargs.pop('chiefs', None)
         objtype = kwargs.pop('objtype')
         databases = kwargs.pop('databases')
-        # objfile = self.filemanager.get(objfile, download=False)
-        # self._check(objfile, objtype)
+        objfile = self.filemanager.get(objfile, download=False)
+        gfile.check(objfile, objtype)
 
         entity = int(entity)
         with self.lock(entity, timeout=3):
@@ -282,6 +331,8 @@ class Application(AppEndpointBase):
         LOG.info('Get post create command with %s' % str(kwargs))
         self.konwn_appentitys.setdefault(entity, dict(objtype=kwargs.pop('objtype'),
                                                       group_id=kwargs.pop('group_id'),
+                                                      areas=kwargs.pop('areas'),
+                                                      opentime=kwargs.pop('opentime'),
                                                       pid=None))
 
     def rpc_reset_entity(self, ctxt, entity, **kwargs):
@@ -321,12 +372,51 @@ class Application(AppEndpointBase):
                                           result=result)
 
     def rpc_start_entitys(self, ctxt, entitys, **kwargs):
+        overtime = count_timeout(ctxt, kwargs) + time.time()
         entitys = argutils.map_to_int(entitys) & set(self.entitys)
         if not entitys:
             return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                               resultcode=manager_common.RESULT_ERROR,
                                               ctxt=ctxt,
                                               result='start entitys fail, no entitys found')
+
+        details = []
+        for entity in entitys:
+
+            def safe_wapper(target_id):
+                try:
+                    self.start_entity(target_id)
+                    details.append(dict(detail_id=target_id,
+                                        resultcode=manager_common.RESULT_SUCCESS,
+                                        result='start entity %d success' % target_id
+                                        ))
+                except Exception:
+                    details.append(dict(detail_id=target_id,
+                                        resultcode=manager_common.RESULT_ERROR,
+                                        result='start entity %d fail' % target_id
+                                        ))
+                    LOG.exception('Start entity %d fail' % target_id)
+            eventlet.spawn_n(safe_wapper, entity)
+
+        while len(details) < len(entitys):
+            eventlet.sleep(0.5)
+            if int(time.time()) >= overtime:
+                break
+        responsed_entitys = set([detail.get('detail_id') for detail in details])
+        for no_response_entity in (entitys - responsed_entitys):
+            details.append(dict(detail_id=no_response_entity,
+                                resultcode=manager_common.RESULT_ERROR,
+                                result='start entity %d overtime, result unkonwn' % no_response_entity
+                                ))
+        if all([False if detail.get('resultcode') else True for detail in details]):
+            resultcode = manager_common.RESULT_SUCCESS
+        else:
+            resultcode = manager_common.RESULT_NOT_ALL_SUCCESS
+
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          ctxt=ctxt,
+                                          resultcode=resultcode,
+                                          result='Start entity end')
 
     def rpc_stop_entitys(self, ctxt, entitys, **kwargs):
         entitys = argutils.map_to_int(entitys) & set(self.entitys)
@@ -336,7 +426,6 @@ class Application(AppEndpointBase):
                                               ctxt=ctxt,
                                               result='stop entitys fail, no entitys found')
 
-
     def rpc_status_entitys(self, ctxt, entitys, **kwargs):
         entitys = argutils.map_to_int(entitys) & set(self.entitys)
         if not entitys:
@@ -345,3 +434,12 @@ class Application(AppEndpointBase):
                                               ctxt=ctxt,
                                               result='status entitys fail, no entitys found')
 
+    def rpc_opentime_entity(self, ctxt, entity, opentime):
+        if entity not in self.entitys:
+            raise RpcCtxtException('Entity %d not exist' % entity)
+        with self.lock(entity=[entity]):
+            self.konwn_appentitys[entity]['opentime'] = opentime
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          resultcode=manager_common.RESULT_SUCCESS,
+                                          ctxt=ctxt,
+                                          result='change entity opentime success')
