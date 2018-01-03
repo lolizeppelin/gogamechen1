@@ -361,7 +361,8 @@ class AppEntityReuest(BaseContorller):
         # 指定亲和性
         body = dict(affinitys=common.AFFINITYS[objtype].values(),
                     dbtype='mysql', zone=zone)
-        impl = kwargs.pop('impl')
+        # 默认使用本地数据库
+        impl = kwargs.pop('impl', 'local')
         _databases = []
         # 返回排序好的可选数据库
         chioces = database_controller.select(req, impl, body)

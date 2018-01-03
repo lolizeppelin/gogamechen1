@@ -14,8 +14,8 @@ UNACTIVE = -1
 OK = 0
 
 AFFINITYS = {GAMESERVER: {DATADB: 1, LOGDB: 2},
-             CROSSSERVER: {DATADB: 3},
-             GMSERVER: {DATADB: 4},}
+             CROSSSERVER: {DATADB: 4},
+             GMSERVER: {DATADB: 8},}
 
 #    map anffinitys by bitwise operation
 #
