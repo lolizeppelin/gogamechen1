@@ -256,16 +256,16 @@ class GroupReuest(BaseContorller):
         body = body or {}
         group_id = int(group_id)
         session = endpoint_session(readonly=True)
-        query = model_query(session, Group, filter=and_(Group.group_id == group_id,
-                                                        AppEntity.objtype.in_([common.GMSERVER, common.CROSSSERVER])))
-        query.options(joinedload(Group.entitys, innerjoin=False))
-        _group = query.one()
+        query = model_query(session, AppEntity,
+                            filter=and_(AppEntity.group_id == group_id,
+                                        AppEntity.objtype.in_([common.GMSERVER, common.CROSSSERVER])))
+        appentitys = query.all()
         chiefs = []
         entitys = set()
-        for entity in _group.entitys:
+        for entity in appentitys:
             entitys.add(entity.entity)
         emaps = entity_controller.shows(common.NAME, entitys=entitys, ports=True, metadata=True)
-        for entity in _group.entitys:
+        for entity in appentitys:
             entityinfo = emaps.get(entity.entity)
             metadata = entityinfo.get('metadata')
             ports = entityinfo.get('ports')
@@ -365,7 +365,7 @@ class AppEntityReuest(BaseContorller):
         impl = kwargs.pop('impl', 'local')
         _databases = []
         # 返回排序好的可选数据库
-        chioces = database_controller.select(req, impl, body)
+        chioces = database_controller.select(req, impl, body)['data']
         if not chioces:
             raise InvalidArgument('Auto selete database fail')
         for chioce in chioces:
@@ -373,7 +373,7 @@ class AppEntityReuest(BaseContorller):
             databases = chioce['databases']
             if affinity & common.AFFINITYS[objtype][common.DATADB] and databases:
                 _databases.append(dict(subtype=common.DATADB,
-                                       database_id=databases[0].get('database_id')))
+                                       database_id=databases[0]))
                 break
         if objtype == common.GAMESERVER:
             for chioce in chioces:
@@ -381,7 +381,7 @@ class AppEntityReuest(BaseContorller):
                 databases = chioce['databases']
                 if affinity & common.AFFINITYS[objtype][common.LOGDB] and databases:
                     _databases.append(dict(subtype=common.LOGDB,
-                                           database_id=databases[0].get('database_id')))
+                                           database_id=databases[0]))
                 break
         return _databases
 
