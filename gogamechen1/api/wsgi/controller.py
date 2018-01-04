@@ -289,25 +289,26 @@ class GroupReuest(BaseContorller):
 class AppEntityReuest(BaseContorller):
 
     CREATEAPPENTITY = {'type': 'object',
+                       'required': ['objfile'],
                        'properties': {
-                        'objfile': {'type': 'object',
-                                    'required': ['version', 'subtype'],
-                                    'properties': {'version': {'type': 'string'},
-                                                   'subtype': {'type': 'string'}},
-                                    'description': '需要下载的文件信息'},
-                        'agent_id': {'type': 'integer', 'minimum': 1,
-                                     'description': '程序安装的目标机器'},
-                        'cross_id': {'type': 'integer', 'minimum': 1,
-                                     'description': '跨服程序的实体id'},
-                        'databases': {'type': 'array',
-                                      'items': {'type': 'object',
-                                                'required': ['type', 'database_id'],
-                                                'properties': {
-                                                    'subtype': {'type': 'string',
-                                                                'description': '数据类型(业务日志/业务数据)'},
-                                                    'character_set':  {'type': 'string'},
-                                                    'database_id': {'type': 'integer', 'minimum': 1,
-                                                                    'description': '目标数据库'}}}}}
+                           'objfile': {'type': 'object',
+                                       'required': ['version', 'subtype'],
+                                       'properties': {'version': {'type': 'string'},
+                                                      'subtype': {'type': 'string'}},
+                                       'description': '需要下载的文件信息'},
+                           'agent_id': {'type': 'integer', 'minimum': 1,
+                                        'description': '程序安装的目标机器'},
+                           'cross_id': {'type': 'integer', 'minimum': 1,
+                                        'description': '跨服程序的实体id'},
+                           'databases': {'type': 'array',
+                                         'items': {'type': 'object',
+                                                    'required': ['type', 'database_id'],
+                                                    'properties': {
+                                                        'subtype': {'type': 'string',
+                                                                    'description': '数据类型(业务日志/业务数据)'},
+                                                        'character_set':  {'type': 'string'},
+                                                        'database_id': {'type': 'integer', 'minimum': 1,
+                                                                        'description': '目标数据库'}}}}}
                        }
 
     BONDDATABASE = {'type': 'array', 'minItems': 1,
@@ -350,7 +351,7 @@ class AppEntityReuest(BaseContorller):
         agents = self.chioces(common.NAME, includes=includes, weighters=weighters)
         if not agents:
             raise InvalidArgument('Auto select agent fail')
-        LOG.info('Auto select agent %d' % agents[0])
+        LOG.debug('Auto select agent %d' % agents[0])
         return agents[0]
 
     def _dbselect(self, req, objtype, **kwargs):
@@ -374,6 +375,7 @@ class AppEntityReuest(BaseContorller):
             if affinity & common.AFFINITYS[objtype][common.DATADB] and databases:
                 _databases.append(dict(subtype=common.DATADB,
                                        database_id=databases[0]))
+                LOG.debug('Auto select %s.%s database %d' % (objtype, common.DATADB, databases[0]))
                 break
         if objtype == common.GAMESERVER:
             for chioce in chioces:
@@ -382,6 +384,7 @@ class AppEntityReuest(BaseContorller):
                 if affinity & common.AFFINITYS[objtype][common.LOGDB] and databases:
                     _databases.append(dict(subtype=common.LOGDB,
                                            database_id=databases[0]))
+                LOG.debug('Auto select %s.%s database %d' % (objtype, common.DATADB, databases[0]))
                 break
         return _databases
 
@@ -481,9 +484,8 @@ class AppEntityReuest(BaseContorller):
         # 开服时间, gameserver专用
         opentime = body.pop('opentime', None)
         # 安装文件信息
-        objfile = body.pop('objfile', None)
-        if objfile:
-            objfile = objfile_controller.find(objtype, objfile.get('subtype'), objfile.get('version'))
+        objfile = body.pop('objfile')
+        objfile = objfile_controller.find(objtype, objfile.get('subtype'), objfile.get('version'))
         LOG.info('Try find agent and database for entity')
         # 选择实例运行服务器
         agent_id = self._agentselect(req, objtype, **body)

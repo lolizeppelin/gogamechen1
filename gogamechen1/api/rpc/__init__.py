@@ -288,7 +288,7 @@ class Application(AppEndpointBase):
 
     def rpc_create_entity(self, ctxt, entity, **kwargs):
         timeout = count_timeout(ctxt, kwargs)
-        objfile = kwargs.pop('objfile', None)
+        objfile = kwargs.pop('objfile')
         ports = kwargs.pop('ports', None)
         chiefs = kwargs.pop('chiefs', None)
         objtype = kwargs.pop('objtype')
@@ -304,6 +304,7 @@ class Application(AppEndpointBase):
                                                   ctxt=ctxt,
                                                   result='create %s database fail, entity exist' % entity)
             with self._prepare_entity_path(entity):
+                os.makedirs(os.path.split(self._objconf(entity, objtype))[0], mode=0755, exist_ok=True)
                 with self._allocate_port(entity, objtype, ports) as ports:
                     middleware = taskflow.create_entity(self, entity, objtype, databases,
                                                         chiefs, objfile, timeout)
