@@ -148,8 +148,8 @@ def create_entity(appendpoint, entity, objtype, databases,
         # 默认认证
         postfix = '-%d' % entity
         auth = dict(user=conf.get('%s_%s' % (subtype, 'user')) + postfix,
-                    passwd=conf.get('%s_%s' % (subtype, 'passwd')) + postfix,
-                    ro_user=conf.get('%s_%s' % (subtype, 'ro_user')),
+                    passwd=conf.get('%s_%s' % (subtype, 'passwd')),
+                    ro_user=conf.get('%s_%s' % (subtype, 'ro_user')) + postfix,
                     ro_passwd=conf.get('%s_%s' % (subtype, 'ro_passwd')),
                     source='%s/%s' % (appendpoint.manager.ipnetwork.network,
                                       appendpoint.manager.ipnetwork.netmask))
