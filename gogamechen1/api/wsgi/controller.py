@@ -118,6 +118,8 @@ class ObjtypeFileReuest(BaseContorller):
         with session.begin():
             create_result = file_controller.create(req, body)
             objtype_file.uuid = create_result['data'][0]['uuid']
+            session.add(objtype_file)
+            session.flush()
         return resultutils.results('creat file for %s success' % objtype,
                                    data=[dict(uuid=objtype_file.uuid)])
 
@@ -485,7 +487,11 @@ class AppEntityReuest(BaseContorller):
         opentime = body.pop('opentime', None)
         # 安装文件信息
         objfile = body.pop('objfile')
-        objfile = objfile_controller.find(objtype, objfile.get('subtype'), objfile.get('version'))
+        try:
+            objfile = objfile_controller.find(objtype, objfile.get('subtype'), objfile.get('version'))
+        except NoResultFound:
+            raise InvalidArgument('%s of %s with versison %s can not be found' %
+                                  (objfile.get('subtype'), objtype, objfile.get('version')))
         LOG.info('Try find agent and database for entity')
         # 选择实例运行服务器
         agent_id = self._agentselect(req, objtype, **body)
