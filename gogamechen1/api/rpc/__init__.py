@@ -139,7 +139,7 @@ class Application(AppEndpointBase):
                 return info.get('pid')
 
     def _objconf(self, entity, objtype):
-        return os.path.join(self.apppath(entity), objtype, 'conf', '%s.conf' % objtype)
+        return os.path.join(self.apppath(entity), 'conf', '%s.conf' % objtype)
 
     @contextlib.contextmanager
     def _allocate_port(self, entity, objtype, ports):
@@ -235,11 +235,13 @@ class Application(AppEndpointBase):
                       databases, chiefs):
         timeout = timeout if timeout else 30
         overtime = int(time.time()) + timeout
-        wait = zlibutils.async_extract(src=objfile, dst=self.apppath(entity), timeout=timeout,
+        dst = self.apppath(entity)
+        wait = zlibutils.async_extract(src=objfile, dst=dst , timeout=timeout,
                                        fork=functools.partial(safe_fork, self.entity_user(entity),
                                                               self.entity_group(entity)))
                                        # exclude=self._exclude(objtype))
         def _postdo():
+            LOG.info('wait %s extract to %s' % (objfile, dst))
             wait()
             while entity not in self.konwn_appentitys:
                 if int(time.time()) > overtime:
@@ -304,7 +306,7 @@ class Application(AppEndpointBase):
                                                   ctxt=ctxt,
                                                   result='create %s database fail, entity exist' % entity)
             with self._prepare_entity_path(entity):
-                os.makedirs(os.path.split(self._objconf(entity, objtype))[0], mode=0755, exist_ok=True)
+                os.makedirs(os.path.split(self._objconf(entity, objtype))[0], mode=0755)
                 with self._allocate_port(entity, objtype, ports) as ports:
                     middleware = taskflow.create_entity(self, entity, objtype, databases,
                                                         chiefs, objfile, timeout)

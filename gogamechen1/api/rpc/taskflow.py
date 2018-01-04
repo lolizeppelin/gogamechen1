@@ -153,7 +153,7 @@ def create_entity(appendpoint, entity, objtype, databases,
                     ro_passwd=conf.get('%s_%s' % (subtype, 'ro_passwd')) + postfix,
                     source='%s/%s' % (appendpoint.manager.ipnetwork.network,
                                       appendpoint.manager.ipnetwork.netmask))
-        LOG.info('Create schema %s in %d with auth %s' % (schema, database_id, str(auth)))
+        LOG.debug('Create schema %s in %d with auth %s' % (schema, database_id, str(auth)))
         _database.append(GogameCreateDatabase(database_id=database_id, schema=schema,
                                               character_set='utf8',
                                               subtype=subtype,
