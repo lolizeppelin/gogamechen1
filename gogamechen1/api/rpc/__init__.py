@@ -247,7 +247,7 @@ class Application(AppEndpointBase):
                                                               self.entity_group(entity)))
                                        # exclude=self._exclude(objtype))
         def _postdo():
-            LOG.info('wait %s extract to %s' % (objfile, dst))
+            LOG.debug('wait %s extract to %s' % (objfile, dst))
             wait()
             while entity not in self.konwn_appentitys:
                 if int(time.time()) > overtime:
@@ -257,7 +257,7 @@ class Application(AppEndpointBase):
                     return
                 eventlet.sleep(0.1)
             opentime = self.konwn_appentitys[entity].get('opentime')
-            LOG.info('Try bond database %s' % databases)
+            LOG.debug('Try bond database %s' % databases)
             self.client.bondto(entity, databases)
             LOG.info('Try bond database success, flush config')
             self.flush_config(entity, databases, opentime, chiefs)

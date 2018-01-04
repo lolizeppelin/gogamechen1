@@ -44,6 +44,7 @@ class GogameCreateDatabase(Database):
         self.ro_user = kwargs['ro_user']
         self.ro_passwd = kwargs['ro_passwd']
 
+
 class GogameDatabaseCreateTask(StandardTask):
 
     def __init__(self, middleware, database):
