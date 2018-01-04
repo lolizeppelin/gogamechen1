@@ -149,8 +149,8 @@ def create_entity(appendpoint, entity, objtype, databases,
         postfix = '-%d' % entity
         auth = dict(user=conf.get('%s_%s' % (subtype, 'user')) + postfix,
                     passwd=conf.get('%s_%s' % (subtype, 'passwd')) + postfix,
-                    ro_user=conf.get('%s_%s' % (subtype, 'ro_user')) + postfix,
-                    ro_passwd=conf.get('%s_%s' % (subtype, 'ro_passwd')) + postfix,
+                    ro_user=conf.get('%s_%s' % (subtype, 'ro_user')),
+                    ro_passwd=conf.get('%s_%s' % (subtype, 'ro_passwd')),
                     source='%s/%s' % (appendpoint.manager.ipnetwork.network,
                                       appendpoint.manager.ipnetwork.netmask))
         LOG.debug('Create schema %s in %d with auth %s' % (schema, database_id, str(auth)))
