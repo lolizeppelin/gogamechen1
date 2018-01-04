@@ -43,8 +43,6 @@ class GogameCreateDatabase(Database):
         self.subtype = kwargs['subtype']
         self.ro_user = kwargs['ro_user']
         self.ro_passwd = kwargs['ro_passwd']
-        self.character_set = kwargs['character_set']
-        self.collation_type = kwargs['collation_type']
 
 class GogameDatabaseCreateTask(StandardTask):
 
@@ -157,6 +155,7 @@ def create_entity(appendpoint, entity, objtype, databases,
                                       appendpoint.manager.ipnetwork.netmask))
         LOG.info('Create schema %s in %d with auth %s' % (schema, database_id, str(auth)))
         _database.append(GogameCreateDatabase(database_id=database_id, schema=schema,
+                                              character_set='utf8',
                                               subtype=subtype,
                                               host=None, port=None, **auth))
 

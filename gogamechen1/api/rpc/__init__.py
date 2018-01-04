@@ -237,8 +237,8 @@ class Application(AppEndpointBase):
         overtime = int(time.time()) + timeout
         wait = zlibutils.async_extract(src=objfile, dst=self.apppath(entity), timeout=timeout,
                                        fork=functools.partial(safe_fork, self.entity_user(entity),
-                                                              self.entity_group(entity)),
-                                       exclude=self._exclude(objtype))
+                                                              self.entity_group(entity)))
+                                       # exclude=self._exclude(objtype))
         def _postdo():
             wait()
             while entity not in self.konwn_appentitys:
@@ -294,7 +294,7 @@ class Application(AppEndpointBase):
         objtype = kwargs.pop('objtype')
         databases = kwargs.pop('databases')
         objfile = self.filemanager.get(objfile, download=False)
-        gfile.check(objfile, objtype)
+        gfile.check(objtype, objfile)
 
         entity = int(entity)
         with self.lock(entity, timeout=3):
