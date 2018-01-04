@@ -23,7 +23,7 @@ def _format_database_url(subtype, database):
                 port=database.get('port'),
                 schema=database.get('schema'),
                 character_set=database.get('character_set'))
-    return '%(user)s:%(passwd)s@tcp(%(host)s:%(port)d)/(schema)s?charset=(character_set)s' % info
+    return '%(user)s:%(passwd)s@tcp(%(host)s:%(port)d)/%(schema)s?charset=%(character_set)s' % info
 
 
 def _format_chiefs(chiefs):
