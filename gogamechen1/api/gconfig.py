@@ -48,6 +48,7 @@ def format_databases(objtype, cfile, databases):
         for subtype in subtypes:
             database = conf.pop(MAPS[subtype])
             _databases.setdefault(subtype, _format_database_url(subtype, database))
+    return _databases
 
 
 def format_chiefs(objtype, cfile, chiefs):
@@ -120,6 +121,6 @@ def make(objtype, logpath,
         args = (logpath, local_ip, ports, entity, databases)
     else:
         raise RuntimeError('Objtype error')
-    func = '%s_make'
+    func = '%s_make' % objtype
     func = eval(func)
     return func(*args)

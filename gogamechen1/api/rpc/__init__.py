@@ -199,20 +199,26 @@ class Application(AppEndpointBase):
     def flush_config(self, entity, databases=None,
                      opentime=None, chiefs=None):
         eventlet.sleep(0.01)
-        objtype = self.konwn_appentitys[entity].get('objtype')
-        areas = self.konwn_appentitys[entity].get('areas')
-        cfile = self._objconf(entity, objtype)
-        posts = self._get_ports(entity)
-        databases = gconfig.format_databases(objtype, cfile, databases)
-        chiefs = gconfig.format_chiefs(objtype, cfile, chiefs)
-        opentime = gconfig.format_opentime(objtype, cfile, opentime)
-        confobj = gconfig.make(objtype, self.logpath(entity),
-                               self.manager.local_ip, posts,
-                               entity, areas,
-                               databases, opentime, chiefs)
-        LOG.info('Make config for %s.%d success' % (objtype, entity))
+        try:
+            objtype = self.konwn_appentitys[entity].get('objtype')
+            areas = self.konwn_appentitys[entity].get('areas')
+            cfile = self._objconf(entity, objtype)
+            posts = self._get_ports(entity)
+            databases = gconfig.format_databases(objtype, cfile, databases)
+            chiefs = gconfig.format_chiefs(objtype, cfile, chiefs)
+            opentime = gconfig.format_opentime(objtype, cfile, opentime)
+            confobj = gconfig.make(objtype, self.logpath(entity),
+                                   self.manager.local_ip, posts,
+                                   entity, areas,
+                                   databases, opentime, chiefs)
+        except Exception:
+            LOG.exception('flush config fail')
+            raise
         with open(cfile, 'wb') as f:
             json.dump(confobj, f, indent=4)
+            f.write('\n')
+        LOG.info('Make config for %s.%d success' % (objtype, entity))
+        systemutils.chown(cfile, self.entity_user(entity), self.entity_group(entity))
 
     def delete_entity(self, entity):
         if self._entity_process(entity):
@@ -306,7 +312,9 @@ class Application(AppEndpointBase):
                                                   ctxt=ctxt,
                                                   result='create %s database fail, entity exist' % entity)
             with self._prepare_entity_path(entity):
-                os.makedirs(os.path.split(self._objconf(entity, objtype))[0], mode=0755)
+                confdir = os.path.split(self._objconf(entity, objtype))[0]
+                os.makedirs(confdir, mode=0755)
+                systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
                 with self._allocate_port(entity, objtype, ports) as ports:
                     middleware = taskflow.create_entity(self, entity, objtype, databases,
                                                         chiefs, objfile, timeout)
