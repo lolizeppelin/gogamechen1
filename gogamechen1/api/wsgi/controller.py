@@ -293,15 +293,17 @@ class AppEntityReuest(BaseContorller):
     CREATEAPPENTITY = {'type': 'object',
                        'required': ['objfile'],
                        'properties': {
-                           'objfile': {'type': 'object',
-                                       'required': ['version', 'subtype'],
-                                       'properties': {'version': {'type': 'string'},
-                                                      'subtype': {'type': 'string'}},
-                                       'description': '需要下载的文件信息'},
+                           'objfile': {'oneOf':
+                                           [{'type': 'object',
+                                             'required': ['version', 'subtype'],
+                                             'properties': {'version': {'type': 'string'},
+                                                            'subtype': {'type': 'string'}}},
+                                            {'type': 'string', 'format': 'uuid'}],
+                                       'description': '需要下载的文件, uuid或对应信息'},
                            'agent_id': {'type': 'integer', 'minimum': 1,
                                         'description': '程序安装的目标机器'},
                            'cross_id': {'type': 'integer', 'minimum': 1,
-                                        'description': '跨服程序的实体id'},
+                                        'description': '跨服程序的实体id,gameserver专用参数'},
                            'databases': {'type': 'array',
                                          'items': {'type': 'object',
                                                     'required': ['type', 'database_id'],
@@ -342,9 +344,9 @@ class AppEntityReuest(BaseContorller):
         includes = ['metadata.zone=%s' % zone,
                     'metadata.agent_type=application',
                     'disk>=500', 'free>=200', 'cpu>=2']
-        if objtype != common.CROSSSERVER:
-            # 非crossserver要求存在外网ip
-            includes.append('external_ips!=None')
+        if objtype == common.GAMESERVER:
+            # gameserver要求存在外网ip
+            includes.append('metadata.external_ips!=None')
         weighters = [{'cputime': 5},
                      {'cpu': -1},
                      {'free': 200},
@@ -487,11 +489,14 @@ class AppEntityReuest(BaseContorller):
         opentime = body.pop('opentime', None)
         # 安装文件信息
         objfile = body.pop('objfile')
-        try:
-            objfile = objfile_controller.find(objtype, objfile.get('subtype'), objfile.get('version'))
-        except NoResultFound:
-            raise InvalidArgument('%s of %s with versison %s can not be found' %
-                                  (objfile.get('subtype'), objtype, objfile.get('version')))
+        if isinstance(objfile, basestring):
+            pass
+        else:
+            try:
+                objfile = objfile_controller.find(objtype, objfile.get('subtype'), objfile.get('version'))
+            except NoResultFound:
+                raise InvalidArgument('%s of %s with versison %s can not be found' %
+                                      (objfile.get('subtype'), objtype, objfile.get('version')))
         LOG.info('Try find agent and database for entity')
         # 选择实例运行服务器
         agent_id = self._agentselect(req, objtype, **body)

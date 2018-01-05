@@ -94,7 +94,8 @@ def loginsvr_make(logpath, local_ip, ports, entity, databases):
     conf = OrderedDict()
     conf.setdefault('LogLevel', 'info')
     conf.setdefault('LogPath', logpath)
-    conf.setdefault('ListenAddr', '%s:%d' % (local_ip, ports[0]))
+    conf.setdefault('WSAddr', '%s:%d' % (local_ip, ports[0]))
+    conf.setdefault('ListenAddr', '%s:%d' % (local_ip, ports[1]))
     conf.setdefault('DB', databases[common.DATADB])
     return conf
 

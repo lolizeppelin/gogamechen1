@@ -145,25 +145,24 @@ class Application(AppEndpointBase):
     def _allocate_port(self, entity, objtype, ports):
         if isinstance(ports, (int, long, type(None))):
             ports = [ports]
-        # if objtype == common.GMSERVER:
-        #     if len(ports) == 1:
-        #         ports.append(None)
-        #     if len(ports) != 2:
-        #         raise ValueError('%s need to ports' % common.GMSERVER)
-        # else:
-        #     if len(ports) > 1:
-        #         raise ValueError('Too many ports')
-        if len(ports) > 1:
-            raise ValueError('Too many ports')
+        if objtype == common.GMSERVER:
+            if len(ports) == 1:
+                ports.append(None)
+            if len(ports) != 2:
+                raise ValueError('%s need two ports' % common.GMSERVER)
+        else:
+            if len(ports) > 1:
+                raise ValueError('Too many ports')
         with self.manager.frozen_ports(common.NAME, entity, ports=ports) as ports:
-            yield list(ports)
+            ports = sorted(ports)
+            yield ports
 
     def _free_ports(self, entity):
         ports = self.manager.allocked_ports.get(common.NAME)[entity]
         self.manager.free_ports(ports)
 
     def _get_ports(self, entity):
-        return [port for port in self.entitys_map[entity]]
+        return sorted([port for port in self.entitys_map[entity]])
 
     def _entity_process(self, entity):
         entityinfo = self.konwn_appentitys.get(entity)
