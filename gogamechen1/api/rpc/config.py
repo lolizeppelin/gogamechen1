@@ -8,7 +8,10 @@ CONF = cfg.CONF
 agent_opts = [cfg.IntOpt('agent_affinity',
                          choices=[1, 2, 3, 4, 5, 6, 7],
                          required=True,
-                         help='agent appcaclition affinity, see common.APPAFFINITYS for more')
+                         help='agent appcaclition affinity bitwise, '
+                              '[gamesvr:1] [publicsvr:2] [loginsvr:4] '
+                              '[publicsvr&loginsvr:6] '
+                              '[gamesvr&publicsvr&loginsvr:7] and so on')
               ]
 
 datadb_opts = [
@@ -89,3 +92,6 @@ def register_opts():
     game_register_opts(gameserver_group)
     gm_register_opts(gmserver_group)
     cross_register_opts(crossserver_group)
+
+def list_agent_opts():
+    return agent_opts
