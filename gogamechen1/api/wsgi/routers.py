@@ -42,9 +42,9 @@ class Routers(router.RoutersBase):
                                        member_actions=MEMBER_ACTIONS)
         collection.member.link('maps', method='GET')
         collection.member.link('chiefs', method='GET')
-        # collection.member.link('start', method='POST')
-        # collection.member.link('stop', method='POST')
-        # collection.member.link('status', method='POST')
+        collection.member.link('start', method='POST')
+        collection.member.link('stop', method='POST')
+        collection.member.link('status', method='POST')
         # collection.member.link('hotfix', method='POST')
         # collection.member.link('upgrade', method='POST')
 
@@ -54,9 +54,9 @@ class Routers(router.RoutersBase):
         game_controller = controller_return_response(controller.AppEntityReuest(),
                                                    controller.FAULT_MAP)
 
-        self._add_resource(mapper, game_controller,
-                           path='/%s/entity/{entity}' % common.NAME,
-                           post_action='bondto')
+        # self._add_resource(mapper, game_controller,
+        #                    path='/%s/entity/{entity}' % common.NAME,
+        #                    post_action='bondto')
 
         self._add_resource(mapper, game_controller,
                    path='/%s/entitys' % common.NAME,

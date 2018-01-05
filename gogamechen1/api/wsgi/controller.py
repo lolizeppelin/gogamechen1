@@ -302,6 +302,8 @@ class AppEntityReuest(BaseContorller):
                                        'description': '需要下载的文件, uuid或对应信息'},
                            'agent_id': {'type': 'integer', 'minimum': 1,
                                         'description': '程序安装的目标机器,不填自动分配'},
+                           'opentime': {'type': 'integer', 'minimum': 1514736000,
+                                        'description': '开服时间, gameserver专用参数'},
                            'cross_id': {'type': 'integer', 'minimum': 1,
                                         'description': '跨服程序的实体id,gameserver专用参数'},
                            'zone': {'type': 'string',
@@ -491,6 +493,8 @@ class AppEntityReuest(BaseContorller):
         cross_id = body.pop('cross_id', None)
         # 开服时间, gameserver专用
         opentime = body.pop('opentime', None)
+        if objtype == common.GAMESERVER and not opentime:
+            raise InvalidArgument('%s need opentime' % objtype)
         # 安装文件信息
         objfile = body.pop('objfile')
         if isinstance(objfile, basestring):
@@ -763,6 +767,7 @@ class AppEntityReuest(BaseContorller):
                                               ports=ports, metadata=metadata)])
 
     def opentime(self, req, group_id, objtype, entity, body=None):
+        """修改开服时间接口"""
         body = body or {}
         group_id = int(group_id)
         entity = int(entity)
@@ -798,6 +803,7 @@ class AppEntityReuest(BaseContorller):
         return resultutils.results(result='change entity opentime' % entity)
 
     def bondto(self, req, entity, body=None):
+        """作废接口,现在创建数据库结构的同时绑定"""
         body = body or {}
         entity = int(entity)
         databases = body.pop('databases')
@@ -816,6 +822,7 @@ class AppEntityReuest(BaseContorller):
         return resultutils.results(result='bond entity %d database success' % entity)
 
     def entitys(self, req, body=None):
+        """批量查询entitys信息接口,内部接口agent启动的时调用"""
         entitys = body.get('entitys')
         if not entitys:
             return resultutils.results(result='not any app entitys found')
