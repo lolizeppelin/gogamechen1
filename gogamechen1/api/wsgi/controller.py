@@ -804,7 +804,7 @@ class AppEntityReuest(BaseContorller):
         return resultutils.results(result='change entity opentime' % entity)
 
     def bondto(self, req, entity, body=None):
-        """作废接口,现在创建数据库结构的同时绑定"""
+        """记录数据库绑定信息"""
         body = body or {}
         entity = int(entity)
         databases = body.pop('databases')

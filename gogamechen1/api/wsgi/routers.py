@@ -54,9 +54,9 @@ class Routers(router.RoutersBase):
         game_controller = controller_return_response(controller.AppEntityReuest(),
                                                    controller.FAULT_MAP)
 
-        # self._add_resource(mapper, game_controller,
-        #                    path='/%s/entity/{entity}' % common.NAME,
-        #                    post_action='bondto')
+        self._add_resource(mapper, game_controller,
+                           path='/%s/entity/{entity}' % common.NAME,
+                           post_action='bondto')
 
         self._add_resource(mapper, game_controller,
                    path='/%s/entitys' % common.NAME,

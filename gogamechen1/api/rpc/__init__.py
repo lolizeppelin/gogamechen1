@@ -235,7 +235,7 @@ class Application(AppEndpointBase):
             try:
                 shutil.rmtree(home)
             except Exception:
-                LOG.exception('delete error')
+                LOG.error('delete %s fail' % home)
                 raise
             else:
                 self._free_ports(entity)
@@ -264,7 +264,11 @@ class Application(AppEndpointBase):
                 eventlet.sleep(0.1)
             opentime = self.konwn_appentitys[entity].get('opentime')
             LOG.debug('Try bond database %s' % databases)
-            self.client.bondto(entity, databases)
+            try:
+                self.client.bondto(entity, databases)
+            except Exception:
+                LOG.error('Notify bond database info fail')
+                LOG.error('Fail for %d %s' % (entity, str(databases)))
             LOG.info('Try bond database success, flush config')
             self.flush_config(entity, databases, opentime, chiefs)
 
