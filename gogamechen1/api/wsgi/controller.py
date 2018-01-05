@@ -301,9 +301,11 @@ class AppEntityReuest(BaseContorller):
                                             {'type': 'string', 'format': 'uuid'}],
                                        'description': '需要下载的文件, uuid或对应信息'},
                            'agent_id': {'type': 'integer', 'minimum': 1,
-                                        'description': '程序安装的目标机器'},
+                                        'description': '程序安装的目标机器,不填自动分配'},
                            'cross_id': {'type': 'integer', 'minimum': 1,
                                         'description': '跨服程序的实体id,gameserver专用参数'},
+                           'zone': {'type': 'string',
+                                    'description': '安装区域'},
                            'databases': {'type': 'array',
                                          'items': {'type': 'object',
                                                     'required': ['type', 'database_id'],
@@ -312,22 +314,24 @@ class AppEntityReuest(BaseContorller):
                                                                     'description': '数据类型(业务日志/业务数据)'},
                                                         'character_set':  {'type': 'string'},
                                                         'database_id': {'type': 'integer', 'minimum': 1,
-                                                                        'description': '目标数据库'}}}}}
+                                                                        'description': '目标数据库'}}
+                                                   },
+                                         'description': '程序使用的数据库,不填自动分配'}}
                        }
 
-    BONDDATABASE = {'type': 'array', 'minItems': 1,
-                    'items': {'type': 'object',
-                              'required': ['quote_id', 'entity', 'type', 'host', 'port', 'user', 'passwd'],
-                              'properties': {'quote_id': {'type': 'integer', 'minimum': 1},
-                                             'entity': {'type': 'integer', 'minimum': 1},
-                                             'type':  {'type': 'string'},
-                                             'host':  {'type': 'string'},
-                                             'port':  {'type': 'integer', 'minimum': 1, 'maxmum': 65535},
-                                             'user':  {'type': 'string'},
-                                             'passwd':  {'type': 'string'},
-                                             }
-                              }
-                    }
+    # BONDDATABASE = {'type': 'array', 'minItems': 1,
+    #                 'items': {'type': 'object',
+    #                           'required': ['quote_id', 'entity', 'type', 'host', 'port', 'user', 'passwd'],
+    #                           'properties': {'quote_id': {'type': 'integer', 'minimum': 1},
+    #                                          'entity': {'type': 'integer', 'minimum': 1},
+    #                                          'type':  {'type': 'string'},
+    #                                          'host':  {'type': 'string'},
+    #                                          'port':  {'type': 'integer', 'minimum': 1, 'maxmum': 65535},
+    #                                          'user':  {'type': 'string'},
+    #                                          'passwd':  {'type': 'string'},
+    #                                          }
+    #                           }
+    #                 }
 
     def _entityinfo(self, req, entity):
         entityinfo = entity_controller.show(req=req, entity=entity,
