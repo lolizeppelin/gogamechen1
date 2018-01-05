@@ -14,7 +14,7 @@ from simpleutil.log import log as logging
 from simpleutil.config import cfg
 
 from simpleutil.utils import zlibutils
-from simpleutil.utils.systemutils import posix
+from simpleutil.utils import systemutils
 
 from goperation import threadpool
 from goperation.utils import safe_fork
@@ -43,6 +43,8 @@ from gogamechen1.api.rpc.config import agent_opts
 
 from gogamechen1.api.rpc import taskflow
 
+if systemutils.POSIX:
+    from simpleutil.utils.systemutils import posix
 
 CONF = cfg.CONF
 CONF.register_group(gameserver_group)

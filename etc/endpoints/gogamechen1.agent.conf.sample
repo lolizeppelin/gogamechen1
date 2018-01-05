@@ -13,6 +13,12 @@
 # Endpoint max lock size (integer value)
 #max_lock = 5
 
+# agent appcaclition affinity bitwise, [gamesvr:1] [publicsvr:2] [loginsvr:4]
+# [publicsvr&loginsvr:6] [gamesvr&publicsvr&loginsvr:7] and so on (integer
+# value)
+# Allowed values: 1, 2, 3, 4, 5, 6, 7
+#agent_affinity = <None>
+
 
 [gogamechen1.gamesvr]
 
@@ -29,7 +35,7 @@
 # data db ro user name (string value)
 #datadb_ro_user = gogamedb-ro
 
-# data db ro user passwd (integer value)
+# data db ro user passwd (string value)
 #datadb_ro_passwd = <None>
 
 # logdb db rw user name (string value)
@@ -41,7 +47,7 @@
 # logdb db ro user name (string value)
 #logdb_ro_user = gogamelog-ro
 
-# logdb db ro user passwd (integer value)
+# logdb db ro user passwd (string value)
 #logdb_ro_passwd = <None>
 
 
@@ -60,7 +66,7 @@
 # data db ro user name (string value)
 #datadb_ro_user = gogmdb-ro
 
-# data db ro user passwd (integer value)
+# data db ro user passwd (string value)
 #datadb_ro_passwd = <None>
 
 
@@ -79,5 +85,5 @@
 # data db ro user name (string value)
 #datadb_ro_user = gocross-ro
 
-# data db ro user passwd (integer value)
+# data db ro user passwd (string value)
 #datadb_ro_passwd = <None>

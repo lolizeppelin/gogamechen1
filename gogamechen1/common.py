@@ -17,8 +17,11 @@ APPAFFINITYS = {GAMESERVER: 1, CROSSSERVER: 2, GMSERVER: 4}
 #    map app affinitys by bitwise operation
 #    GM    CROSS  GAME
 #     4      2      1
+# GAME 1
+# CROSS 2
+# GM 4
 # GM & CROSS 6
-# GM & CROSS & GAME
+# GM & CROSS & GAME 7
 
 DBAFFINITYS = {GAMESERVER: {DATADB: 1, LOGDB: 2},
                CROSSSERVER: {DATADB: 4}, GMSERVER: {DATADB: 8},}
