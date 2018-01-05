@@ -37,7 +37,7 @@ def _format_chiefs(chiefs):
 def format_databases(objtype, cfile, databases):
     if not cfile and not databases:
         raise ValueError('No databases found')
-    subtypes = common.AFFINITYS[objtype].keys()
+    subtypes = common.DBAFFINITYS[objtype].keys()
     _databases = dict()
     if databases:
         for subtype in subtypes:

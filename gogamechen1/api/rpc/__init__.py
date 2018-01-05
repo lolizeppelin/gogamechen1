@@ -39,6 +39,7 @@ from gogamechen1.api.rpc.config import gameserver_group
 from gogamechen1.api.rpc.config import crossserver_group
 from gogamechen1.api.rpc.config import gmserver_group
 from gogamechen1.api.rpc.config import register_opts
+from gogamechen1.api.rpc.config import agent_opts
 
 from gogamechen1.api.rpc import taskflow
 
@@ -69,6 +70,7 @@ class Application(AppEndpointBase):
 
     def __init__(self, manager):
         group = CONF.find_group(common.NAME)
+        CONF.register_opts(agent_opts, group)
         super(Application, self).__init__(manager, group.name)
         self.client = GogameChen1DBClient(get_http())
         self.delete_tokens = {}
@@ -87,6 +89,10 @@ class Application(AppEndpointBase):
 
     def entity_group(self, entity):
         return 'gogamechen1'
+
+    def pre_start(self, external_objects):
+        super(AppEndpointBase, self).pre_start(external_objects)
+        external_objects.update({'gogamechen1-aff': CONF[common.NAME].agent_affinity})
 
     def post_start(self):
         super(Application, self).post_start()
@@ -193,7 +199,6 @@ class Application(AppEndpointBase):
         except psutil.NoSuchProcess:
             self.konwn_appentitys[entity]['pid'] = None
             return None
-
 
     def flush_config(self, entity, databases=None,
                      opentime=None, chiefs=None):

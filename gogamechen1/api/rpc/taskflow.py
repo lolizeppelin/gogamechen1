@@ -58,7 +58,7 @@ class GogameDatabaseCreateTask(StandardTask):
                     ro_user=self.database.ro_user, ro_passwd=self.database.ro_passwd,
                     source=self.database.source)
         # 亲和性数值
-        affinity = common.AFFINITYS[self.middleware.objtype][self.database.subtype]
+        affinity = common.DBAFFINITYS[self.middleware.objtype][self.database.subtype]
         dbresult = appendpoint.client.schemas_create(self.database.database_id,
                                                      body={'schema': self.database.schema,
                                                            'affinity': affinity,

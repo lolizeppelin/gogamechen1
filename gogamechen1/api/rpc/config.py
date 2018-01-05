@@ -5,6 +5,11 @@ from gogamechen1 import common
 
 CONF = cfg.CONF
 
+agent_opts = [cfg.IntOpt('agent_affinity',
+                         choices=[1, 2, 3, 4, 5, 6, 7],
+                         required=True,
+                         help='agent appcaclition affinity, see common.APPAFFINITYS for more')
+              ]
 
 datadb_opts = [
     cfg.StrOpt('datadb_user',

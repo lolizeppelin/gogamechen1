@@ -348,16 +348,19 @@ class AppEntityReuest(BaseContorller):
             return kwargs.get('agent_id')
         zone = kwargs.get('zone', 'all')
         includes = ['metadata.zone=%s' % zone,
+                    'metadata.gogamechen1-aff&%d' % common.APPAFFINITYS[objtype],
                     'metadata.agent_type=application',
                     'disk>=500', 'free>=200', 'cpu>=2']
         if objtype == common.GAMESERVER:
             # gameserver要求存在外网ip
             includes.append('metadata.external_ips!=None')
-        weighters = [{'cputime': 5},
-                     {'cpu': -1},
-                     {'free': 200},
-                     {'left': 500},
-                     {'process': None}]
+        weighters = [
+            {'metadata.gogamechen1-aff': None},
+            {'cputime': 5},
+            {'cpu': -1},
+            {'free': 200},
+            {'left': 500},
+            {'process': None}]
         agents = self.chioces(common.NAME, includes=includes, weighters=weighters)
         if not agents:
             raise InvalidArgument('Auto select agent fail')
@@ -370,7 +373,7 @@ class AppEntityReuest(BaseContorller):
             return kwargs.get('databases')
         zone = kwargs.get('zone', 'all')
         # 指定亲和性
-        body = dict(affinitys=common.AFFINITYS[objtype].values(),
+        body = dict(affinitys=common.DBAFFINITYS[objtype].values(),
                     dbtype='mysql', zone=zone)
         # 默认使用本地数据库
         impl = kwargs.pop('impl', 'local')
@@ -382,7 +385,7 @@ class AppEntityReuest(BaseContorller):
         for chioce in chioces:
             affinity = chioce['affinity']
             databases = chioce['databases']
-            if affinity & common.AFFINITYS[objtype][common.DATADB] and databases:
+            if affinity & common.DBAFFINITYS[objtype][common.DATADB] and databases:
                 _databases.append(dict(subtype=common.DATADB,
                                        database_id=databases[0]))
                 LOG.debug('Auto select %s.%s database %d' % (objtype, common.DATADB, databases[0]))
@@ -391,7 +394,7 @@ class AppEntityReuest(BaseContorller):
             for chioce in chioces:
                 affinity = chioce['affinity']
                 databases = chioce['databases']
-                if affinity & common.AFFINITYS[objtype][common.LOGDB] and databases:
+                if affinity & common.DBAFFINITYS[objtype][common.LOGDB] and databases:
                     _databases.append(dict(subtype=common.LOGDB,
                                            database_id=databases[0]))
                 LOG.debug('Auto select %s.%s database %d' % (objtype, common.DATADB, databases[0]))
@@ -497,9 +500,7 @@ class AppEntityReuest(BaseContorller):
             raise InvalidArgument('%s need opentime' % objtype)
         # 安装文件信息
         objfile = body.pop('objfile')
-        if isinstance(objfile, basestring):
-            pass
-        else:
+        if not isinstance(objfile, basestring):
             try:
                 objfile = objfile_controller.find(objtype, objfile.get('subtype'), objfile.get('version'))
             except NoResultFound:
@@ -677,7 +678,7 @@ class AppEntityReuest(BaseContorller):
 
     def delete(self, req, group_id, objtype, entity, body=None):
         body = body or {}
-        clean = body.get('clean', 'unquote')
+        clean = body.pop('clean', 'unquote')
         if clean not in ('delete', 'unquote'):
             raise InvalidArgument('clean option value error')
         group_id = int(group_id)

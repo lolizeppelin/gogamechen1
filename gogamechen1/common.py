@@ -13,11 +13,17 @@ APPFILE = 'appfile'
 UNACTIVE = -1
 OK = 0
 
-AFFINITYS = {GAMESERVER: {DATADB: 1, LOGDB: 2},
-             CROSSSERVER: {DATADB: 4},
-             GMSERVER: {DATADB: 8},}
+APPAFFINITYS = {GAMESERVER: 1, CROSSSERVER: 2, GMSERVER: 4}
+#    map app affinitys by bitwise operation
+#    GM    CROSS  GAME
+#     4      2      1
+# GM & CROSS 6
+# GM & CROSS & GAME
 
-#    map anffinitys by bitwise operation
+DBAFFINITYS = {GAMESERVER: {DATADB: 1, LOGDB: 2},
+               CROSSSERVER: {DATADB: 4}, GMSERVER: {DATADB: 8},}
+
+#    map database affinitys by bitwise operation
 #
 #    GM-DATADB    CROSS-DATA-DB   GAME-LOGDB    GAME-DATADB
 #         1             1              1            1
@@ -32,4 +38,4 @@ AFFINITYS = {GAMESERVER: {DATADB: 1, LOGDB: 2},
 # GAME-LOGDB & GAME-LOGDB = 3
 # CROSS-DATA-DB & GM-DATADB = 12
 #
-# affinity & AFFINITYS[GAMESERVER][DATADB]
+# affinity & DBAFFINITYS[GAMESERVER][DATADB]
