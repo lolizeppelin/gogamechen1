@@ -142,9 +142,8 @@ def create_entity(appendpoint, entity, objtype, databases,
     conf = CONF['%s.%s' % (common.NAME, objtype)]
     _database = []
     # format database to class
-    for database in databases:
-        subtype = database.get('subtype')
-        database_id = database.get('database_id')
+    for subtype in databases:
+        database_id = databases[subtype]
         schema = '%s_%s_%s_%d' % (common.NAME, objtype, subtype, entity)
         # 默认认证
         postfix = '-%d' % entity

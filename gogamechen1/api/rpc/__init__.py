@@ -269,6 +269,7 @@ class Application(AppEndpointBase):
             except Exception:
                 LOG.error('Notify bond database info fail')
                 LOG.error('Fail for %d %s' % (entity, str(databases)))
+                raise
             LOG.info('Try bond database success, flush config')
             self.flush_config(entity, databases, opentime, chiefs)
 

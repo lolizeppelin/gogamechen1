@@ -69,6 +69,7 @@ class Routers(router.RoutersBase):
                                        member_prefix='/{entity}',
                                        collection_actions=COLLECTION_ACTIONS,
                                        member_actions=MEMBER_ACTIONS)
+        collection.member.link('reset', method='POST')
         collection.member.link('start', method='POST')
         collection.member.link('stop', method='POST')
         collection.member.link('status', method='POST')

@@ -306,34 +306,9 @@ class AppEntityReuest(BaseContorller):
                                         'description': '开服时间, gameserver专用参数'},
                            'cross_id': {'type': 'integer', 'minimum': 1,
                                         'description': '跨服程序的实体id,gameserver专用参数'},
-                           'zone': {'type': 'string',
-                                    'description': '安装区域'},
-                           'databases': {'type': 'array',
-                                         'items': {'type': 'object',
-                                                    'required': ['type', 'database_id'],
-                                                    'properties': {
-                                                        'subtype': {'type': 'string',
-                                                                    'description': '数据类型(业务日志/业务数据)'},
-                                                        'character_set':  {'type': 'string'},
-                                                        'database_id': {'type': 'integer', 'minimum': 1,
-                                                                        'description': '目标数据库'}}
-                                                   },
-                                         'description': '程序使用的数据库,不填自动分配'}}
+                           'zone': {'type': 'string', 'description': '安装区域,默认zone为all'},
+                           'databases': {'type': 'object', 'description': '程序使用的数据库,不填自动分配'}}
                        }
-
-    # BONDDATABASE = {'type': 'array', 'minItems': 1,
-    #                 'items': {'type': 'object',
-    #                           'required': ['quote_id', 'entity', 'type', 'host', 'port', 'user', 'passwd'],
-    #                           'properties': {'quote_id': {'type': 'integer', 'minimum': 1},
-    #                                          'entity': {'type': 'integer', 'minimum': 1},
-    #                                          'type':  {'type': 'string'},
-    #                                          'host':  {'type': 'string'},
-    #                                          'port':  {'type': 'integer', 'minimum': 1, 'maxmum': 65535},
-    #                                          'user':  {'type': 'string'},
-    #                                          'passwd':  {'type': 'string'},
-    #                                          }
-    #                           }
-    #                 }
 
     def _entityinfo(self, req, entity):
         entityinfo = entity_controller.show(req=req, entity=entity,
@@ -377,50 +352,30 @@ class AppEntityReuest(BaseContorller):
                     dbtype='mysql', zone=zone)
         # 默认使用本地数据库
         impl = kwargs.pop('impl', 'local')
-        _databases = []
+        _databases = dict()
         # 返回排序好的可选数据库
         chioces = database_controller.select(req, impl, body)['data']
         if not chioces:
             raise InvalidArgument('Auto selete database fail')
-        for chioce in chioces:
-            affinity = chioce['affinity']
-            databases = chioce['databases']
-            if affinity & common.DBAFFINITYS[objtype][common.DATADB] and databases:
-                _databases.append(dict(subtype=common.DATADB,
-                                       database_id=databases[0]))
-                LOG.debug('Auto select %s.%s database %d' % (objtype, common.DATADB, databases[0]))
-                break
-        if objtype == common.GAMESERVER:
+        for subtype in common.DBAFFINITYS[objtype].keys():
             for chioce in chioces:
                 affinity = chioce['affinity']
                 databases = chioce['databases']
-                if affinity & common.DBAFFINITYS[objtype][common.LOGDB] and databases:
-                    _databases.append(dict(subtype=common.LOGDB,
-                                           database_id=databases[0]))
-                LOG.debug('Auto select %s.%s database %d' % (objtype, common.DATADB, databases[0]))
-                break
+                if affinity & common.DBAFFINITYS[objtype][common.DATADB] and databases:
+                    _databases.setdefault(subtype, databases[0])
+                    # _databases.append(dict(subtype=common.DATADB,
+                    #                        database_id=databases[0]))
+                    LOG.debug('Auto select %s.%s database %d' % (objtype, subtype, databases[0]))
+                    break
         return _databases
 
     def _validate_databases(self, objtype, databases):
-        datadb = 0
-        logdb = 0
-        for database in databases:
-            if database.get('subtype') == common.DATADB:
-                datadb += 1
-            elif database.get('subtype') == common.LOGDB:
-                logdb += 1
-            else:
-                raise InvalidArgument('Database subtype %s unkonwn' % database.get('subtype'))
-        if objtype == common.GAMESERVER:
-            if datadb == 1 and logdb == 1:
-                pass
-            else:
-                raise InvalidArgument('%s datadb %d, logdb %d' % (objtype, datadb, logdb))
-        else:
-            if datadb == 1 and logdb == 0:
-                pass
-            else:
-                raise InvalidArgument('%s datadb %d, logdb %d' % (objtype, datadb, logdb))
+        NEEDED = common.DBAFFINITYS[objtype].keys()
+        if set(NEEDED) != set(databases.keys()):
+            for subtype in NEEDED:
+                if subtype not in databases:
+                    raise InvalidArgument('database %s.%s not set')
+            raise ValueError('Databases not match database needed info')
 
     def index(self, req, group_id, objtype, body=None):
         body = body or {}
@@ -633,7 +588,7 @@ class AppEntityReuest(BaseContorller):
             threadpool.add_thread(entity_controller.post_create_entity,
                                   _entity.get('entity'), common.NAME, objtype=objtype,
                                   opentime=opentime,
-                                  group_id=group_id, areas=[next_area,])
+                                  group_id=group_id, areas=[next_area, ])
 
             return resultutils.results(result='create %s entity success' % objtype,
                                        data=[_result, ])
@@ -712,7 +667,7 @@ class AppEntityReuest(BaseContorller):
                                                         schema=schema,
                                                         body={'quotes': True})['data'][0]['quotes']
                         if set(quotes) != set([_database.quote_id]):
-                            result = 'delete %s:%d fail' %  (objtype, entity)
+                            result = 'delete %s:%d fail' % (objtype, entity)
                             reason = ': database [%d].%s quote: %s' % (_database.database_id, schema, str(quotes))
                             return resultutils.results(result=(result + reason))
                         LOG.info('Delete quotes check success for %s' % schema)
@@ -865,6 +820,7 @@ class AppEntityReuest(BaseContorller):
         rpc_method = '%s_entitys' % action
         rpc_args = dict(entitys=list(_entitys))
         rpc_args.update(body)
+
         def wapper():
             self.send_asyncrequest(asyncrequest, target,
                                    rpc_ctxt, rpc_method, rpc_args)
@@ -880,3 +836,63 @@ class AppEntityReuest(BaseContorller):
 
     def status(self, req, group_id, objtype, entity, body):
         return self._async_bluck_rpc('start', group_id, objtype, entity, body)
+
+    def reset(self, req, group_id, objtype, entity, body):
+        session = endpoint_session()
+        query = model_query(session, AppEntity, filter=and_(AppEntity.group_id == group_id,
+                                                            AppEntity.entity == entity))
+        query.options(joinedload(AppEntity.databases, innerjoin=False))
+        entity = query.one()
+        if entity.objtype != objtype:
+            raise InvalidArgument('Entity objtype is %s' % entity.objtype)
+
+        # 从本地查询数据库信息
+        databases = {}
+        for database in entity.databases:
+            subtype = database.subtype
+            if subtype in databases:
+                schema = '%s_%s_%s_%d' % (common.NAME, objtype, subtype, entity)
+                databases[subtype] = dict(host=database.host,
+                                          port=database.port,
+                                          user=database.user,
+                                          passwd=database.passwd,
+                                          schema=schema,
+                                          character_set=database.character_set)
+        saves = []
+        # 必要数据库信息
+        NEEDED = common.DBAFFINITYS[objtype].keys()
+        # 数据库信息不匹配,从gopdb接口反查数据库信息
+        if set(NEEDED) != set(databases.keys()):
+            quotes = schema_controller.quotes(req, body=dict(entitys=[entity, ], endpoint=common.NAME))['data']
+            for subtype in NEEDED:
+                if subtype not in databases:
+                    # 从gopdb接口查询引用信息
+                    schema = '%s_%s_%s_%d' % (common.NAME, objtype, subtype, entity)
+                    for quote_detail in quotes:
+                        # 确认引用不是从库且结构名称相等
+                        if quote_detail['qdatabase_id'] == quote_detail['database_id'] \
+                                and quote_detail['schema'] == schema:
+                            databases.setdefault(common.DATADB,
+                                                 dict(host=quote_detail['host'],
+                                                      port=quote_detail['port'],
+                                                      user=quote_detail['user'],
+                                                      passwd=quote_detail['passwd'],
+                                                      schema=schema,
+                                                      character_set=quote_detail['character_set']))
+                            saves.append(AreaDatabase(quote_id=quote_detail['quote_id'],
+                                                      entity=entity,
+                                                      subtype=subtype,
+                                                      host=quote_detail['host'],
+                                                      port=quote_detail['port'],
+                                                      user=quote_detail['user'],
+                                                      passwd=quote_detail['passwd'],
+                                                      ro_user=quote_detail['ro_user'],
+                                                      ro_passwd=quote_detail['ro_passwd'],
+                                                      ))
+                            quotes.remove(quote_detail)
+                            break
+                    if subtype not in databases:
+                        LOG.critical('Miss database of %s' % schema)
+                        # 数据库信息对正确
+                        raise ValueError('Not %s.%s database found for %d' % (objtype, subtype, entity))
+        self._validate_databases(objtype, databases)
