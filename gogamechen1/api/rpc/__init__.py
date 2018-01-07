@@ -125,12 +125,15 @@ class Application(AppEndpointBase):
                 LOG.info('App entity %d is running at %d' % (entity, _pid))
                 self.konwn_appentitys[entity]['pid'] = _pid
 
-    def _esure(self, entity, objtype, username, pwd):
+    def _esure(self, entity, objtype, proc):
         datadir = False
         runuser = False
-        if username == self.entity_user(entity):
+        _execfile = os.path.join(self.apppath(entity), 'bin', objtype)
+        if proc.get('exe') != _execfile:
+            return False
+        if proc.get('username') == self.entity_user(entity):
             runuser = True
-        if pwd == os.path.join(self.apppath(entity), objtype):
+        if proc.get('pwd') == self.apppath(entity):
             datadir = True
         if datadir and runuser:
             return True
@@ -142,9 +145,9 @@ class Application(AppEndpointBase):
     def _find_from_pids(self, entity, objtype, pids=None):
         if not pids:
             pids = utils.find_process(objtype)
-        for info in pids:
-            if self._esure(entity, objtype, info.get('username'), info.get('pwd')):
-                return info.get('pid')
+        for proc in pids:
+            if self._esure(entity, objtype, proc):
+                return proc.get('pid')
 
     def _objconf(self, entity, objtype):
         return os.path.join(self.apppath(entity), 'conf', '%s.json' % objtype)
@@ -283,7 +286,7 @@ class Application(AppEndpointBase):
         user = self.entity_user(entity)
         group = self.entity_group(entity)
         pwd = self.apppath(entity)
-        logfile = os.path.join(self.logpath(entity), '%s.log.%d' %
+        logfile = os.path.join(self.logpath(entity), '%s.log.start.%d' %
                                (objtype, int(time.time())))
         EXEC = os.path.join(pwd, os.path.join('bin', objtype))
         if not os.path.exists(EXEC):
@@ -373,6 +376,11 @@ class Application(AppEndpointBase):
         entity = int(entity)
         _start = time.time()
         with self.lock(entity):
+            if self._entity_process(entity):
+                return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                                  ctxt=ctxt,
+                                                  resultcode=manager_common.RESULT_ERROR,
+                                                  result='entity is running, can not reset')
             objtype = self.konwn_appentitys[entity].get('objtype')
             ports = self._get_ports(entity)
             if not ports:
@@ -410,7 +418,10 @@ class Application(AppEndpointBase):
                 waiter()
 
             self.flush_config(entity, databases=databases, chiefs=chiefs)
-
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          ctxt=ctxt,
+                                          resultcode=manager_common.RESULT_SUCCESS,
+                                          result='entity is reset finish')
 
     def rpc_delete_entity(self, ctxt, entity, **kwargs):
         entity = int(entity)
