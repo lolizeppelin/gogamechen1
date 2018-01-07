@@ -909,6 +909,14 @@ class AppEntityReuest(BaseContorller):
                         # 数据库信息无法从gopdb中反查到
                         raise ValueError('Not %s.%s database found for %d' % (objtype, subtype, entity))
         self._validate_databases(objtype, databases)
+        entityinfo = entity_controller.show(req=req, entity=entity,
+                                            endpoint=common.NAME,
+                                            body={'ports': False})['data'][0]
+        # ports = entityinfo['ports']
+        agent_id = entityinfo['agent_id']
+        metadata = entityinfo['metadata']
+        if not metadata:
+            raise InvalidArgument('Agent is off line, can not reset entity')
         with session.begin():
             if objtype == common.GAMESERVER:
                 cross_id = _entity.cross_id
@@ -922,8 +930,8 @@ class AppEntityReuest(BaseContorller):
                     raise ValueError('Try find %s.%d chiefs from local database error' % (objtype, entity))
                 for chief in _chiefs:
                     for _objtype in (common.GMSERVER, common.CROSSSERVER):
-                        metadata, ports = self._entityinfo(req, chief.entity)
-                        if not metadata:
+                        _metadata, ports = self._entityinfo(req, chief.entity)
+                        if not _metadata:
                             raise InvalidArgument('Metadata of %s.%d is none' % (_objtype, chief.entity))
                         if chief.objtype == _objtype:
                             chiefs[_objtype] = dict(entity=chief.entity,
@@ -936,13 +944,7 @@ class AppEntityReuest(BaseContorller):
                 for obj in miss:
                     session.add(obj)
                     session.flush()
-            entityinfo = entity_controller.show(req=req, entity=entity,
-                                                endpoint=common.NAME,
-                                                body={'ports': False})['data'][0]
-            agent_id = entityinfo['agent_id']
-            metadata = entityinfo['metadata']
-            target = targetutils.target_agent_by_string(metadata.get('agent_type'),
-                                                        metadata.get('host'))
+            target = targetutils.target_agent_by_string(metadata.get('agent_type'), metadata.get('host'))
             target.namespace = common.NAME
             rpc = get_client()
             finishtime, timeout = rpcfinishtime()

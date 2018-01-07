@@ -151,8 +151,10 @@ class Application(AppEndpointBase):
 
     @contextlib.contextmanager
     def _allocate_port(self, entity, objtype, ports):
-        if isinstance(ports, (int, long, type(None))):
+        if isinstance(ports, (int, long)):
             ports = [ports]
+        elif not ports:
+            ports = [None,]
         if objtype == common.GMSERVER:
             if len(ports) == 1:
                 ports.append(None)
@@ -271,6 +273,7 @@ class Application(AppEndpointBase):
                 LOG.error('Fail for %d %s' % (entity, str(databases)))
                 raise
             LOG.info('Try bond database success, flush config')
+            eventlet.sleep(3)
             self.flush_config(entity, databases, opentime, chiefs)
 
         threadpool.add_thread(_postdo)
@@ -317,7 +320,7 @@ class Application(AppEndpointBase):
         gfile.check(objtype, objfile)
 
         entity = int(entity)
-        with self.lock(entity, timeout=3):
+        with self.lock(entity):
             if entity in self.entitys:
                 return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                                   resultcode=manager_common.RESULT_ERROR,
@@ -338,8 +341,14 @@ class Application(AppEndpointBase):
                                                           result=str(middleware))
                     def _port_notity():
                         """notify port bond"""
-                        self.client.ports_add(agent_id=self.manager.agent_id,
-                                              endpoint=common.NAME, entity=entity, ports=ports)
+                        eventlet.sleep(0)
+                        with self.lock(entity, timeout=15):
+                            try:
+                                self.client.ports_add(agent_id=self.manager.agent_id,
+                                                      endpoint=common.NAME, entity=entity, ports=ports)
+                            except Exception:
+                                LOG.error('Bond ports for %d fail')
+                                self._free_ports(entity)
                     threadpool.add_thread(_port_notity)
 
         resultcode = manager_common.RESULT_SUCCESS
@@ -365,6 +374,13 @@ class Application(AppEndpointBase):
         _start = time.time()
         with self.lock(entity):
             objtype = self.konwn_appentitys[entity].get('objtype')
+            ports = self._get_ports(entity)
+            if not ports:
+                LOG.info('%s.%d port is miss' % (objtype, entity) )
+                with self._allocate_port(entity, objtype, ports) as ports:
+                    self.client.ports_add(agent_id=self.manager.agent_id, endpoint=common.NAME,
+                                          entity=entity, ports=ports)
+                    LOG.info('Miss port of %s.%d, success allocate' % (objtype, entity))
             if objfile:
                 objfile = self.filemanager.get(objfile, download=False)
                 gfile.check(objtype, objfile)
