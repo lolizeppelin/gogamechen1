@@ -29,6 +29,9 @@ def _format_database_url(subtype, database):
 def _format_chiefs(chiefs):
     _chiefs = OrderedDict()
     for chief in (common.GMSERVER, common.CROSSSERVER):
+        if chief == common.GMSERVER:
+            if len(chiefs[chief]['ports']) != 2:
+                raise ValueError('Port count of %s is not 2' % chief)
         _chiefs.setdefault(chief, '%s:%d' % (chiefs[chief]['local_ip'],
                                              chiefs[chief]['ports'][0]))
     return _chiefs
@@ -94,8 +97,8 @@ def loginsvr_make(logpath, local_ip, ports, entity, databases):
     conf = OrderedDict()
     conf.setdefault('LogLevel', 'info')
     conf.setdefault('LogPath', logpath)
-    conf.setdefault('WSAddr', '%s:%d' % (local_ip, ports[0]))
-    conf.setdefault('ListenAddr', '%s:%d' % (local_ip, ports[1]))
+    conf.setdefault('WSAddr', '%s:%d' % (local_ip, ports[1]))
+    conf.setdefault('ListenAddr', '%s:%d' % (local_ip, ports[0]))
     conf.setdefault('DB', databases[common.DATADB])
     return conf
 

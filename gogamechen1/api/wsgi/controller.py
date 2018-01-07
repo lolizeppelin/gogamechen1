@@ -937,7 +937,8 @@ class AppEntityReuest(BaseContorller):
                     session.add(obj)
                     session.flush()
             entityinfo = entity_controller.show(req=req, entity=entity,
-                                                endpoint=common.NAME, body={'ports': False})['data'][0]
+                                                endpoint=common.NAME,
+                                                body={'ports': False})['data'][0]
             agent_id = entityinfo['agent_id']
             metadata = entityinfo['metadata']
             target = targetutils.target_agent_by_string(metadata.get('agent_type'),
