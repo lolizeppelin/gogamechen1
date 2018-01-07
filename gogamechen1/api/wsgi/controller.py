@@ -9,6 +9,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.orm.exc import MultipleResultsFound
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.sql import and_
+from sqlalchemy.sql import or_
 
 from simpleutil.common.exceptions import InvalidArgument
 from simpleutil.log import log as logging
@@ -227,14 +228,13 @@ class GroupReuest(BaseContorller):
             _entitys = {}
             for entity in _group.entitys:
                 objtype = entity.objtype
-                info = dict(entity=entity.entity)
+                entityinfo = dict(entity=entity.entity)
                 if entity.areas:
-                    info.setdefault('areas', [dict(area_id=area.area_id, cross_id=area.cross_id)
-                                              for area in entity.areas])
+                    entityinfo.setdefault('areas', [ area.area_id for area in entity.areas])
                 try:
-                    _entitys[objtype].append(info)
+                    _entitys[objtype].append(entityinfo)
                 except KeyError:
-                    _entitys[objtype] = [info, ]
+                    _entitys[objtype] = [entityinfo, ]
             group_info.setdefault('entitys', _entitys)
         return resultutils.results(result='show group success', data=[group_info, ])
 
@@ -272,6 +272,7 @@ class GroupReuest(BaseContorller):
             metadata = entityinfo.get('metadata')
             ports = entityinfo.get('ports')
             chiefs.append(dict(entity=entity.entity,
+                               objtype=entity.objtype,
                                ports=ports,
                                local_ip=metadata.get('local_ip'),
                                external_ips=metadata.get('external_ips'))
@@ -522,12 +523,13 @@ class AppEntityReuest(BaseContorller):
                             counter = dict()
                             for _cross in crossservers:
                                 counter.setdefault(_cross.cross_id, 0)
-                            # 查询当前组内所有area
-                            for _area in _group.areas:
-                                if _area.entity in counted:
+                            # 查询当前组内所有entity对应的cross_id
+                            for _entity in _group._entity:
+                                if _entity.objtype != common.GAMESERVER:
                                     continue
-                                _area.entity.add(_area.entity)
-                                counter[_area.cross_id] += 1
+                                if _entity.cross_id in counted:
+                                    continue
+                                counter[_entity.cross_id] += 1
                             # 选取引用次数最少的cross_id
                             cross_id = sorted(zip(counter.itervalues(), counter.iterkeys()))[0][1]
                             for _cross in crossservers:
@@ -560,12 +562,14 @@ class AppEntityReuest(BaseContorller):
                         chiefs=chiefs)
 
             with session.begin():
+                body.setdefault('finishtime', rpcfinishtime()+5)
                 _entity = entity_controller.create(req=req, agent_id=agent_id,
                                                    endpoint=common.NAME, body=body)['data'][0]
                 # 插入实体信息
                 appentity = AppEntity(entity=_entity.get('entity'),
                                       agent_id=agent_id,
                                       group_id=group_id, objtype=objtype,
+                                      cross_id=chiefs.get(common.CROSSSERVER).get('entity'),
                                       opentime=opentime)
                 session.add(appentity)
                 session.flush()
@@ -573,9 +577,8 @@ class AppEntityReuest(BaseContorller):
                     # 插入area数据
                     query = model_query(session, Group, filter=Group.group_id == group_id)
                     gamearea = GameArea(area_id=_group.lastarea+1,
-                                        entity=appentity.appentity,
                                         group_id=_group.group_id,
-                                        cross_id=chiefs.get(common.CROSSSERVER).get('entity'))
+                                        entity=appentity.appentity)
                     session.add(gamearea)
                     session.flush()
                     # 更新 group lastarea属性
@@ -655,7 +658,7 @@ class AppEntityReuest(BaseContorller):
                     if model_count_with_key(session, AppEntity, filter=AppEntity.group_id == group_id) > 1:
                         raise InvalidArgument('You must delete other objtype entity before delete gm')
                 elif objtype == common.CROSSSERVER:
-                    if model_count_with_key(session, GameArea, filter=GameArea.cross_id == _entity.entity):
+                    if model_count_with_key(session, AppEntity, filter=AppEntity.cross_id == _entity.entity):
                         raise InvalidArgument('Cross server are reflected')
 
                 # esure database delete
@@ -748,10 +751,11 @@ class AppEntityReuest(BaseContorller):
                                                         metadata.get('host'))
             target.namespace = common.NAME
             rpc = get_client()
-            rpc_ret = rpc.call(target, ctxt={'finishtime': rpcfinishtime(),
-                                             'agents': [agent_id, ]},
-                                  msg={'method': 'opentime_entity', 'args': dict(entity=entity,
-                                                                                 opentime=opentime)})
+            finishtime, timeout = rpcfinishtime()
+            rpc_ret = rpc.call(target, ctxt={'finishtime': finishtime, 'agents': [agent_id, ]},
+                               msg={'method': 'opentime_entity',
+                                    'args': dict(entity=entity,opentime=opentime)},
+                               timeout=timeout)
             if not rpc_ret:
                 raise RpcResultError('change entity opentime result is None')
             if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
@@ -759,7 +763,7 @@ class AppEntityReuest(BaseContorller):
         return resultutils.results(result='change entity opentime' % entity)
 
     def bondto(self, req, entity, body=None):
-        """记录数据库绑定信息"""
+        """本地记录数据库绑定信息"""
         body = body or {}
         entity = int(entity)
         databases = body.pop('databases')
@@ -838,17 +842,27 @@ class AppEntityReuest(BaseContorller):
         return self._async_bluck_rpc('start', group_id, objtype, entity, body)
 
     def reset(self, req, group_id, objtype, entity, body):
+        body = body or {}
+        # 重置文件信息,为空表示不需要重置文件
+        objfile = body.pop('objfile', None)
+        if objfile and not isinstance(objfile, basestring):
+            try:
+                objfile = objfile_controller.find(objtype, objfile.get('subtype'), objfile.get('version'))
+            except NoResultFound:
+                raise InvalidArgument('%s of %s with versison %s can not be found' %
+                                      (objfile.get('subtype'), objtype, objfile.get('version')))
+        # 查询entity信息
         session = endpoint_session()
         query = model_query(session, AppEntity, filter=and_(AppEntity.group_id == group_id,
                                                             AppEntity.entity == entity))
         query.options(joinedload(AppEntity.databases, innerjoin=False))
-        entity = query.one()
-        if entity.objtype != objtype:
-            raise InvalidArgument('Entity objtype is %s' % entity.objtype)
-
-        # 从本地查询数据库信息
+        _entity = query.one()
+        if _entity.objtype != objtype:
+            raise InvalidArgument('Entity objtype is %s' % _entity.objtype)
+        chiefs = {}
         databases = {}
-        for database in entity.databases:
+        # 从本地查询数据库信息
+        for database in _entity.databases:
             subtype = database.subtype
             if subtype in databases:
                 schema = '%s_%s_%s_%d' % (common.NAME, objtype, subtype, entity)
@@ -858,7 +872,7 @@ class AppEntityReuest(BaseContorller):
                                           passwd=database.passwd,
                                           schema=schema,
                                           character_set=database.character_set)
-        saves = []
+        miss = []
         # 必要数据库信息
         NEEDED = common.DBAFFINITYS[objtype].keys()
         # 数据库信息不匹配,从gopdb接口反查数据库信息
@@ -879,20 +893,68 @@ class AppEntityReuest(BaseContorller):
                                                       passwd=quote_detail['passwd'],
                                                       schema=schema,
                                                       character_set=quote_detail['character_set']))
-                            saves.append(AreaDatabase(quote_id=quote_detail['quote_id'],
-                                                      entity=entity,
-                                                      subtype=subtype,
-                                                      host=quote_detail['host'],
-                                                      port=quote_detail['port'],
-                                                      user=quote_detail['user'],
-                                                      passwd=quote_detail['passwd'],
-                                                      ro_user=quote_detail['ro_user'],
-                                                      ro_passwd=quote_detail['ro_passwd'],
-                                                      ))
+                            miss.append(AreaDatabase(quote_id=quote_detail['quote_id'],
+                                                     entity=entity,
+                                                     subtype=subtype,
+                                                     host=quote_detail['host'],
+                                                     port=quote_detail['port'],
+                                                     user=quote_detail['user'],
+                                                     passwd=quote_detail['passwd'],
+                                                     ro_user=quote_detail['ro_user'],
+                                                     ro_passwd=quote_detail['ro_passwd']))
                             quotes.remove(quote_detail)
                             break
                     if subtype not in databases:
                         LOG.critical('Miss database of %s' % schema)
-                        # 数据库信息对正确
+                        # 数据库信息无法从gopdb中反查到
                         raise ValueError('Not %s.%s database found for %d' % (objtype, subtype, entity))
         self._validate_databases(objtype, databases)
+        with session.begin():
+            if objtype == common.GAMESERVER:
+                cross_id = _entity.cross_id
+                if cross_id is None:
+                    raise ValueError('%s.%d cross_id is None' % (objtype, entity))
+                query = model_query(session, AppEntity,
+                                    filter=or_(AppEntity.entity == entity,
+                                               AppEntity.objtype == common.GMSERVER))
+                _chiefs = query.all()
+                if len(_chiefs) != 2:
+                    raise ValueError('Try find %s.%d chiefs from local database error' % (objtype, entity))
+                for chief in _chiefs:
+                    for _objtype in (common.GMSERVER, common.CROSSSERVER):
+                        metadata, ports = self._entityinfo(req, chief.entity)
+                        if not metadata:
+                            raise InvalidArgument('Metadata of %s.%d is none' % (_objtype, chief.entity))
+                        if chief.objtype == _objtype:
+                            chiefs[_objtype] = dict(entity=chief.entity,
+                                                    posts=ports,
+                                                    local_ip=metadata.get('local_ip'))
+                if len(chiefs) != 2:
+                    raise ValueError('%s.%d chiefs error' % (objtype, entity))
+            # 有数据库信息遗漏
+            if miss:
+                for obj in miss:
+                    session.add(obj)
+                    session.flush()
+            entityinfo = entity_controller.show(req=req, entity=entity,
+                                                endpoint=common.NAME, body={'ports': False})['data'][0]
+            agent_id = entityinfo['agent_id']
+            metadata = entityinfo['metadata']
+            target = targetutils.target_agent_by_string(metadata.get('agent_type'),
+                                                        metadata.get('host'))
+            target.namespace = common.NAME
+            rpc = get_client()
+            finishtime, timeout = rpcfinishtime()
+            if objfile:
+                finishtime += 15
+                timeout += 15
+            rpc_ret = rpc.call(target, ctxt={'finishtime': finishtime, 'agents': [agent_id, ]},
+                               msg={'method': 'reset_entity', 'args':
+                                   dict(entity=entity, objfile=objfile,
+                                        databases=databases, chiefs=chiefs)},
+                               timeout=timeout)
+            if not rpc_ret:
+                raise RpcResultError('reset entity result is None')
+            if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
+                raise RpcResultError('reset entity fail %s' % rpc_ret.get('result'))
+            return resultutils.results(result='reset entity %d success' % entity)

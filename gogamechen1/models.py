@@ -53,15 +53,13 @@ class AreaDatabase(TableBase):
 
 class GameArea(TableBase):
     area_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
-    entity = sa.Column(sa.ForeignKey('appentitys.entity', ondelete="RESTRICT", onupdate='RESTRICT'),
-                       primary_key=True, nullable=False)
     group_id = sa.Column(sa.ForeignKey('groups.group_id', ondelete="RESTRICT", onupdate='RESTRICT'),
-                         nullable=False)
-    cross_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
+                         nullable=False, primary_key=True)
+    entity = sa.Column(sa.ForeignKey('appentitys.entity', ondelete="RESTRICT", onupdate='RESTRICT'),
+                       nullable=False)
 
     __table_args__ = (
         sa.Index('group_index', 'group_id'),
-        sa.UniqueConstraint('area_id', 'group_id', name='area_id_unique'),
         InnoDBTableBase.__table_args__
     )
 
@@ -74,6 +72,7 @@ class AppEntity(TableBase):
     objtype = sa.Column(VARCHAR(64), nullable=False)
     opentime = sa.Column(INTEGER(unsigned=True), nullable=True)
     status = sa.Column(TINYINT(64), nullable=False, default=common.UNACTIVE)
+    cross_id = sa.Column(INTEGER(unsigned=True), nullable=True)
     areas = orm.relationship(GameArea, backref='appentity', lazy='select',
                              cascade='delete,delete-orphan')
     databases = orm.relationship(AreaDatabase, backref='appentity', lazy='select',

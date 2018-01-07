@@ -57,14 +57,14 @@ LOG = logging.getLogger(__name__)
 
 
 def count_timeout(ctxt, kwargs):
-    deadline = ctxt.get('deadline')
-    timeout = kwargs.pop('timeout', None)
-    if deadline is None:
-        return timeout if timeout is not None else 600
-    deadline = deadline - int(time.time())
+    finishtime = ctxt.get('finishtime')
+    timeout = kwargs.pop('timeout', None) if kwargs else None
+    if finishtime is None:
+        return timeout if timeout is not None else 15
+    _timeout = finishtime - int(time.time())
     if timeout is None:
-        return deadline
-    return min(deadline, timeout)
+        return _timeout
+    return min(_timeout, timeout)
 
 
 @singleton.singleton
@@ -147,7 +147,7 @@ class Application(AppEndpointBase):
                 return info.get('pid')
 
     def _objconf(self, entity, objtype):
-        return os.path.join(self.apppath(entity), 'conf', '%s.conf' % objtype)
+        return os.path.join(self.apppath(entity), 'conf', '%s.json' % objtype)
 
     @contextlib.contextmanager
     def _allocate_port(self, entity, objtype, ports):
@@ -248,13 +248,13 @@ class Application(AppEndpointBase):
         timeout = timeout if timeout else 30
         overtime = int(time.time()) + timeout
         dst = self.apppath(entity)
-        wait = zlibutils.async_extract(src=objfile, dst=dst , timeout=timeout,
-                                       fork=functools.partial(safe_fork, self.entity_user(entity),
-                                                              self.entity_group(entity)))
+        waiter = zlibutils.async_extract(src=objfile, dst=dst , timeout=timeout,
+                                        fork=functools.partial(safe_fork, self.entity_user(entity),
+                                                               self.entity_group(entity)))
                                        # exclude=self._exclude(objtype))
         def _postdo():
             LOG.debug('wait %s extract to %s' % (objfile, dst))
-            wait()
+            waiter()
             while entity not in self.konwn_appentitys:
                 if int(time.time()) > overtime:
                     LOG.error('Get entity %d from konwn appentity fail, database not bond' % entity)
@@ -286,21 +286,22 @@ class Application(AppEndpointBase):
         if not os.path.exists(EXEC):
             raise ValueError('Execute targe %s not exist' % EXEC)
         args = [EXEC, ]
-        pid = safe_fork(user=user, group=group)
-        if pid == 0:
-            ppid = os.fork()
-            # fork twice
-            if ppid == 0:
-                os.closerange(3, systemutils.MAXFD)
-                os.chdir(pwd)
-                with open(logfile, 'ab') as f:
-                    os.dup2(f.fileno(), 1)
-                    os.dup2(f.fileno(), 2)
-                os.execv(EXEC, args)
+        with self.lock(entity):
+            pid = safe_fork(user=user, group=group)
+            if pid == 0:
+                ppid = os.fork()
+                # fork twice
+                if ppid == 0:
+                    os.closerange(3, systemutils.MAXFD)
+                    os.chdir(pwd)
+                    with open(logfile, 'ab') as f:
+                        os.dup2(f.fileno(), 1)
+                        os.dup2(f.fileno(), 2)
+                    os.execv(EXEC, args)
+                else:
+                    os._exit(0)
             else:
-                os._exit(0)
-        else:
-            posix.wait(pid)
+                posix.wait(pid)
 
     def stop(self, entity):
         pass
@@ -357,14 +358,48 @@ class Application(AppEndpointBase):
                                                       opentime=kwargs.pop('opentime'),
                                                       pid=None))
 
-    def rpc_reset_entity(self, ctxt, entity, **kwargs):
+    def rpc_reset_entity(self, ctxt, entity, objfile,
+                      databases, chiefs, **kwargs):
+        timeout = count_timeout(ctxt, kwargs)
         entity = int(entity)
-        pass
+        _start = time.time()
+        with self.lock(entity):
+            objtype = self.konwn_appentitys[entity].get('objtype')
+            if objfile:
+                objfile = self.filemanager.get(objfile, download=False)
+                gfile.check(objtype, objfile)
+                apppath = self.apppath(entity)
+                cfile = self._objconf(entity, objtype)
+                confdir = os.path.split(cfile)[0]
+                oldcf = None
+                if os.path.exists(cfile):
+                    LOG.debug('Read old config from %s' % cfile)
+                    with open(cfile, 'rb') as f:
+                        oldcf = json.load(f)
+                LOG.info('Remove path %s' % apppath)
+                shutil.rmtree(apppath)
+                os.makedirs(apppath, 0755)
+                systemutils.chown(apppath, self.entity_user(entity), self.entity_group(entity))
+                if oldcf:
+                    LOG.debug('Write back old config from %s' % cfile)
+                    os.makedirs(confdir, 0755)
+                    systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
+                    with open(cfile, 'wb') as f:
+                        json.dump(oldcf, f)
+                used = time.time() - _start
+                timeout -= used
+                waiter = zlibutils.async_extract(src=objfile, dst=apppath , timeout=timeout,
+                                                 fork=functools.partial(safe_fork, self.entity_user(entity),
+                                                                        self.entity_group(entity)))
+                waiter()
+
+            self.flush_config(entity, databases=databases, chiefs=chiefs)
+
 
     def rpc_delete_entity(self, ctxt, entity, **kwargs):
         entity = int(entity)
         token = kwargs.pop('token')
-        timeout = count_timeout(ctxt, kwargs if kwargs else {})
+        timeout = count_timeout(ctxt, kwargs)
         while self.frozen:
             if timeout < 1:
                 raise RpcTargetLockException(self.namespace, str(entity), 'endpoint locked')
@@ -394,14 +429,14 @@ class Application(AppEndpointBase):
                                           result=result)
 
     def rpc_start_entitys(self, ctxt, entitys, **kwargs):
-        overtime = count_timeout(ctxt, kwargs) + time.time()
+        timeout = count_timeout(ctxt, kwargs)
+        overtime = timeout + time.time()
         entitys = argutils.map_to_int(entitys) & set(self.entitys)
         if not entitys:
             return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                               resultcode=manager_common.RESULT_ERROR,
                                               ctxt=ctxt,
                                               result='start entitys fail, no entitys found')
-
         details = []
         for entity in entitys:
 
@@ -412,17 +447,23 @@ class Application(AppEndpointBase):
                                         resultcode=manager_common.RESULT_SUCCESS,
                                         result='start entity %d success' % target_id
                                         ))
+                except RpcTargetLockException as e:
+                    details.append(dict(detail_id=target_id,
+                                        resultcode=manager_common.RESULT_ERROR,
+                                        result='start entity %d fail, %s' % (target_id, e.message)
+                                        ))
                 except Exception:
                     details.append(dict(detail_id=target_id,
                                         resultcode=manager_common.RESULT_ERROR,
                                         result='start entity %d fail' % target_id
                                         ))
                     LOG.exception('Start entity %d fail' % target_id)
+
             eventlet.spawn_n(safe_wapper, entity)
 
         while len(details) < len(entitys):
             eventlet.sleep(0.5)
-            if int(time.time()) >= overtime:
+            if int(time.time()) > overtime:
                 break
         responsed_entitys = set([detail.get('detail_id') for detail in details])
         for no_response_entity in (entitys - responsed_entitys):
@@ -459,8 +500,12 @@ class Application(AppEndpointBase):
     def rpc_opentime_entity(self, ctxt, entity, opentime):
         if entity not in self.entitys:
             raise RpcCtxtException('Entity %d not exist' % entity)
+        objtype = self.konwn_appentitys[entity].get('objtype')
+        if objtype != common.GAMESERVER:
+            raise ValueError('%s has no opentime conf' % object)
         with self.lock(entity=[entity]):
             self.konwn_appentitys[entity]['opentime'] = opentime
+            self.flush_config(entity, opentime=opentime)
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           resultcode=manager_common.RESULT_SUCCESS,
                                           ctxt=ctxt,
