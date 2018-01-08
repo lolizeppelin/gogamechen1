@@ -13,17 +13,17 @@ gamesvr_regx = re.compile('^bin/(libbehaviac.so|libgointerface.so|gamesvr)*?$|'
 
 def gamesvr_checker(filename):
     if not re.match(gamesvr_regx, filename):
-        raise ValueError('%s not for gamesvr')
+        raise ValueError('%s not for gamesvr' % filename)
 
 
 def loginsvr_checker(filename):
     if filename not in ('bin/', 'bin/loginsvr'):
-        raise ValueError('%s not for loginsvr')
+        raise ValueError('%s not for loginsvr' % filename)
 
 
 def publicsvr_checker(filename):
     if filename not in ('bin/', 'bin/publicsvr'):
-        raise ValueError('%s not for publicsvr')
+        raise ValueError('%s not for publicsvr' % filename)
 
 
 def nameiter(filepath):

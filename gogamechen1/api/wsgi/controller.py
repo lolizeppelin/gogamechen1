@@ -249,7 +249,7 @@ class GroupReuest(BaseContorller):
         query.options(joinedload(Group.entitys, innerjoin=False))
         _group = query.one()
         if _group.entitys:
-            raise
+            raise InvalidArgument('Group has entitys, can not be delete')
         query.delete()
         return resultutils.results(result='delete group success',
                                    data=[dict(group_id=_group.group_id, name=_group.name)])
@@ -499,7 +499,7 @@ class AppEntityReuest(BaseContorller):
             else:
                 # 非gm实体添加需要先找到同组的gm
                 try:
-                    gm = typemap[common.GMSERVER]
+                    gm = typemap[common.GMSERVER][0]
                 except KeyError as e:
                     return resultutils.results('create entity fail, can not find my chief: %s' % e.message,
                                                resultcode=manager_common.RESULT_ERROR)

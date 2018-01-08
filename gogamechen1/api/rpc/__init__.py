@@ -328,7 +328,7 @@ class Application(AppEndpointBase):
                 return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                                   resultcode=manager_common.RESULT_ERROR,
                                                   ctxt=ctxt,
-                                                  result='create %s database fail, entity exist' % entity)
+                                                  result='create %s.%d fail, entity exist' % (objtype, entity))
             with self._prepare_entity_path(entity):
                 confdir = os.path.split(self._objconf(entity, objtype))[0]
                 os.makedirs(confdir, mode=0755)
@@ -437,11 +437,11 @@ class Application(AppEndpointBase):
             if entity not in set(self.entitys):
                 return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                                   resultcode=manager_common.RESULT_ERROR,
-                                                  ctxt=ctxt, result='delete database fail, entity not exist')
+                                                  ctxt=ctxt, result='delete fail, entity not exist')
             if token != self._entity_token(entity):
                 return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                                   resultcode=manager_common.RESULT_ERROR,
-                                                  ctxt=ctxt, result='delete database fail, token error')
+                                                  ctxt=ctxt, result='delete fail, token error')
             try:
                 self.delete_entity(entity)
                 resultcode = manager_common.RESULT_SUCCESS
