@@ -44,6 +44,7 @@ class AreaDatabase(TableBase):
     passwd = sa.Column(VARCHAR(128), default=None, nullable=False)
     ro_user = sa.Column(VARCHAR(64), default=None, nullable=False)
     ro_passwd = sa.Column(VARCHAR(128), default=None, nullable=False)
+    character_set = sa.Column(VARCHAR(64), default='utf8', nullable=True)
 
     __table_args__ = (
         sa.UniqueConstraint('entity', 'subtype', name='type_unique'),

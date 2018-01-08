@@ -776,7 +776,9 @@ class AppEntityReuest(BaseContorller):
                                          entity=entity, subtype=subtype,
                                          host=database.get('host'), port=database.get('port'),
                                          user=database.get('user'), passwd=database.get('passwd'),
-                                         ro_user=database.get('ro_user'), ro_passwd=database.get('ro_passwd'))
+                                         ro_user=database.get('ro_user'), ro_passwd=database.get('ro_passwd'),
+                                         character_set=database.get('character_set')
+                                         )
                             )
                 session.flush()
         return resultutils.results(result='bond entity %d database success' % entity)
@@ -867,19 +869,19 @@ class AppEntityReuest(BaseContorller):
         # 从本地查询数据库信息
         for database in _entity.databases:
             subtype = database.subtype
-            if subtype in databases:
-                schema = '%s_%s_%s_%d' % (common.NAME, objtype, subtype, entity)
-                databases[subtype] = dict(host=database.host,
-                                          port=database.port,
-                                          user=database.user,
-                                          passwd=database.passwd,
-                                          schema=schema,
-                                          character_set=database.character_set)
+            schema = '%s_%s_%s_%d' % (common.NAME, objtype, subtype, entity)
+            databases[subtype] = dict(host=database.host,
+                                      port=database.port,
+                                      user=database.user,
+                                      passwd=database.passwd,
+                                      schema=schema,
+                                      character_set=database.character_set)
         miss = []
         # 必要数据库信息
         NEEDED = common.DBAFFINITYS[objtype].keys()
         # 数据库信息不匹配,从gopdb接口反查数据库信息
         if set(NEEDED) != set(databases.keys()):
+            LOG.warning('Database not match, try find schema info from gopdb')
             quotes = schema_controller.quotes(req, body=dict(entitys=[entity, ], endpoint=common.NAME))['data']
             for subtype in NEEDED:
                 if subtype not in databases:
@@ -897,14 +899,15 @@ class AppEntityReuest(BaseContorller):
                                                       schema=schema,
                                                       character_set=quote_detail['character_set']))
                             miss.append(AreaDatabase(quote_id=quote_detail['quote_id'],
+                                                     database_id=quote_detail['qdatabase_id'],
                                                      entity=entity,
                                                      subtype=subtype,
-                                                     host=quote_detail['host'],
-                                                     port=quote_detail['port'],
-                                                     user=quote_detail['user'],
-                                                     passwd=quote_detail['passwd'],
+                                                     host=quote_detail['host'], port=quote_detail['port'],
+                                                     user=quote_detail['user'], passwd=quote_detail['passwd'],
                                                      ro_user=quote_detail['ro_user'],
-                                                     ro_passwd=quote_detail['ro_passwd']))
+                                                     ro_passwd=quote_detail['ro_passwd'],
+                                                     character_set=quote_detail['character_set'])
+                                        )
                             quotes.remove(quote_detail)
                             break
                     if subtype not in databases:
