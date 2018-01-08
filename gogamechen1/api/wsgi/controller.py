@@ -560,6 +560,7 @@ class AppEntityReuest(BaseContorller):
                                            ports=maps.get(gm.entity).get('ports'),
                                            local_ip=maps.get(gm.entity).get('metadata').get('local_ip')
                                            ))
+                    cross_id = cross.entity
             # 完整的rpc数据包
             body = dict(objtype=objtype,
                         objfile=objfile,
@@ -567,14 +568,14 @@ class AppEntityReuest(BaseContorller):
                         chiefs=chiefs)
 
             with session.begin():
-                body.setdefault('finishtime', rpcfinishtime()+5)
+                body.setdefault('finishtime', rpcfinishtime()[0]+5)
                 _entity = entity_controller.create(req=req, agent_id=agent_id,
                                                    endpoint=common.NAME, body=body)['data'][0]
                 # 插入实体信息
                 appentity = AppEntity(entity=_entity.get('entity'),
                                       agent_id=agent_id,
                                       group_id=group_id, objtype=objtype,
-                                      cross_id=chiefs.get(common.CROSSSERVER).get('entity'),
+                                      cross_id=cross_id,
                                       opentime=opentime)
                 session.add(appentity)
                 session.flush()
@@ -637,7 +638,7 @@ class AppEntityReuest(BaseContorller):
                                               metadata=metadata, ports=ports)])
 
     def update(self, req, group_id, objtype, entity, body=None):
-            pass
+        pass
 
     def delete(self, req, group_id, objtype, entity, body=None):
         body = body or {}
