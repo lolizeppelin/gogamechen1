@@ -11,7 +11,7 @@
 #module = gogamechen1.api.rpc
 
 # Endpoint max lock size (integer value)
-#max_lock = 5
+#max_lock = 100
 
 # agent appcaclition affinity bitwise, [gamesvr:1] [publicsvr:2] [loginsvr:4]
 # [publicsvr&loginsvr:6] [gamesvr&publicsvr&loginsvr:7] and so on (integer

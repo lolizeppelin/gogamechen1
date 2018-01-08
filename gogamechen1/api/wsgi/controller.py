@@ -754,7 +754,7 @@ class AppEntityReuest(BaseContorller):
             finishtime, timeout = rpcfinishtime()
             rpc_ret = rpc.call(target, ctxt={'finishtime': finishtime, 'agents': [agent_id, ]},
                                msg={'method': 'opentime_entity',
-                                    'args': dict(entity=entity,opentime=opentime)},
+                                    'args': dict(entity=entity, opentime=opentime)},
                                timeout=timeout)
             if not rpc_ret:
                 raise RpcResultError('change entity opentime result is None')
@@ -799,6 +799,7 @@ class AppEntityReuest(BaseContorller):
 
     def _async_bluck_rpc(self, action, group_id, objtype, entity, body):
         body = body or {}
+        group_id = int(group_id)
         if entity == 'all':
             entitys = 'all'
         else:
@@ -832,17 +833,19 @@ class AppEntityReuest(BaseContorller):
         return resultutils.results(result='%s gogamechen1 entitys spawning',
                                    data=[asyncrequest.to_dict()])
 
-    def start(self, req, group_id, objtype, entity, body):
+    def start(self, req, group_id, objtype, entity, body=None):
         return self._async_bluck_rpc('start', group_id, objtype, entity, body)
 
-    def stop(self, req, group_id, objtype, entity, body):
+    def stop(self, req, group_id, objtype, entity, body=None):
         return self._async_bluck_rpc('start', group_id, objtype, entity, body)
 
-    def status(self, req, group_id, objtype, entity, body):
+    def status(self, req, group_id, objtype, entity, body=None):
         return self._async_bluck_rpc('start', group_id, objtype, entity, body)
 
-    def reset(self, req, group_id, objtype, entity, body):
+    def reset(self, req, group_id, objtype, entity, body=None):
         body = body or {}
+        group_id = int(group_id)
+        entity = int(entity)
         # 重置文件信息,为空表示不需要重置文件
         objfile = body.pop('objfile', None)
         if objfile and not isinstance(objfile, basestring):
@@ -952,9 +955,9 @@ class AppEntityReuest(BaseContorller):
                 finishtime += 15
                 timeout += 15
             rpc_ret = rpc.call(target, ctxt={'finishtime': finishtime, 'agents': [agent_id, ]},
-                               msg={'method': 'reset_entity', 'args':
-                                   dict(entity=entity, objfile=objfile,
-                                        databases=databases, chiefs=chiefs)},
+                               msg={'method': 'reset_entity',
+                                    'args': dict(entity=entity, objfile=objfile,
+                                                 databases=databases, chiefs=chiefs)},
                                timeout=timeout)
             if not rpc_ret:
                 raise RpcResultError('reset entity result is None')

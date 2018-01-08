@@ -24,8 +24,8 @@ class GogameChen1DBClient(GopDBClient):
     cross_path = '/gogamechen1/group/%s/publicsvr/entitys/%s'
 
     bond_path = '/gogamechen1/entity/%s'
-
     appentitys_path = '/gogamechen1/entitys'
+    reset_path = '/gogamechen1/group/%s/%s/entitys/%s/reset'
 
     def objfiles_index(self, body=None):
         resp, results = self.get(action=self.objfiles_path, body=body)
@@ -138,6 +138,15 @@ class GogameChen1DBClient(GopDBClient):
                                             resone=results['result'])
         return results
 
+    def reset(self,  group_id, objtype, entity, body=None):
+        resp, results = self.post(action=self.reset_path % (str(group_id), objtype, str(entity)), body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='reset gogamechen1 %s.%d fail:%d' % (results['resultcode'],
+                                                                                         objtype, entity),
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
     # -----------game server api-----------------
     def games_index(self, group_id, body=None):
         resp, results = self.get(action=self.games_path % str(group_id), body=body)
@@ -213,7 +222,6 @@ class GogameChen1DBClient(GopDBClient):
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
-
 
     # -----------cross server api-----------------
     def crosss_index(self, group_id, body=None):
