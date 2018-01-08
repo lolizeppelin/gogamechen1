@@ -497,11 +497,16 @@ class AppEntityReuest(BaseContorller):
                     return resultutils.results('create entity fail, %s duplicate in group' % objtype,
                                                resultcode=manager_common.RESULT_ERROR)
             else:
+                # 非gm实体添加需要先找到同组的gm
+                try:
+                    gm = typemap[common.GMSERVER]
+                except KeyError as e:
+                    return resultutils.results('create entity fail, can not find my chief: %s' % e.message,
+                                               resultcode=manager_common.RESULT_ERROR)
                 if objtype == common.GAMESERVER:
-                    # 游戏服务器需要在同组中找到gm和cross实例
+                    cross = None
+                    # 游戏服务器需要在同组中找到cross实例
                     try:
-                        gm = typemap[common.GMSERVER]
-                        cross = None
                         crossservers = typemap[common.CROSSSERVER]
                     except KeyError as e:
                         return resultutils.results('create entity fail, can not find my chief: %s' % e.message,

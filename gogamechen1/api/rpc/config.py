@@ -9,11 +9,12 @@ agent_opts = [
     cfg.IntOpt('agent_affinity',
                choices=[1, 2, 3, 4, 5, 6, 7],
                required=True,
-                help='agent appcaclition affinity bitwise, '
-                     '[gamesvr:1] [publicsvr:2] [loginsvr:4] '
-                     '[publicsvr&loginsvr:6] '
-                     '[gamesvr&publicsvr&loginsvr:7] and so on')
-              ]
+               default=1,
+               help='agent appcaclition affinity bitwise, '
+                    '[gamesvr:1] [publicsvr:2] [loginsvr:4] '
+                    '[publicsvr&loginsvr:6] '
+                    '[gamesvr&publicsvr&loginsvr:7] and so on')
+]
 
 
 datadb_opts = [
