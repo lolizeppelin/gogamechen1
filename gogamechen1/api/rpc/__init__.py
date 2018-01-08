@@ -26,6 +26,7 @@ from goperation.manager.rpc.agent.application.base import AppEndpointBase
 from goperation.manager.utils import resultutils
 from goperation.manager.utils import validateutils
 from goperation.manager.rpc.exceptions import RpcCtxtException
+from goperation.manager.rpc.exceptions import RpcEntityError
 from goperation.manager.rpc.exceptions import RpcTargetLockException
 
 
@@ -338,10 +339,7 @@ class Application(AppEndpointBase):
                                                         chiefs, objfile, timeout)
                     if not middleware.success:
                         LOG.error('create middleware result %s' % str(middleware))
-                        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                                          ctxt=ctxt,
-                                                          resultcode=manager_common.RESULT_ERROR,
-                                                          result=str(middleware))
+                        raise RpcEntityError(common.NAME, entity, str(middleware))
                     def _port_notity():
                         """notify port bond"""
                         eventlet.sleep(0)
