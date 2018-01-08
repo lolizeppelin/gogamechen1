@@ -260,10 +260,10 @@ class Application(AppEndpointBase):
                                        # exclude=self._exclude(objtype))
         def _postdo():
             LOG.debug('wait %s extract to %s' % (objfile, dst))
-            waiter()
+            waiter.wait()
             while entity not in self.konwn_appentitys:
                 if int(time.time()) > overtime:
-                    LOG.error('Get entity %d from konwn appentity fail, database not bond' % entity)
+                    LOG.error('Get entity %d from konwn appentity fail' % entity)
                     LOG.error('%s' % str(chiefs))
                     LOG.error('%s' % str(databases))
                     return
@@ -281,6 +281,7 @@ class Application(AppEndpointBase):
             self.flush_config(entity, databases, opentime, chiefs)
 
         threadpool.add_thread(_postdo)
+        return waiter
 
     def start_entity(self, entity, **kwargs):
         objtype = self.konwn_appentitys[entity].get('objtype')
@@ -338,6 +339,7 @@ class Application(AppEndpointBase):
                     middleware = taskflow.create_entity(self, entity, objtype, databases,
                                                         chiefs, objfile, timeout)
                     if not middleware.success:
+                        middleware.waiter.stop()
                         LOG.error('create middleware result %s' % str(middleware))
                         raise RpcEntityError(endpoint=common.NAME, entity=entity,
                                              reason=str(middleware))
