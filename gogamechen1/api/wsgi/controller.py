@@ -362,10 +362,8 @@ class AppEntityReuest(BaseContorller):
             for chioce in chioces:
                 affinity = chioce['affinity']
                 databases = chioce['databases']
-                if affinity & common.DBAFFINITYS[objtype][common.DATADB] and databases:
+                if (affinity & common.DBAFFINITYS[objtype][subtype]) and databases:
                     _databases.setdefault(subtype, databases[0])
-                    # _databases.append(dict(subtype=common.DATADB,
-                    #                        database_id=databases[0]))
                     LOG.debug('Auto select %s.%s database %d' % (objtype, subtype, databases[0]))
                     break
         return _databases

@@ -125,7 +125,7 @@ class GogameAppCreate(application.AppCreateBase):
         self.timeout = timeout
 
     def execute(self, objfile, chiefs=None):
-        if self.middleware.is_success(self.__class__.__name__):
+        if self.middleware.is_success(self.taskname):
             return
         appendpoint = self.middleware.reflection()
         # 创建实体
