@@ -582,7 +582,7 @@ class AppEntityReuest(BaseContorller):
                     query = model_query(session, Group, filter=Group.group_id == group_id)
                     gamearea = GameArea(area_id=_group.lastarea+1,
                                         group_id=_group.group_id,
-                                        entity=appentity.appentity)
+                                        entity=appentity.entity)
                     session.add(gamearea)
                     session.flush()
                     # 更新 group lastarea属性

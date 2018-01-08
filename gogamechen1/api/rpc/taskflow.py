@@ -52,7 +52,6 @@ class GogameDatabaseCreateTask(StandardTask):
     def taskname(self):
         return self.__class__.__name__ + '-' + self.database.subtype
 
-
     def __init__(self, middleware, database):
         self.database = database
         super(GogameDatabaseCreateTask, self).__init__(middleware)
@@ -93,7 +92,7 @@ class GogameDatabaseCreateTask(StandardTask):
                                                        self.database.database_id))
             return
         # 弹出返回结果, 解绑并删除
-        dbresult = self.middleware.database.pop(self.database.subtype)
+        dbresult = self.middleware.databases.pop(self.database.subtype)
         schema = dbresult.get('schema')
         database_id = dbresult.get('database_id')
         unquotes = [dbresult.get('quote_id')]
@@ -136,11 +135,10 @@ class GogameAppCreate(application.AppCreateBase):
                                                            self.middleware.databases, chiefs)
 
     def revert(self, result, **kwargs):
-        super(GogameAppCreate, self).revert(result, **kwargs)
         if isinstance(result, failure.Failure):
             LOG.debug(result.pformat(traceback=True))
-            # 外部会自动清理,这里不需要回滚
-            self.middleware.set_return(self.taskname, task_common.REVERTED)
+        # 外部会自动清理,这里不需要回滚
+        self.middleware.set_return(self.taskname, task_common.REVERTED)
 
 
 def create_entity(appendpoint, entity, objtype, databases,
