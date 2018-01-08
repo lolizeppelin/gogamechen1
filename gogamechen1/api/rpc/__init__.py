@@ -339,7 +339,8 @@ class Application(AppEndpointBase):
                                                         chiefs, objfile, timeout)
                     if not middleware.success:
                         LOG.error('create middleware result %s' % str(middleware))
-                        raise RpcEntityError(common.NAME, entity, str(middleware))
+                        raise RpcEntityError(endpoint=common.NAME, entity=entity,
+                                             reason=str(middleware))
                     def _port_notity():
                         """notify port bond"""
                         eventlet.sleep(0)

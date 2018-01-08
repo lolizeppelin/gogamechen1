@@ -47,6 +47,11 @@ class GogameCreateDatabase(Database):
 
 class GogameDatabaseCreateTask(StandardTask):
 
+    @property
+    def taskname(self):
+        return self.__class__.__name__ + '-' + self.database.subtype
+
+
     def __init__(self, middleware, database):
         self.database = database
         super(GogameDatabaseCreateTask, self).__init__(middleware)
@@ -99,7 +104,7 @@ class GogameDatabaseCreateTask(StandardTask):
             self.middleware.dberrors.append(dict(database_id=database_id, schema=schema, unquotes=unquotes,
                                                  reason='%s :%s' % (e.__class__.__name__, e.message)))
         else:
-            self.middleware.set_return(self.__class__.__name__, task_common.REVERTED)
+            self.middleware.set_return(self.taskname, task_common.REVERTED)
 
 
 def create_db_flowfactory(app, store):
@@ -132,7 +137,7 @@ class GogameAppCreate(application.AppCreateBase):
         if isinstance(result, failure.Failure):
             LOG.debug(result.pformat(traceback=True))
             # 外部会自动清理,这里不需要回滚
-            self.middleware.set_return(self.__class__.__name__, task_common.REVERTED)
+            self.middleware.set_return(self.taskname, task_common.REVERTED)
 
 
 def create_entity(appendpoint, entity, objtype, databases,
@@ -174,9 +179,11 @@ def create_entity(appendpoint, entity, objtype, databases,
 
     try:
         engine.run()
-    except Exception:
+    except Exception as e:
         if LOG.isEnabledFor(logging.DEBUG):
             LOG.exception('Task execute fail')
+        else:
+            LOG.error('Task execute fail, %s %s' % (e.__class__.__name__, str(e)))
     finally:
         connection.destroy_logbook(book.uuid)
         for dberror in middleware.dberrors:
