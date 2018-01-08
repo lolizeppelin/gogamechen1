@@ -339,7 +339,8 @@ class Application(AppEndpointBase):
                     middleware = taskflow.create_entity(self, entity, objtype, databases,
                                                         chiefs, objfile, timeout)
                     if not middleware.success:
-                        middleware.waiter.stop()
+                        if middleware.waiter:
+                            middleware.waiter.stop()
                         LOG.error('create middleware result %s' % str(middleware))
                         raise RpcEntityError(endpoint=common.NAME, entity=entity,
                                              reason=str(middleware))

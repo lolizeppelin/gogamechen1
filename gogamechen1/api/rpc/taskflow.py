@@ -86,9 +86,7 @@ class GogameDatabaseCreateTask(StandardTask):
                                                   collation_type=self.database.collation_type))
 
     def revert(self, *args, **kwargs):
-        LOG.info(args)
-        LOG.info(kwargs)
-        result = kwargs.get('result') or args[0]
+        result = kwargs.get('result') if 'result' in kwargs else args[0]
         super(GogameDatabaseCreateTask, self).revert(result, **kwargs)
         if isinstance(result, failure.Failure):
             LOG.error('Create schema %s on %d fail' % (self.database.schema,
