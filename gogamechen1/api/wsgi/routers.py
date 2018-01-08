@@ -19,13 +19,14 @@ class Routers(router.RoutersBase):
 
         group_controller = controller_return_response(controller.ObjtypeFileReuest(),
                                                    controller.FAULT_MAP)
-        mapper.collection(collection_name=collection_name,
-                          resource_name=resource_name,
-                          controller=group_controller,
-                          path_prefix='/%s' % common.NAME,
-                          member_prefix='/{uuid}',
-                          collection_actions=COLLECTION_ACTIONS,
-                          member_actions=MEMBER_ACTIONS)
+        collection = mapper.collection(collection_name=collection_name,
+                                       resource_name=resource_name,
+                                       controller=group_controller,
+                                       path_prefix='/%s' % common.NAME,
+                                       member_prefix='/{uuid}',
+                                       collection_actions=COLLECTION_ACTIONS,
+                                       member_actions=MEMBER_ACTIONS)
+        # collection.member.link('send', method='POST')
 
 
         resource_name = 'group'
