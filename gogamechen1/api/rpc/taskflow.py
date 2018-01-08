@@ -132,8 +132,10 @@ class GogameAppCreate(application.AppCreateBase):
             return
         appendpoint = self.middleware.reflection()
         # 创建实体
-        appendpoint.create_entity(self.middleware.entity, self.middleware.objtype, objfile, self.timeout,
-                                  self.middleware.databases, chiefs)
+        self.middleware.waiter = appendpoint.create_entity(self.middleware.entity,
+                                                           self.middleware.objtype,
+                                                           objfile, self.timeout,
+                                                           self.middleware.databases, chiefs)
 
     def revert(self, result, **kwargs):
         super(GogameAppCreate, self).revert(result, **kwargs)
