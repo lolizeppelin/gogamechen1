@@ -111,9 +111,9 @@ class ObjtypeFileReuest(BaseContorller):
 
     def create(self, req, body=None):
         body = body or {}
-        subtype = utils.validate_string(body.pop('subtype', None))
+        subtype = utils.validate_string(body.pop('subtype'))
         objtype = body.pop('objtype')
-        version = body.pop('version', None)
+        version = body.pop('version')
         session = endpoint_session()
         objtype_file = ObjtypeFile(objtype=objtype, version=version, subtype=subtype)
         with session.begin():
@@ -569,8 +569,9 @@ class AppEntityReuest(BaseContorller):
                 body.setdefault('finishtime', rpcfinishtime()[0]+5)
                 _entity = entity_controller.create(req=req, agent_id=agent_id,
                                                    endpoint=common.NAME, body=body)['data'][0]
+                entity = _entity.get('entity')
                 # 插入实体信息
-                appentity = AppEntity(entity=_entity.get('entity'),
+                appentity = AppEntity(entity=entity,
                                       agent_id=agent_id,
                                       group_id=group_id, objtype=objtype,
                                       cross_id=cross_id,
@@ -597,6 +598,16 @@ class AppEntityReuest(BaseContorller):
                                   opentime=opentime,
                                   group_id=group_id, areas=[next_area, ])
 
+            query = model_query(session, AreaDatabase, filter=AreaDatabase.entity == _entity.get('entity'))
+            _result.setdefault('databases', [dict(quote_id=database.quote_id,
+                                                  host=database.host,
+                                                  port=database.port,
+                                                  ro_user=database.ro_user,
+                                                  ro_passwd=database.ro_passwd,
+                                                  subtype=database.subtype,
+                                                  schema='%s_%s_%s_%d' % (common.NAME, objtype,
+                                                                          database.subtype, entity))
+                                             for database in query])
             return resultutils.results(result='create %s entity success' % objtype,
                                        data=[_result, ])
 
@@ -624,8 +635,8 @@ class AppEntityReuest(BaseContorller):
                                               databases=[dict(quote_id=database.quote_id,
                                                               host=database.host,
                                                               port=database.port,
-                                                              # user=database.user,
-                                                              # passwd=database.passwd,
+                                                              ro_user=database.ro_user,
+                                                              ro_passwd=database.ro_passwd,
                                                               subtype=database.subtype,
                                                               schema='%s_%s_%s_%d' % (common.NAME,
                                                                                       objtype,
@@ -708,7 +719,7 @@ class AppEntityReuest(BaseContorller):
                 LOG.info('Send delete command with token %s' % token)
                 try:
                     entity_controller.delete(req, common.NAME, entity=entity, body=dict(token=token))
-                except Exception:
+                except Exception as e:
                     # roll back unquote
                     def _rollback():
                         for back in rollbacks:
@@ -723,7 +734,7 @@ class AppEntityReuest(BaseContorller):
                                 LOG.error('rollback entity %d quote %d.%s.%d fail' %
                                           (entity, __database_id, schema, __quote_id))
                     threadpool.add_thread(_rollback)
-                    raise
+                    raise e
                 query.delete()
         return resultutils.results(result='delete %s:%d success' % (objtype, entity),
                                    data=[dict(entity=entity, objtype=objtype,
