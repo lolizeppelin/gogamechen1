@@ -610,15 +610,11 @@ class AppEntityReuest(BaseContorller):
         body = body or {}
         group_id = int(group_id)
         entity = int(entity)
-        detail = body.get('detail', False)
         session = endpoint_session(readonly=True)
-        query = model_query(session, Group, filter=Group.group_id == group_id)
-        joins = joinedload(Group.entitys, innerjoin=False)
-        if detail:
-            joins = joins.joinedload(AppEntity.databases, innerjoin=False)
-        query = query.options(joins)
-        group = query.filter(and_(AppEntity.entity == entity, AppEntity.objtype == objtype)).one()
-        _entity = group.entitys[0]
+        query = model_query(session, AppEntity, filter=and_(AppEntity.group_id == group_id,
+                                                            AppEntity.entity == entity))
+        query = query.options(joinedload(AppEntity.databases, innerjoin=False))
+        _entity = query.one()
         metadata, ports = self._entityinfo(req, entity)
         return resultutils.results(result='show %s areas success' % objtype,
                                    data=[dict(entity=_entity.entity,
@@ -658,12 +654,17 @@ class AppEntityReuest(BaseContorller):
             raise InvalidArgument('Agent offline, can not delete entity')
         with glock.grouplock(group=group_id):
             with session.begin():
-                query = model_query(session, AppEntity, filter=and_(AppEntity.entity == entity,
-                                                                    AppEntity.objtype == objtype))
+                query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
+                # AppEntity.objtype == objtype,
+                # AppEntity.group_id == group_id))
                 query.options(joinedload(AppEntity.databases, innerjoin=False))
                 _entity = query.one()
                 if _entity.status == common.OK:
                     raise InvalidArgument('Entity is active, unactive before delete it')
+                if _entity.objtype != objtype:
+                    raise InvalidArgument('Objtype not match')
+                if _entity.group_id != group_id:
+                    raise InvalidArgument('Group id not match')
                 if objtype == common.GMSERVER:
                     if model_count_with_key(session, AppEntity, filter=AppEntity.group_id == group_id) > 1:
                         raise InvalidArgument('You must delete other objtype entity before delete gm')
@@ -762,10 +763,12 @@ class AppEntityReuest(BaseContorller):
             target.namespace = common.NAME
             rpc = get_client()
             finishtime, timeout = rpcfinishtime()
-            rpc_ret = rpc.call(target, ctxt={'finishtime': finishtime, 'agents': [agent_id, ]},
-                               msg={'method': 'opentime_entity',
-                                    'args': dict(entity=entity, opentime=opentime)},
-                               timeout=timeout)
+            with session.begin():
+                rpc_ret = rpc.call(target, ctxt={'finishtime': finishtime, 'agents': [agent_id, ]},
+                                   msg={'method': 'opentime_entity',
+                                        'args': dict(entity=entity, opentime=opentime)},
+                                   timeout=timeout)
+                query.update({'opentime': opentime})
             if not rpc_ret:
                 raise RpcResultError('change entity opentime result is None')
             if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
