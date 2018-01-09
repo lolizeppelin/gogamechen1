@@ -68,6 +68,18 @@ def count_timeout(ctxt, kwargs):
     return min(_timeout, timeout)
 
 
+class CreateResult(resultutils.AgentRpcResult):
+    def __init__(self, agent_id, ctxt=None,
+                 resultcode=0, result=None, databases=None):
+        super(CreateResult, self).__init__(agent_id, ctxt, resultcode, result)
+        self.databases = databases
+
+    def to_dict(self):
+        ret_dict = super(CreateResult, self).to_dict()
+        ret_dict.setdefault('databases', self.databases)
+        return ret_dict
+
+
 @singleton.singleton
 class Application(AppEndpointBase):
 
@@ -359,10 +371,9 @@ class Application(AppEndpointBase):
         resultcode = manager_common.RESULT_SUCCESS
         result = 'create %s success' % objtype
 
-        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                          ctxt=ctxt,
-                                          resultcode=resultcode,
-                                          result=result)
+        return CreateResult(agent_id=self.manager.agent_id,
+                            ctxt=ctxt, resultcode=resultcode, result=result,
+                            databases=middleware.databases)
 
     def rpc_post_create_entity(self, ctxt, entity, **kwargs):
         LOG.info('Get post create command with %s' % str(kwargs))

@@ -528,9 +528,9 @@ class AppEntityReuest(BaseContorller):
                             counted = set()
                             counter = dict()
                             for _cross in crossservers:
-                                counter.setdefault(_cross.cross_id, 0)
+                                counter.setdefault(_cross.entity, 0)
                             # 查询当前组内所有entity对应的cross_id
-                            for _entity in _group._entity:
+                            for _entity in _group.entitys:
                                 if _entity.objtype != common.GAMESERVER:
                                     continue
                                 if _entity.cross_id in counted:
@@ -573,6 +573,8 @@ class AppEntityReuest(BaseContorller):
                 _entity = entity_controller.create(req=req, agent_id=agent_id,
                                                    endpoint=common.NAME, body=body)['data'][0]
                 entity = _entity.get('entity')
+                notify = _entity.get('notify')
+                LOG.info('Entity controller create rpc result %s' % str(notify))
                 # 插入实体信息
                 appentity = AppEntity(entity=entity,
                                       agent_id=agent_id,
@@ -592,7 +594,8 @@ class AppEntityReuest(BaseContorller):
                     # 更新 group lastarea属性
                     query.update({'lastarea': next_area})
 
-            _result = dict(entity=_entity.get('entity'), objtype=objtype, agent_id=agent_id)
+            _result = dict(entity=entity, objtype=objtype, agent_id=agent_id,
+                           databases=notify.get('databases'))
             if objtype == common.GAMESERVER:
                 _result.setdefault('area_id', next_area)
 
@@ -600,17 +603,6 @@ class AppEntityReuest(BaseContorller):
                                   _entity.get('entity'), common.NAME, objtype=objtype,
                                   opentime=opentime,
                                   group_id=group_id, areas=[next_area, ])
-
-            query = model_query(session, AreaDatabase, filter=AreaDatabase.entity == _entity.get('entity'))
-            _result.setdefault('databases', [dict(quote_id=database.quote_id,
-                                                  host=database.host,
-                                                  port=database.port,
-                                                  ro_user=database.ro_user,
-                                                  ro_passwd=database.ro_passwd,
-                                                  subtype=database.subtype,
-                                                  schema='%s_%s_%s_%d' % (common.NAME, objtype,
-                                                                          database.subtype, entity))
-                                             for database in query])
             return resultutils.results(result='create %s entity success' % objtype,
                                        data=[_result, ])
 
