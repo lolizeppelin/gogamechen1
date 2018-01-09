@@ -117,7 +117,10 @@ class ObjtypeFileReuest(BaseContorller):
         session = endpoint_session()
         objtype_file = ObjtypeFile(objtype=objtype, version=version, subtype=subtype)
         with session.begin():
-            create_result = file_controller.create(req, body)
+            try:
+                create_result = file_controller.create(req, body)
+            except DBDuplicateEntry:
+                raise InvalidArgument('File info Duplicate error')
             objtype_file.uuid = create_result['data'][0]['uuid']
             session.add(objtype_file)
             session.flush()
