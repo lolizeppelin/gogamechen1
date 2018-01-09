@@ -524,6 +524,7 @@ class Application(AppEndpointBase):
     def rpc_stop_entitys(self, ctxt, entitys, **kwargs):
         entitys = argutils.map_to_int(entitys) & set(self.entitys)
         if not entitys:
+            # stop with signal.SIGINT
             return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                               resultcode=manager_common.RESULT_ERROR,
                                               ctxt=ctxt,
