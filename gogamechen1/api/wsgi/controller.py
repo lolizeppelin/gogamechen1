@@ -611,10 +611,13 @@ class AppEntityReuest(BaseContorller):
         group_id = int(group_id)
         entity = int(entity)
         session = endpoint_session(readonly=True)
-        query = model_query(session, AppEntity, filter=and_(AppEntity.group_id == group_id,
-                                                            AppEntity.entity == entity))
+        query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
         query = query.options(joinedload(AppEntity.databases, innerjoin=False))
         _entity = query.one()
+        if _entity.objtype != objtype:
+            raise InvalidArgument('Entity is not %s' % objtype)
+        if _entity.group_id != group_id:
+            raise InvalidArgument('Entity group %d not match  %d' % (_entity.group_id, group_id))
         metadata, ports = self._entityinfo(req, entity)
         return resultutils.results(result='show %s areas success' % objtype,
                                    data=[dict(entity=_entity.entity,
@@ -624,6 +627,7 @@ class AppEntityReuest(BaseContorller):
                                               status=_entity.status,
                                               areas=[area.area_id for area in _entity.areas],
                                               databases=[dict(quote_id=database.quote_id,
+                                                              database_id=database.database_id,
                                                               host=database.host,
                                                               port=database.port,
                                                               ro_user=database.ro_user,
@@ -871,12 +875,13 @@ class AppEntityReuest(BaseContorller):
                                       (objfile.get('subtype'), objtype, objfile.get('version')))
         # 查询entity信息
         session = endpoint_session()
-        query = model_query(session, AppEntity, filter=and_(AppEntity.group_id == group_id,
-                                                            AppEntity.entity == entity))
+        query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
         query.options(joinedload(AppEntity.databases, innerjoin=False))
         _entity = query.one()
         if _entity.objtype != objtype:
-            raise InvalidArgument('Entity objtype is %s' % _entity.objtype)
+            raise InvalidArgument('Entity is not %s' % objtype)
+        if _entity.group_id != group_id:
+            raise InvalidArgument('Entity group %d not match  %d' % (_entity.group_id, group_id))
         chiefs = {}
         databases = {}
         # 从本地查询数据库信息
