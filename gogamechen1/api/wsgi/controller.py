@@ -849,7 +849,7 @@ class AppEntityReuest(BaseContorller):
             self.send_asyncrequest(asyncrequest, target,
                                    rpc_ctxt, rpc_method, rpc_args)
         threadpool.add_thread(safe_func_wrapper, wapper, LOG)
-        return resultutils.results(result='%s gogamechen1 entitys spawning',
+        return resultutils.results(result='gogamechen1 %s entitys spawning' % objtype,
                                    data=[asyncrequest.to_dict()])
 
     def start(self, req, group_id, objtype, entity, body=None):
