@@ -104,7 +104,7 @@ def areas_map(group_id):
 def resource_map(req, resource_id):
     """cache  resource info"""
     if resource_id not in CDNRESOURCE:
-        with goperation.lock('gogamechen1-cdnresource'):
+        with goperation.tlock('gogamechen1-cdnresource'):
             if resource_id not in CDNRESOURCE:
                 info = cdnresource_controller.show(req, resource_id, body=dict(metadata=False))['data'][0]
                 # entity = info.get('entity')
