@@ -355,7 +355,8 @@ class Application(AppEndpointBase):
                         LOG.error('create middleware result %s' % str(middleware))
                         raise RpcEntityError(endpoint=common.NAME, entity=entity,
                                              reason=str(middleware))
-                    def _port_notity():
+
+                    def _port_notify():
                         """notify port bond"""
                         eventlet.sleep(0)
                         with self.lock(entity, timeout=15):
@@ -365,7 +366,8 @@ class Application(AppEndpointBase):
                             except Exception:
                                 LOG.error('Bond ports for %d fail')
                                 self._free_ports(entity)
-                    threadpool.add_thread(_port_notity)
+
+                    threadpool.add_thread(_port_notify)
 
         resultcode = manager_common.RESULT_SUCCESS
         result = 'create %s success' % objtype

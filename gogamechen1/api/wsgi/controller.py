@@ -138,7 +138,7 @@ def resource_map(req, resource_id):
     return CDNRESOURCE[resource_id]
 
 
-def gopcdn_upload(req, resource_id, body, notity=None):
+def gopcdn_upload(req, resource_id, body, notify=None):
     if not resource_id:
         raise InvalidArgument('No gopcdn resource is designated')
     httpbase = resource_map(req, resource_id)
@@ -168,7 +168,7 @@ def gopcdn_upload(req, resource_id, body, notity=None):
                                                  body=dict(impl=impl,
                                                            timeout=timeout,
                                                            auth=auth,
-                                                           notity=notity,
+                                                           notify=notify,
                                                            fileinfo=dict(size=size, md5=md5,
                                                                          crc32=crc32, ext=ext,
                                                                          filename=filename,
@@ -219,13 +219,13 @@ class ObjtypeFileReuest(BaseContorller):
         # 没有地址,通过gopcdn上传
         if not address:
             # 上传结束后通知
-            notity = {'success': dict(action='/files/%s' % uuid,
+            notify = {'success': dict(action='/files/%s' % uuid,
                                       method='PUT',
                                       body=dict(status=manager_common.DOWNFILE_FILEOK)),
                       'fail': dict(action='/gogamechen1/objfiles/%s' % uuid,
                                    method='DELETE',
                                    body=dict(status=manager_common.DOWNFILE_MISSED))}
-            uri, address = gopcdn_upload(req, CONF[common.NAME].objfile_resource, body, notity=notity)
+            uri, address = gopcdn_upload(req, CONF[common.NAME].objfile_resource, body, notify=notify)
             status = manager_common.DOWNFILE_UPLOADING
         else:
             status = manager_common.DOWNFILE_FILEOK

@@ -1,5 +1,6 @@
 import time
 import simpleservice
+from websocket import create_connection
 
 from simpleutil.config import cfg
 from goperation import config
@@ -8,7 +9,8 @@ from goperation.api.client import ManagerClient
 
 from gogamechen1.api.client import GogameChen1DBClient
 from gogamechen1 import common
-
+import os
+from simpleutil.utils import digestutils
 from goperation.manager import common as manager_common
 
 
@@ -25,34 +27,53 @@ httpclient = ManagerClient(wsgi_url, wsgi_port, timeout=30)
 client = GogameChen1DBClient(httpclient)
 
 
-def file_create():
-    cross = {'address': 'http://172.17.0.3/crosserver.zip',
-                                      'size': 3640656,
-                                      'md5': '37a92e3670793d9fe7d7b4166405b7c0',
-                                      'crc32': '2328264931'}
+def file_create(path):
+    md5 = digestutils.filemd5(path)
+    crc32 = digestutils.filecrc32(path)
+    size = os.path.getsize(path)
+    ext = os.path.split(path)[1][1:]
+    body = {'size': size,
+            'crc32': crc32,
+            'md5': md5,
+            'ext': os.path.splitext(path)[1][1:],
+            }
 
-    gm = {'address': 'http://172.17.0.3/gmserver.zip',
-          'size': 3810087, 'md5': 'ccfccde94771f8a383055ae0ca54f395', 'crc32': '3345614830'}
+    ret = client.objfile_create(common.GMSERVER, 'appfile', '1001', body=body)['data'][0]
 
-    game = {'address': 'http://172.17.0.3/gameserver.zip',
-            'size': 21363437, 'md5': '4aef586427aa0fab051d19c930a87c0b', 'crc32': '3527425352'}
+    print 'create cdn result %s' % str(ret)
 
-    print client.objfile_create(objtype=common.GAMESERVER, subtype=common.APPFILE,
-                                version='20180104.001',
-                                body=game)
+    uri = ret.get('uri')
+    import time
+    time.sleep(0.1)
+    ws = create_connection("ws://%s:%d" % (uri.get('ipaddr'), uri.get('port')),
+                           subprotocols=["binary"])
+    print "connect websocket success"
+    with open(path, 'rb') as f:
+        while True:
+            buffer = f.read(4096)
+            if buffer:
+                ws.send(buffer)
+            else:
+                print 'file send finish'
+                break
+
 
 def file_index():
     print client.objfiles_index()
 
-def send_file(uuid):
-    print client.send_file_to_agents(agent_id=6, file_id=uuid,
+
+def send_file(agent_id, uuid):
+    print client.send_file_to_agents(agent_id=agent_id, file_id=uuid,
                                      body={'request_time': int(time.time())})
+
 
 def group_index_test():
     print client.groups_index()
 
+
 def group_create_test():
     print client.groups_create(name='test', desc='test group')
+
 
 def group_show_test(group_id):
     print client.group_show(group_id=group_id, detail=True)
@@ -62,16 +83,25 @@ def group_map_test(group_id):
     print client.group_maps(group_id=group_id)
 
 
+def group_delete(group_id):
+    print client.group_delete(group_id=group_id)
+
+
+
 def game_index():
-    print client.games_index(group_id=1)
+    for game in client.games_index(group_id=1, body={'detail': True})['data']:
+        print game
 
 def game_show(entity):
     print client.game_show(group_id=1, entity=entity)
 
 
+def game_create():
+    print client.games_create(group_id=1, body={'objfile': {'subtype': 'appfile', 'version': '20180104.002'},
+                                                'opentime': int(time.time())})
+
 def crosss_create():
-    print client.crosss_create(group_id=1, body={'impl': 'local',
-                                                 'objfile': {'subtype': 'appfile',
+    print client.crosss_create(group_id=1, body={'objfile': {'subtype': 'appfile',
                                                              'version': '20180104.001'}})
 
 def cross_delete(entity):
@@ -88,30 +118,38 @@ def gm_create():
 def gm_delete(entity):
     print client.gm_delete(group_id=1, entity=entity, clean='delete')
 
+
 def gm_show(entity):
     print client.gm_show(group_id=1, entity=entity, detail=True)
 
 
-# file_create()
+path = r'C:\Users\loliz_000\Desktop\zhuomian5\charge.dat'
+
+file_create(path)
+
 # file_index()
-# send_file(uuid='a1ed7026-c7a4-4bde-b031-4b4106386c2e')
+# send_file(agent_id=6, uuid='ed3c683c-64a7-45d3-b149-c156ce3af508')
 
 # group_create_test()
 # group_index_test()
 # group_show_test(1)
 # group_map_test(1)
 
+# group_delete(1)
 
 # game_index()
-# game_show(1)
+# game_create()
+# game_show(3)
 
 # crosss_create()
 # cross_show(entity=1)
-# cross_delete(1)
+# cross_delete(5)
 
 # gm_create()
-# gm_delete(entity=2)
+# gm_delete(entity=4)
 # gm_show(entity=2)
 
 
-print client.quotes(endpoint='gogamechen1', entitys=[1,2,3,4,5])
+# print client.quotes(endpoint='gogamechen1', entitys=[1,2,3,4,5])
+
+# print client.reset(group_id=1, objtype='publicsvr', entity=5)
