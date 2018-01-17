@@ -117,7 +117,7 @@ def resource_map(req, resource_id):
                 # version = info.get('version')
                 prefix = urllib.pathname2url(os.path.join(etype, name))
                 metadata = BaseContorller.agent_metadata(agent_id)
-                host = metadata.get('loacl_ip')
+                host = metadata.get('local_ip')
                 if not internal:
                     if domains:
                         host = domains[0]
