@@ -2,8 +2,9 @@ from simpleutil.config import cfg
 def list_server_opts():
     from simpleservice.ormdb.config import database_opts
     from goperation.manager.wsgi.config import route_opts
+    from gogamechen1.api.wsgi.config import resource_opts
     cfg.set_defaults(route_opts, routes=['gogamechen1.api.wsgi.routers'])
-    return route_opts + database_opts
+    return route_opts + resource_opts + database_opts
 
 
 def list_agent_opts():

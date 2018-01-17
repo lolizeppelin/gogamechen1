@@ -10,6 +10,12 @@
 # Manager extend route module string (multi import string)
 #routes = gogamechen1.api.wsgi.routers
 
+# Gopcdn resource for objfile (integer value)
+#objfile_resource = <None>
+
+# Gopcdn resource for packages (integer value)
+#package_resource = <None>
+
 # The SQLAlchemy connection string to use to connect to the database. (string
 # value)
 #connection = <None>

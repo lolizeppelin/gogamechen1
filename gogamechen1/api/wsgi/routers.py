@@ -78,3 +78,17 @@ class Routers(router.RoutersBase):
         # collection.member.link('hotfix', method='POST')
         # collection.member.link('upgrade', method='POST')
 
+        # resource_name = 'package'
+        # collection_name = resource_name + 's'
+        # collection = mapper.collection(collection_name=collection_name,
+        #                                resource_name=resource_name,
+        #                                controller=controller_return_response(controller.PackageReuest(),
+        #                                                                      controller.FAULT_MAP),
+        #                                path_prefix='/%s/group/{group_id}' % common.NAME,
+        #                                member_prefix='/{package_id}',
+        #                                collection_actions=COLLECTION_ACTIONS,
+        #                                member_actions=MEMBER_ACTIONS)
+        # collection.member.link('source', name='add_package_source', method='POST', action='add_source')
+        # collection.member.link('source', name='del_package_source', method='DELETE', action='delete_source')
+        # collection.member.link('source', name='update_package_source', method='PUT', action='update_source')
+        # collection.member.link('cdngroup', method='PUT')

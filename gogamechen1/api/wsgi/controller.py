@@ -1,9 +1,12 @@
 # -*- coding:utf-8 -*-
+import os
 import six
 import time
+import urllib
 import eventlet
 import webob.exc
 from six.moves import zip
+import six.moves.urllib.parse as urlparse
 
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm.exc import MultipleResultsFound
@@ -17,6 +20,8 @@ from simpleutil.utils import jsonutils
 from simpleutil.utils import argutils
 from simpleutil.utils import uuidutils
 from simpleutil.utils import singleton
+from simpleutil.config import cfg
+
 
 from simpleservice.ormdb.api import model_query
 from simpleservice.ormdb.api import model_count_with_key
@@ -25,12 +30,14 @@ from simpleservice.rpc.exceptions import AMQPDestinationNotFound
 from simpleservice.rpc.exceptions import MessagingTimeout
 from simpleservice.rpc.exceptions import NoSuchMethod
 
+import goperation
 from goperation import threadpool
 from goperation.utils import safe_func_wrapper
 from goperation.manager import common as manager_common
 from goperation.manager.api import get_client
 from goperation.manager.api import rpcfinishtime
 from goperation.manager.exceptions import CacheStoneError
+from goperation.manager.utils import validateutils
 from goperation.manager.utils import resultutils
 from goperation.manager.utils import targetutils
 from goperation.manager.wsgi.contorller import BaseContorller
@@ -42,6 +49,9 @@ from goperation.manager.wsgi.exceptions import RpcResultError
 from gopdb import common as dbcommon
 from gopdb.api.wsgi.controller import SchemaReuest
 from gopdb.api.wsgi.controller import DatabaseReuest
+
+from gopcdn import common as cdncommon
+from gopcdn.api.wsgi.resource import CdnResourceReuest
 
 from gogamechen1 import common
 from gogamechen1 import utils
@@ -73,7 +83,11 @@ entity_controller = EntityReuest()
 file_controller = FileReuest()
 schema_controller = SchemaReuest()
 database_controller = DatabaseReuest()
+cdnresource_controller = CdnResourceReuest()
 
+CONF = cfg.CONF
+
+CDNRESOURCE = {}
 
 def areas_map(group_id):
     session = endpoint_session(readonly=True)
@@ -87,8 +101,86 @@ def areas_map(group_id):
     return maps
 
 
+def resource_map(req, resource_id):
+    """cache  resource info"""
+    if resource_id not in CDNRESOURCE:
+        with goperation.lock('gogamechen1-cdnresource'):
+            if resource_id not in CDNRESOURCE:
+                info = cdnresource_controller.show(req, resource_id, body=dict(metadata=False))['data'][0]
+                # entity = info.get('entity')
+                agent_id = info.get('agent_id')
+                port = info.get('port')
+                internal = info.get('internal')
+                domains = info.get('domains')
+                name = info.get('name')
+                etype = info.get('etype')
+                # version = info.get('version')
+                prefix = urllib.pathname2url(os.path.join(etype, name))
+                metadata = BaseContorller.agent_metadata(agent_id)
+                host = metadata.get('loacl_ip')
+                if not internal:
+                    if domains:
+                        host = domains[0]
+                    elif metadata.get('external_ips'):
+                        host = metadata.get('external_ips')[0]
+                schema = 'http'
+                if port == 443:
+                    schema = 'https'
+                if port in (80, 443):
+                    httpbase = '%s://%s' % (schema, host)
+                else:
+                    httpbase = '%s://%s:%d' % (schema, host, port)
+                httpbase = urlparse.urljoin(httpbase, prefix)
+                # CDNRESOURCE.setdefault(resource_id, dict(entity=entity, internal=internal, version=version,
+                #                                          host=host, port=port, prefix=prefix,
+                #                                          httpbase=httpbase))
+                CDNRESOURCE.setdefault(resource_id, httpbase)
+    return CDNRESOURCE[resource_id]
+
+
+def gopcdn_upload(req, resource_id, body, notity=None):
+    if not resource_id:
+        raise InvalidArgument('No gopcdn resource is designated')
+    httpbase = resource_map(req, resource_id)
+    timeout = body.get('timeout', 30)
+    impl = body.pop('impl', 'websocket')
+    auth = body.pop('auth', None)
+
+    md5 = body.get('md5')
+    crc32 = body.get('crc32')
+    ext = body.get('ext')
+    size = body.get('size')
+
+    filename = body.get('filename')
+    overwrite = body.get('overwrite')
+    if not filename:
+        if not ext:
+            raise InvalidArgument('not filename and ext')
+        # 生成随机文件名
+        filename = '%s.%s' % (str(uuidutils.generate_uuid()).replace('-', ''), ext)
+    if not ext:
+        ext = os.path.split(filename)[1][1:]
+    if not ext:
+        raise InvalidArgument('not filename and ext')
+
+    address = urlparse.urljoin(httpbase, filename)
+    uri_result = cdnresource_controller.add_file(req, resource_id,
+                                                 body=dict(impl=impl,
+                                                           timeout=timeout,
+                                                           auth=auth,
+                                                           notity=notity,
+                                                           fileinfo=dict(size=size, md5=md5,
+                                                                         crc32=crc32, ext=ext,
+                                                                         filename=filename,
+                                                                         overwrite=overwrite)))
+    uri = uri_result.get('uri')
+    return uri, address
+
+
+
 @singleton.singleton
 class ObjtypeFileReuest(BaseContorller):
+    CREATESCHEMA = {}
 
     def index(self, req, body=None):
         body = body or {}
@@ -114,18 +206,42 @@ class ObjtypeFileReuest(BaseContorller):
         subtype = utils.validate_string(body.pop('subtype'))
         objtype = body.pop('objtype')
         version = body.pop('version')
+        address = body.get('address')
+        uuid = uuidutils.generate_uuid()
+        uri = None
+        # 没有地址,通过gopcdn上传
+        if not address:
+            # 上传结束后通知
+            notity = {'success': dict(action='/files/%s' % uuid,
+                                      method='PUT',
+                                      body=dict(status=manager_common.DOWNFILE_FILEOK)),
+                      'fail': dict(action='/gogamechen1/objfiles/%s' % uuid,
+                                   method='DELETE',
+                                   body=dict(status=manager_common.DOWNFILE_MISSED))}
+            uri, address = gopcdn_upload(req, CONF[common.NAME].objfile_resource, body, notity=notity)
+
+        # 直接增加一条记录
+        md5 = body.get('md5')
+        crc32 = body.get('crc32')
+        ext = body.get('ext')
+        size = body.get('size')
+        status = manager_common.DOWNFILE_FILEOK
         session = endpoint_session()
-        objtype_file = ObjtypeFile(objtype=objtype, version=version, subtype=subtype)
         with session.begin():
+            objtype_file = ObjtypeFile(objtype=objtype, version=version, subtype=subtype)
             try:
-                create_result = file_controller.create(req, body)
+                create_result = file_controller.create(req, body=dict(uuid=uuid,
+                                                                      address=address,
+                                                                      size=size, md5=md5,
+                                                                      crc32=crc32, ext=ext,
+                                                                      status=status))
             except DBDuplicateEntry:
                 raise InvalidArgument('File info Duplicate error')
             objtype_file.uuid = create_result['data'][0]['uuid']
             session.add(objtype_file)
             session.flush()
         return resultutils.results('creat file for %s success' % objtype,
-                                   data=[dict(uuid=objtype_file.uuid)])
+                                   data=[dict(uuid=objtype_file.uuid, uri=uri)])
 
     def show(self, req, uuid, body=None):
         body = body or {}
@@ -985,3 +1101,294 @@ class AppEntityReuest(BaseContorller):
             if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
                 raise RpcResultError('reset entity fail %s' % rpc_ret.get('result'))
             return resultutils.results(result='reset entity %d success' % entity)
+
+#
+# @singleton.singleton
+# class PackageReuest(BaseContorller):
+#
+#     CREATRESCHEMA = {
+#         'type': 'object',
+#         'required': ['entity', 'name', 'group', 'version', 'mark'],
+#         'properties':
+#             {
+#                 'entity': {'type': 'integer',  'minimum': 1},
+#                 'name': {'type': 'string'},
+#                 'group': {'type': 'integer',  'minimum': 0},
+#                 'version': {'type': 'string'},
+#                 'mark': {'type': 'string'},
+#                 'magic': {'type': 'object'},
+#                 'desc': {'type': 'string'},
+#                 'sources': {'type': 'array', 'minItems': 1,
+#                             'items': {'type': 'object',
+#                                       'required': ['address', 'ptype'],
+#                                       'properties': {'desc': {'type': 'string'},
+#                                                      'address': {'type': 'string'},
+#                                                      'ptype': {'type': 'string'}}}}
+#             }
+#     }
+#
+#     UPDATESCHEMA = {
+#         'type': 'object',
+#         'required': ['version'],
+#         'properties':
+#             {
+#                 'version': {'type': 'string'},
+#                 'mark': {'type': 'string'},
+#                 'magic': {'type': 'object'},
+#                 'desc': {'type': 'string'},
+#                 'sources': {'type': 'array', 'minItems': 1,
+#                             'items': {'type': 'object',
+#                                       'required': ['address', 'ptype'],
+#                                       'properties': {'desc': {'type': 'string'},
+#                                                      'address': {'type': 'string'},
+#                                                      'ptype': {'type': 'string'}}}}
+#             }
+#     }
+#
+#     SOURCESCHEMA = {
+#         'type': 'object',
+#         'required': ['sources'],
+#         'properties': {
+#             'sources': {'type': 'array', 'minItems': 1,
+#                         'items': {'type': 'object',
+#                                   'required': ['ptype', 'address'],
+#                                   'properties': {'ptype': {'type': 'string'},
+#                                                  'address': {'type': 'string'},
+#                                                  'desc': {'type': 'string'},
+#                                                  }}}
+#         }
+#     }
+#
+#     def index(self, req, group_id, body=None):
+#         endpoint = validateutils.validate_endpoint(endpoint)
+#         if endpoint == common.CDN:
+#             raise InvalidArgument('Ednpoint error for cdn resource')
+#         body = body or {}
+#         order = body.pop('order', None)
+#         page_num = int(body.pop('page_num', 0))
+#         session = endpoint_session(readonly=True)
+#         joins = joinedload(Package.sources, Package.checkoutresource, innerjoin=False)
+#         results = resultutils.bulk_results(session,
+#                                            model=Package,
+#                                            columns=[Package.package_id,
+#                                                     Package.name,
+#                                                     Package.group,
+#                                                     Package.version,
+#                                                     Package.mark,
+#                                                     Package.status,
+#                                                     Package.magic,
+#                                                     Package.checkoutresource,
+#                                                     Package.sources,
+#                                                     Package.desc],
+#                                            counter=Package.package_id,
+#                                            order=order,
+#                                            option=joins,
+#                                            filter=Package.endpoint == endpoint,
+#                                            page_num=page_num)
+#         for column in results['data']:
+#             checkoutresource = column.get('checkoutresource')
+#             if endpoint != checkoutresource.endpoint:
+#                 raise ValueError('')
+#             column['checkoutresource'] = dict(entity=checkoutresource.entity,
+#                                               etype=common.EntityTypeMap[checkoutresource.etype],
+#                                               name=checkoutresource.name)
+#             magic = column.get('magic')
+#             column['magic'] = safe_loads(magic)
+#             sources = column.get('sources', [])
+#             column['sources'] = []
+#             for source in sources:
+#                 column['sources'].append(dict(ptype=common.PackageTypeMap[source.ptype],
+#                                               address=source.address))
+#         return results
+#
+#     def create(self, req, group_id, body=None):
+#         endpoint = validateutils.validate_endpoint(endpoint)
+#         if endpoint == common.CDN:
+#             raise InvalidArgument('Ednpoint error for cdn resource')
+#         body = body or {}
+#         jsonutils.schema_validate(body, self.CREATRESCHEMA)
+#         entity = body.pop('entity')
+#         name = body.pop('name')
+#         group = body.pop('group')
+#         version = body.pop('version')
+#         mark = body.pop('mark')
+#         magic = body.get('magic')
+#         desc = body.get('desc')
+#         sources = body.get('sources', [])
+#         session = endpoint_session()
+#         with session.begin():
+#             cdnresource = model_query(session, CdnResource, filter=CdnResource.entity == entity).one()
+#             if cdnresource.endpoint != endpoint:
+#                 raise InvalidArgument('Add new package fail, endpoint not the same as cdn resource')
+#             package = Package(entity=entity,
+#                               endpoint=endpoint,
+#                               name=name,
+#                               group=group,
+#                               version=version,
+#                               mark=mark,
+#                               magic=safe_dumps(magic), desc=desc)
+#             session.add(package)
+#             session.flush()
+#             for source in sources:
+#                 ptype = common.InvertPackageTypeMap[source['ptype']]
+#                 session.add(PackageSource(package_id=package.package_id,
+#                                           ptype=ptype,
+#                                           address=source.get('address'), desc=source.get('desc')))
+#                 session.flush()
+#         return resultutils.results(result='Add new package success')
+#
+#     def show(self, req, group_id, package_id):
+#         endpoint = validateutils.validate_endpoint(endpoint)
+#         if endpoint == common.CDN:
+#             raise InvalidArgument('Ednpoint error for cdn resource')
+#         session = endpoint_session(readonly=True)
+#         joins = joinedload(Package.sources, Package.checkoutresource, innerjoin=False)
+#         package = model_query(session, Package, filter=Package.package_id == package_id).options(joins).one()
+#         etype = common.EntityTypeMap[package.checkoutresource.etype]
+#         return resultutils.results('Show package success',
+#                                    data=[dict(package_id=package.package_id,
+#                                               endpoint=endpoint,
+#                                               name=package.name,
+#                                               group=package.group,
+#                                               version=package.version,
+#                                               mark=package.mark,
+#                                               status=package.status,
+#                                               magic=safe_loads(package.magic),
+#                                               sources=[dict(ptype=source.ptype,
+#                                                             address=source.address,
+#                                                             desc=source.desc,
+#                                                             ) for source in package.sources],
+#                                               desc=package.desc,
+#                                               checkoutresource=dict(entity=package.checkoutresource.entity,
+#                                                                     etype=etype,
+#                                                                     name=package.checkoutresource.name))])
+#
+#     def update(self, req, group_id, package_id, body=None):
+#         endpoint = validateutils.validate_endpoint(endpoint)
+#         if endpoint == common.CDN:
+#             raise InvalidArgument('Ednpoint error for cdn resource')
+#         body = body or {}
+#         jsonutils.schema_validate(body, self.UPDATESCHEMA)
+#         magic = body.get('magic')
+#         sources = body.get('sources', [])
+#         session = endpoint_session()
+#         with session.begin():
+#             package = model_query(session, Package, filter=Package.package_id == package_id).one()
+#             package.version = body.pop('version')
+#             if body.get('desc'):
+#                 package.desc = body.get('desc')
+#             if package.endpoint != endpoint:
+#                 raise InvalidArgument('Update package fail, endpoint not the same')
+#             if magic:
+#                 package.magic = package.magic.update(magic) if package.magic else magic
+#             for source in sources:
+#                 ptype = common.InvertPackageTypeMap[source.get('ptype')]
+#                 query = model_query(session, PackageSource,
+#                                     filter=and_(PackageSource.package_id == package_id,
+#                                                 PackageSource.ptype == ptype))
+#                 data = {'address': source.get('address')}
+#                 if source.get('desc'):
+#                     data.setdefault('desc', source.get('desc'))
+#                 query.update(data)
+#         return resultutils.results('Update package success')
+#
+#     def delete(self, req, group_id, package_id):
+#         endpoint = validateutils.validate_endpoint(endpoint)
+#         if endpoint == common.CDN:
+#             raise InvalidArgument('Ednpoint error for cdn resource')
+#         session = endpoint_session()
+#         with session.begin():
+#             package = model_query(session, Package, filter=Package.package_id == package_id).one()
+#             if package.endpoint != endpoint:
+#                 raise InvalidArgument('Delete package fail, endpoint not the same')
+#             if package.group:
+#                 raise InvalidArgument('Pacakge can not be delete, used by group %d' % package.group)
+#             session.delete(package)
+#         return resultutils.results('Update package success')
+#
+#     def add_source(self, req, group_id, package_id, body=None):
+#         endpoint = validateutils.validate_endpoint(endpoint)
+#         if endpoint == common.CDN:
+#             raise InvalidArgument('Ednpoint error for cdn resource')
+#         body = body or {}
+#         jsonutils.schema_validate(body, self.SOURCESCHEMA)
+#         session = endpoint_session()
+#         with session.begin():
+#             package = model_query(session, Package,
+#                                   filter=Package.package_id == package_id).one()
+#             if package.endpoint != endpoint:
+#                 raise InvalidArgument('Delete package fail, endpoint not the same')
+#             for source in body.get('sources'):
+#                 ptype = common.PackageTypeMap[source.get('ptype')]
+#                 session.add(PackageSource(package_id=package_id,
+#                                           ptype=ptype,
+#                                           address=source.get('address'),
+#                                           desc=source.get('desc')))
+#                 session.flush()
+#         return resultutils.results('Update package success')
+#
+#     def delete_source(self, req, group_id, package_id, body=None):
+#         endpoint = validateutils.validate_endpoint(endpoint)
+#         if endpoint == common.CDN:
+#             raise InvalidArgument('Ednpoint error for cdn resource')
+#         body = body or {}
+#         try:
+#             ptype = common.EntityTypeMap[body.get('ptype')]
+#         except KeyError:
+#             raise InvalidArgument('Delete cdn package source fail, ptype error')
+#         session = endpoint_session()
+#         joins = joinedload(Package.sources)
+#         with session.begin():
+#             package = model_query(session, Package,
+#                                   filter=Package.package_id == package_id).options(joins).one()
+#             if package.endpoint != endpoint:
+#                 raise InvalidArgument('Delete package source fail, endpoint not the same')
+#             for source in package.sources:
+#                 if source.ptype == ptype:
+#                     session.delete(source)
+#                     return resultutils.results('Delete package source success')
+#         return resultutils.results('No package source match')
+#
+#     def update_source(self, req, group_id, package_id, body=None):
+#         endpoint = validateutils.validate_endpoint(endpoint)
+#         if endpoint == common.CDN:
+#             raise InvalidArgument('Ednpoint error for cdn resource')
+#         body = body or {}
+#         try:
+#             address = body.pop('address')
+#             ptype = common.EntityTypeMap[body.get('ptype')]
+#         except KeyError:
+#             raise InvalidArgument('Update cdn package source fail, ptype or address error')
+#         session = endpoint_session()
+#         joins = joinedload(Package.sources)
+#         with session.begin():
+#             package = model_query(session, Package,
+#                                   filter=Package.package_id == package_id).options(joins).one()
+#             if package.endpoint != endpoint:
+#                 raise InvalidArgument('Update package source fail, endpoint not the same')
+#             for source in package.sources:
+#                 if source.ptype == ptype:
+#                     source.address = address
+#                     if body.get('desc'):
+#                         source.desc = body.get('desc')
+#                     return resultutils.results('Update package source success')
+#         return resultutils.results('No package source match')
+#
+#     def cdngroup(self, req, group_id, package_id, body=None):
+#         endpoint = validateutils.validate_endpoint(endpoint)
+#         if endpoint == common.CDN:
+#             raise InvalidArgument('Ednpoint error for cdn resource')
+#         body = body or {}
+#         try:
+#             group = body.pop('group')
+#         except KeyError:
+#             raise InvalidArgument('Update cdn package group fail, no group found')
+#         session = endpoint_session()
+#         with session.begin():
+#             package = model_query(session, Package,
+#                                   filter=Package.package_id == package_id).one()
+#             if package.endpoint != endpoint:
+#                 raise InvalidArgument('Update package source fail, endpoint not the same')
+#             package.group = group
+#             return resultutils.results('Update package group success')
+#         return resultutils.results('No package source match')

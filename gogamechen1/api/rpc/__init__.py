@@ -249,17 +249,17 @@ class Application(AppEndpointBase):
             raise ValueError('Entity is running')
         LOG.info('Try delete %s entity %d' % (self.namespace, entity))
         home = self.entity_home(entity)
-        if os.path.exists(home):
-            try:
+        try:
+            if os.path.exists(home):
                 shutil.rmtree(home)
-            except Exception:
-                LOG.error('delete %s fail' % home)
-                raise
-            else:
-                self._free_ports(entity)
-                self.entitys_map.pop(entity, None)
-                self.konwn_appentitys.pop(entity, None)
-                systemutils.drop_user(self.entity_user(entity))
+        except Exception:
+            LOG.error('delete %s fail' % home)
+            raise
+        else:
+            self._free_ports(entity)
+            self.entitys_map.pop(entity, None)
+            self.konwn_appentitys.pop(entity, None)
+            systemutils.drop_user(self.entity_user(entity))
 
     def create_entity(self, entity, objtype, objfile, timeout,
                       databases, chiefs):
@@ -329,7 +329,6 @@ class Application(AppEndpointBase):
     def rpc_create_entity(self, ctxt, entity, **kwargs):
         timeout = count_timeout(ctxt, kwargs)
         objfile = kwargs.pop('objfile')
-        ports = kwargs.pop('ports', None)
         chiefs = kwargs.pop('chiefs', None)
         objtype = kwargs.pop('objtype')
         databases = kwargs.pop('databases')
@@ -347,7 +346,7 @@ class Application(AppEndpointBase):
                 confdir = os.path.split(self._objconf(entity, objtype))[0]
                 os.makedirs(confdir, mode=0755)
                 systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
-                with self._allocate_port(entity, objtype, ports) as ports:
+                with self._allocate_port(entity, objtype, None) as ports:
                     middleware = taskflow.create_entity(self, entity, objtype, databases,
                                                         chiefs, objfile, timeout)
                     if not middleware.success:

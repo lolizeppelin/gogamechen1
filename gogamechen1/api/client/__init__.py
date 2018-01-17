@@ -27,6 +27,10 @@ class GogameChen1DBClient(GopDBClient):
     appentitys_path = '/gogamechen1/entitys'
     reset_path = '/gogamechen1/group/%s/%s/entitys/%s/reset'
 
+    # packages_path = '/gopcdn/%s/packages'
+    # package_path = '/gopcdn/%s/packages/%s'
+    # packages_ex_path = '/gopcdn/%s/packages/%s/%s'
+
     def objfiles_index(self, body=None):
         resp, results = self.get(action=self.objfiles_path, body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
@@ -257,6 +261,92 @@ class GogameChen1DBClient(GopDBClient):
                                  body=dict(clean=clean))
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='delete gogamechen1 gmserver fail:%d' % results['resultcode'],
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    # -----------package api-----------------
+    def package_create(self, endpoint, body):
+        resp, results = self.post(action=self.packages_path % endpoint, body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='create %s package fail:%d' %
+                                                    (endpoint, results['resultcode']),
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def package_index(self, endpoint, body):
+        resp, results = self.get(action=self.packages_path % endpoint, body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='list %s package fail:%d' %
+                                                    (endpoint, results['resultcode']),
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def package_show(self, endpoint, package_id, body):
+        resp, results = self.get(action=self.package_path % (endpoint, package_id), body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='show %s package fail:%d' %
+                                                    (endpoint, results['resultcode']),
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def package_update(self, endpoint, package_id, body):
+        resp, results = self.put(action=self.package_path % (endpoint, package_id), body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='update %s package fail:%d' %
+                                                    (endpoint, results['resultcode']),
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def package_delete(self, endpoint, package_id, body):
+        resp, results = self.delete(action=self.package_path % (endpoint, package_id), body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='delete %s package fail:%d' %
+                                                    (endpoint, results['resultcode']),
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def package_source_add(self, endpoint, package_id, body):
+        resp, results = self.retryable_post(action=self.package_path % (endpoint, package_id, 'source'),
+                                            body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='add %s package source fail:%d' %
+                                                    (endpoint, results['resultcode']),
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def package_source_delete(self, endpoint, package_id, body):
+        resp, results = self.delete(action=self.package_path % (endpoint, package_id, 'source'),
+                                    body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='delete %s package source fail:%d' %
+                                                    (endpoint, results['resultcode']),
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def package_source_update(self, endpoint, package_id, body):
+        resp, results = self.put(action=self.package_path % (endpoint, package_id, 'source'),
+                                 body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='update %s package source fail:%d' %
+                                                    (endpoint, results['resultcode']),
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def package_change_group(self, endpoint, package_id, body):
+        resp, results = self.put(action=self.package_path % (endpoint, package_id, 'group'),
+                                 body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='update %s package group fail:%d' %
+                                                    (endpoint, results['resultcode']),
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
