@@ -105,34 +105,33 @@ class Group(TableBase):
         InnoDBTableBase.__table_args__
     )
 
-
-class PackageSource(TableBase):
-    package_id = sa.Column(sa.ForeignKey('packages.package_id', ondelete="CASCADE", onupdate='RESTRICT'),
-                           nullable=False, primary_key=True)
-    ptype = sa.Column(sa.SMALLINT, nullable=False, primary_key=True)
-    address = sa.Column(VARCHAR(128), nullable=False)
-    desc = sa.Column(VARCHAR(256), nullable=True)
-    __table_args__ = (
-        sa.UniqueConstraint('address', name='address_unique'),
-        InnoDBTableBase.__table_args__
-    )
-
-
-class Package(TableBase):
-    package_id = sa.Column(INTEGER(unsigned=True), nullable=False,
-                           primary_key=True, autoincrement=True)
-    entity = sa.Column(INTEGER(unsigned=True), nullable=False)
-    name = sa.Column(VARCHAR(256), nullable=False)
-    group = sa.Column(INTEGER(unsigned=True), nullable=True, default=None)
-    version = sa.Column(VARCHAR(64), nullable=False, default='1.0')
-    mark = sa.Column(VARCHAR(16), nullable=False)
-    status = sa.Column(SMALLINT, nullable=False, default=common.ENABLE)
-    uptime = sa.Column(DATETIME, nullable=False, onupdate=datetime.datetime.now)
-    magic = sa.Column(BLOB, nullable=True)
-    desc = sa.Column(VARCHAR(256), nullable=True)
-    sources = orm.relationship(PackageSource, backref='package', lazy='select',
-                               cascade='delete,delete-orphan,save-update')
-    __table_args__ = (
-        sa.Index('endpoint_index', 'endpoint'),
-        InnoDBTableBase.__table_args__
-    )
+# class PackageSource(TableBase):
+#     package_id = sa.Column(sa.ForeignKey('packages.package_id', ondelete="CASCADE", onupdate='RESTRICT'),
+#                            nullable=False, primary_key=True)
+#     ptype = sa.Column(sa.SMALLINT, nullable=False, primary_key=True)
+#     address = sa.Column(VARCHAR(128), nullable=False)
+#     desc = sa.Column(VARCHAR(256), nullable=True)
+#     __table_args__ = (
+#         sa.UniqueConstraint('address', name='address_unique'),
+#         InnoDBTableBase.__table_args__
+#     )
+#
+#
+# class Package(TableBase):
+#     package_id = sa.Column(INTEGER(unsigned=True), nullable=False,
+#                            primary_key=True, autoincrement=True)
+#     entity = sa.Column(INTEGER(unsigned=True), nullable=False)
+#     name = sa.Column(VARCHAR(256), nullable=False)
+#     group = sa.Column(INTEGER(unsigned=True), nullable=True, default=None)
+#     version = sa.Column(VARCHAR(64), nullable=False, default='1.0')
+#     mark = sa.Column(VARCHAR(16), nullable=False)
+#     status = sa.Column(SMALLINT, nullable=False, default=common.ENABLE)
+#     uptime = sa.Column(DATETIME, nullable=False, onupdate=datetime.datetime.now)
+#     magic = sa.Column(BLOB, nullable=True)
+#     desc = sa.Column(VARCHAR(256), nullable=True)
+#     sources = orm.relationship(PackageSource, backref='package', lazy='select',
+#                                cascade='delete,delete-orphan,save-update')
+#     __table_args__ = (
+#         sa.Index('endpoint_index', 'endpoint'),
+#         InnoDBTableBase.__table_args__
+#     )
