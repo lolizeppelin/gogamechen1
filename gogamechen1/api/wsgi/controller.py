@@ -177,7 +177,6 @@ def gopcdn_upload(req, resource_id, body, notity=None):
     return uri, address
 
 
-
 @singleton.singleton
 class ObjtypeFileReuest(BaseContorller):
     CREATESCHEMA = {}
@@ -188,10 +187,10 @@ class ObjtypeFileReuest(BaseContorller):
         desc = body.pop('desc', False)
         page_num = int(body.pop('page_num', 0))
         session = endpoint_session(readonly=True)
-        columns=[ObjtypeFile.uuid,
-                 ObjtypeFile.objtype,
-                 ObjtypeFile.subtype,
-                 ObjtypeFile.version,]
+        columns = [ObjtypeFile.uuid,
+                   ObjtypeFile.objtype,
+                   ObjtypeFile.subtype,
+                   ObjtypeFile.version]
 
         results = resultutils.bulk_results(session,
                                            model=ObjtypeFile,
@@ -203,12 +202,20 @@ class ObjtypeFileReuest(BaseContorller):
 
     def create(self, req, body=None):
         body = body or {}
+
+        uri = None
+        uuid = uuidutils.generate_uuid()
+
         subtype = utils.validate_string(body.pop('subtype'))
         objtype = body.pop('objtype')
         version = body.pop('version')
+
+        md5 = body.get('md5')
+        crc32 = body.get('crc32')
+        ext = body.get('ext')
+        size = body.get('size')
         address = body.get('address')
-        uuid = uuidutils.generate_uuid()
-        uri = None
+
         # 没有地址,通过gopcdn上传
         if not address:
             # 上传结束后通知
@@ -219,27 +226,25 @@ class ObjtypeFileReuest(BaseContorller):
                                    method='DELETE',
                                    body=dict(status=manager_common.DOWNFILE_MISSED))}
             uri, address = gopcdn_upload(req, CONF[common.NAME].objfile_resource, body, notity=notity)
+            status = manager_common.DOWNFILE_UPLOADING
+        else:
+            status = manager_common.DOWNFILE_FILEOK
 
-        # 直接增加一条记录
-        md5 = body.get('md5')
-        crc32 = body.get('crc32')
-        ext = body.get('ext')
-        size = body.get('size')
-        status = manager_common.DOWNFILE_FILEOK
         session = endpoint_session()
         with session.begin():
-            objtype_file = ObjtypeFile(objtype=objtype, version=version, subtype=subtype)
-            try:
-                create_result = file_controller.create(req, body=dict(uuid=uuid,
-                                                                      address=address,
-                                                                      size=size, md5=md5,
-                                                                      crc32=crc32, ext=ext,
-                                                                      status=status))
-            except DBDuplicateEntry:
-                raise InvalidArgument('File info Duplicate error')
-            objtype_file.uuid = create_result['data'][0]['uuid']
+            objtype_file = ObjtypeFile(uuid=uuid, objtype=objtype,
+                                       version=version, subtype=subtype)
             session.add(objtype_file)
             session.flush()
+            try:
+                file_controller.create(req, body=dict(uuid=uuid,
+                                                      address=address,
+                                                      size=size, md5=md5, crc32=crc32,
+                                                      ext=ext,
+                                                      status=status))
+            except DBDuplicateEntry:
+                raise InvalidArgument('File info Duplicate error')
+
         return resultutils.results('creat file for %s success' % objtype,
                                    data=[dict(uuid=objtype_file.uuid, uri=uri)])
 
@@ -291,11 +296,11 @@ class GroupReuest(BaseContorller):
         page_num = int(body.pop('page_num', 0))
 
         session = endpoint_session(readonly=True)
-        columns=[Group.group_id,
-                 Group.name,
-                 Group.lastarea,
-                 Group.desc,
-                 Group.areas]
+        columns = [Group.group_id,
+                   Group.name,
+                   Group.lastarea,
+                   Group.desc,
+                   Group.areas]
 
         results = resultutils.bulk_results(session,
                                            model=Group,
@@ -349,7 +354,7 @@ class GroupReuest(BaseContorller):
                 objtype = entity.objtype
                 entityinfo = dict(entity=entity.entity)
                 if entity.areas:
-                    entityinfo.setdefault('areas', [ area.area_id for area in entity.areas])
+                    entityinfo.setdefault('areas', [area.area_id for area in entity.areas])
                 try:
                     _entitys[objtype].append(entityinfo)
                 except KeyError:
