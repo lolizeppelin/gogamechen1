@@ -15,7 +15,6 @@ from sqlalchemy.dialects.mysql import BLOB
 
 from simpleservice.ormdb.models import TableBase
 from simpleservice.ormdb.models import InnoDBTableBase
-from simpleservice.ormdb.models import MyISAMTableBase
 
 from gogamechen1 import common
 
@@ -31,7 +30,7 @@ class ObjtypeFile(TableBase):
 
     __table_args__ = (
         sa.UniqueConstraint('objtype', 'subtype', 'version', name='file_unique'),
-        MyISAMTableBase.__table_args__
+        InnoDBTableBase.__table_args__
     )
 
 
