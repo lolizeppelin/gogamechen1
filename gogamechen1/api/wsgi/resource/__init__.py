@@ -90,7 +90,7 @@ def _map_resources(resource_ids):
     missed = set(resource_ids) - set(CDNRESOURCE.keys())
     if missed:
         with goperation.tlock('gogamechen1-cdnresource'):
-            resources = cdnresource_controller._shows(resource_ids=True, domains=True, metadatas=True)
+            resources = cdnresource_controller._shows(resource_ids=missed, domains=True, metadatas=True)
             for resource in resources:
                 resource_id = resource.get('resource_id')
                 agent_id = resource.get('agent_id')
@@ -168,9 +168,9 @@ def gopcdn_upload(req, resource_id, body, fileinfo, notify=None):
 
 @singleton.singleton
 class ObjtypeFileReuest(BaseContorller):
-    CREATRESCHEMA = {
+    CREATESCHEMA = {
         'type': 'object',
-        'required': ['package_id', 'ftype', 'gversion'],
+        'required': ['subtype', 'objtype', 'version'],
         'properties':
             {
                 'subtype': {'type': 'string'},
@@ -301,7 +301,7 @@ class ObjtypeFileReuest(BaseContorller):
 
 @singleton.singleton
 class PackageReuest(BaseContorller):
-    CREATRESCHEMA = {
+    CREATESCHEMA = {
         'type': 'object',
         'required': ['resource_id', 'package_name', 'group_id', 'mark'],
         'properties':
@@ -395,7 +395,7 @@ class PackageReuest(BaseContorller):
 
     def create(self, req, group_id, body=None):
         body = body or {}
-        jsonutils.schema_validate(body, self.CREATRESCHEMA)
+        jsonutils.schema_validate(body, self.CREATESCHEMA)
         resource_id = body.pop('resource_id')
         package_name = body.pop('package_name')
         group_id = int(body.pop('group_id'))
@@ -486,7 +486,7 @@ class PackageReuest(BaseContorller):
 
 @singleton.singleton
 class PackageFileReuest(BaseContorller):
-    CREATRESCHEMA = {
+    CREATESCHEMA = {
         'type': 'object',
         'required': ['package_id', 'ftype', 'gversion'],
         'properties':
@@ -524,6 +524,7 @@ class PackageFileReuest(BaseContorller):
 
     def create(self, req, package_id, body=None):
         body = body or {}
+        jsonutils.schema_validate(body, self.CREATESCHEMA)
         package_id = int(package_id)
         uri = None
 
