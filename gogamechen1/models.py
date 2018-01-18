@@ -1,4 +1,4 @@
-import datetime
+# -*- coding:utf-8 -*-
 import sqlalchemy as sa
 from sqlalchemy import orm
 from sqlalchemy.ext import declarative
@@ -10,11 +10,13 @@ from sqlalchemy.dialects.mysql import TINYINT
 from sqlalchemy.dialects.mysql import SMALLINT
 from sqlalchemy.dialects.mysql import INTEGER
 from sqlalchemy.dialects.mysql import CHAR
-from sqlalchemy.dialects.mysql import DATETIME
+from sqlalchemy.dialects.mysql import ENUM
 from sqlalchemy.dialects.mysql import BLOB
 
 from simpleservice.ormdb.models import TableBase
 from simpleservice.ormdb.models import InnoDBTableBase
+
+from goperation.manager import common as manager_common
 
 from gogamechen1 import common
 
@@ -104,33 +106,53 @@ class Group(TableBase):
         InnoDBTableBase.__table_args__
     )
 
-# class PackageSource(TableBase):
-#     package_id = sa.Column(sa.ForeignKey('packages.package_id', ondelete="CASCADE", onupdate='RESTRICT'),
-#                            nullable=False, primary_key=True)
-#     ptype = sa.Column(sa.SMALLINT, nullable=False, primary_key=True)
-#     address = sa.Column(VARCHAR(128), nullable=False)
-#     desc = sa.Column(VARCHAR(256), nullable=True)
-#     __table_args__ = (
-#         sa.UniqueConstraint('address', name='address_unique'),
-#         InnoDBTableBase.__table_args__
-#     )
-#
-#
-# class Package(TableBase):
-#     package_id = sa.Column(INTEGER(unsigned=True), nullable=False,
-#                            primary_key=True, autoincrement=True)
-#     entity = sa.Column(INTEGER(unsigned=True), nullable=False)
-#     name = sa.Column(VARCHAR(256), nullable=False)
-#     group = sa.Column(INTEGER(unsigned=True), nullable=True, default=None)
-#     version = sa.Column(VARCHAR(64), nullable=False, default='1.0')
-#     mark = sa.Column(VARCHAR(16), nullable=False)
-#     status = sa.Column(SMALLINT, nullable=False, default=common.ENABLE)
-#     uptime = sa.Column(DATETIME, nullable=False, onupdate=datetime.datetime.now)
-#     magic = sa.Column(BLOB, nullable=True)
-#     desc = sa.Column(VARCHAR(256), nullable=True)
-#     sources = orm.relationship(PackageSource, backref='package', lazy='select',
-#                                cascade='delete,delete-orphan,save-update')
-#     __table_args__ = (
-#         sa.Index('endpoint_index', 'endpoint'),
-#         InnoDBTableBase.__table_args__
-#     )
+
+class PackageFile(TableBase):
+    # 包文件id
+    pfile_id = sa.Column(INTEGER(unsigned=True), nullable=False,
+                         primary_key=True, autoincrement=True)
+    # 引用id, 为0则为外部地址
+    quote_id = sa.Column(INTEGER(unsigned=True), nullable=False, default=0)
+    package_id = sa.Column(sa.ForeignKey('packages.package_id', ondelete="RESTRICT", onupdate='RESTRICT'),
+                           nullable=False)
+    # 包类型
+    ftype = sa.Column(VARCHAR(32), nullable=False)
+    # 安装包版本号
+    gversion = sa.Column(VARCHAR(64), nullable=False)
+    address = sa.Column(VARCHAR(200), nullable=True)
+    utime = sa.Column(INTEGER(unsigned=True), nullable=False)
+    status = sa.Column(VARCHAR(16), ENUM(*manager_common.DOWNFILESTATUS),
+                       default=manager_common.DOWNFILE_FILEOK, nullable=False)
+    desc = sa.Column(VARCHAR(256), nullable=True)
+    __table_args__ = (
+        sa.UniqueConstraint('address', name='address_unique'),
+        sa.Index('ftype_index', 'ftype'),
+        InnoDBTableBase.__table_args__
+    )
+
+
+class Package(TableBase):
+    package_id = sa.Column(INTEGER(unsigned=True), nullable=False,
+                           primary_key=True, autoincrement=True)
+    # 安装包对应resource,是安装包所使用的资源,而不是安装包文件所在的资源
+    resource_id = sa.Column(INTEGER(unsigned=True), nullable=False)
+    # 资源引用id
+    quote_id = sa.Column(INTEGER(unsigned=True), nullable=False)
+    # 包名,唯一
+    package_name = sa.Column(VARCHAR(200), nullable=False)
+    # 游戏服务器组id
+    group_id = sa.Column(sa.ForeignKey('groups.group_id', ondelete="RESTRICT", onupdate='RESTRICT'),
+                         nullable=False)
+    # 标记
+    mark = sa.Column(VARCHAR(32), nullable=False)
+    status = sa.Column(SMALLINT, nullable=False, default=common.ENABLE)
+    # 说明
+    desc = sa.Column(VARCHAR(256), nullable=True)
+    # 特殊标记
+    magic = sa.Column(BLOB, nullable=True)
+    files = orm.relationship(PackageFile, backref='package', lazy='select',
+                             cascade='delete,delete-orphan,save-update')
+    __table_args__ = (
+        # sa.UniqueConstraint('package_name', name='package_unique'),
+        InnoDBTableBase.__table_args__
+    )
