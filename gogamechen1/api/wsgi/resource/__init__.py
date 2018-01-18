@@ -142,6 +142,8 @@ def resource_cache_map(resource_id):
 
 
 def resource_url(resource_id, fileinfo):
+    if not resource_id:
+        raise ValueError('resource_id is None')
     filename = fileinfo.get('filename')
     resource = resource_cache_map(resource_id)
     url = resource.get('urls')[0]
@@ -222,6 +224,9 @@ class ObjtypeFileReuest(BaseContorller):
 
         # 没有地址,通过gopcdn上传
         if not address:
+            resource_id = CONF[common.NAME].objfile_resource
+            if not resource_id:
+                raise InvalidArgument('Both address and resource_id is None')
             # 上传结束后通知
             notify = {'success': dict(action='/files/%s' % uuid,
                                       method='PUT',
@@ -229,9 +234,9 @@ class ObjtypeFileReuest(BaseContorller):
                       'fail': dict(action='/gogamechen1/objfiles/%s' % uuid,
                                    method='DELETE')}
 
-            uri = gopcdn_upload(req, CONF[common.NAME].objfile_resource, body,
+            uri = gopcdn_upload(req, resource_id, body,
                                 fileinfo=fileinfo, notify=notify)
-            address = resource_url(CONF[common.NAME].objfile_resource, fileinfo)
+            address = resource_url(resource_id, fileinfo)
             status = manager_common.DOWNFILE_UPLOADING
         else:
             status = manager_common.DOWNFILE_FILEOK
@@ -542,6 +547,8 @@ class PackageFileReuest(BaseContorller):
                 session.flush()
         else:
             resource_id = CONF[common.NAME].package_resource
+            if not resource_id:
+                raise InvalidArgument('Both address and resource_id is None')
             fileinfo = body.pop('fileinfo', None)
             if not fileinfo:
                 raise InvalidArgument('Both fileinfo and address is none')
