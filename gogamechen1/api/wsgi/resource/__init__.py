@@ -1,4 +1,5 @@
 # -*- coding:utf-8 -*-
+import time
 import os
 import urllib
 import eventlet
@@ -506,12 +507,15 @@ class PackageReuest(BaseContorller):
 class PackageFileReuest(BaseContorller):
     CREATESCHEMA = {
         'type': 'object',
-        'required': ['package_id', 'ftype', 'gversion'],
+        'required': ['ftype', 'gversion'],
         'properties':
             {
-                'package_id': {'type': 'integer', 'minimum': 1},
-                'ftype': {'type': 'string'},
-                'gversion': {'type': 'string'},
+                'ftype': {'type': 'string', 'description': '包类型,打包,小包,更新包等'},
+                'gversion': {'type': 'string', 'description': '安装包版本号'},
+                'timeout': {'oneOf': [{'type': 'integer', 'minimum': 30}, {'type': 'null'}],
+                            'description': '上传超时时间'},
+                'impl': {'oneOf': [{'type': 'string'}, {'type': 'null'}]},
+                'auth': {'oneOf': [{'type': 'string'}, {'type': 'object'}, {'type': 'null'}]},
                 'address': {'oneOf': [{'type': 'string'}, {'type': 'null'}]},
                 'fileinfo': {'oneOf': [cdncommon.FILEINFOSCHEMA, {'type': 'null'}]},
                 'desc': {'oneOf': [{'type': 'string'},
@@ -543,14 +547,14 @@ class PackageFileReuest(BaseContorller):
     def create(self, req, package_id, body=None):
         body = body or {}
         jsonutils.schema_validate(body, self.CREATESCHEMA)
-        package_id = int(package_id)
+
         uri = None
+        package_id = int(package_id)
+        uptime = int(time.time())
 
         gversion = body.pop('gversion')
         ftype = body.pop('ftype')
-        uptime = body.pop('uptime')
         desc = body.pop('desc')
-
         address = body.get('address')
 
         session = endpoint_session()
