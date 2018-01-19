@@ -1,11 +1,12 @@
 from simpleservice.plugin.exceptions import ServerExecuteRequestError
 
 from gopdb.api.client import GopDBClient
+from gopcdn.api.client import GopCdnClient
 
 from goperation.manager import common
 
 
-class GogameChen1DBClient(GopDBClient):
+class GogameChen1DBClient(GopDBClient, GopCdnClient):
 
     objfiles_path = '/gogamechen1/objfiles'
     objfile_path = '/gogamechen1/objfiles/%s'
@@ -76,8 +77,8 @@ class GogameChen1DBClient(GopDBClient):
                                             resone=results['result'])
         return results
 
-    def objfile_send(self, uuid, objtype):
-        resp, results = self.retryable_post(action=self.objfile_path_ex % (uuid, 'send'))
+    def objfile_send(self, uuid, objtype, body=None):
+        resp, results = self.retryable_post(action=self.objfile_path_ex % (uuid, 'send'), body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='send gogamechen1 objfiles fail:%d' % results['resultcode'],
                                             code=resp.status_code,
@@ -287,7 +288,10 @@ class GogameChen1DBClient(GopDBClient):
                                             resone=results['result'])
         return results
 
-    def package_create(self, group_id, body):
+    def package_create(self, group_id, resource_id, package_name, mark,
+                       body):
+        body.update({'resource_id': resource_id, 'group_id': group_id,
+                     'package_name': package_name, 'mark': mark})
         resp, results = self.post(action=self.packages_path % str(group_id), body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='create %d package fail:%d' %

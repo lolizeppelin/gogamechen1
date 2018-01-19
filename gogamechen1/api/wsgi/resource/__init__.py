@@ -293,7 +293,7 @@ class ObjtypeFileReuest(BaseContorller):
         send file to agents
         """
         body = body or {}
-        objtype = body.get('objtype')
+        objtype = body.pop('objtype')
         session = endpoint_session(readonly=True)
         query = model_query(session, AppEntity.agent_id)
         if objtype:
@@ -317,18 +317,18 @@ class ObjtypeFileReuest(BaseContorller):
         return resultutils.results(result='Send file to %s agents thread spawning' % common.NAME,
                                    data=[asyncrequest.to_dict()])
 
+
 @singleton.singleton
 class PackageReuest(BaseContorller):
     CREATESCHEMA = {
         'type': 'object',
-        'required': ['resource_id', 'package_name', 'group_id', 'mark'],
+        'required': ['resource_id', 'package_name', 'mark'],
         'properties':
             {
                 'resource_id': {'type': 'integer', 'minimum': 1,
                                 'description': '安装包关联的游戏cdn资源'},
                 'package_name': {'type': 'string'},
-                'group_id': {'type': 'integer', 'minimum': 1},
-                'mark': {'type': 'string'},
+                'mark': {'type': 'string', 'description': '渠道标记'},
                 'magic': {'oneOf': [{'type': 'string'},
                                     {'type': 'object'},
                                     {'type': 'null'}]},
@@ -416,7 +416,7 @@ class PackageReuest(BaseContorller):
         jsonutils.schema_validate(body, self.CREATESCHEMA)
         resource_id = body.pop('resource_id')
         package_name = body.pop('package_name')
-        group_id = int(body.pop('group_id'))
+        group_id = int(group_id)
         mark = body.pop('mark')
         magic = body.get('magic')
         desc = body.get('desc')
