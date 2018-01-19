@@ -48,7 +48,7 @@ class Routers(router.RoutersBase):
 
         resource_name = 'pfile'
         collection_name = resource_name + 's'
-        package_controller = controller_return_response(resource.PackageReuest(),
+        package_controller = controller_return_response(resource.PackageFileReuest(),
                                                         resource.FAULT_MAP)
         collection = mapper.collection(collection_name=collection_name,
                                        resource_name=resource_name,

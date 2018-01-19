@@ -33,8 +33,8 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
     packages_path = '/gogamechen1/group/%s/packages'
     package_path = '/gogamechen1/group/%s/packages/%s'
 
-    packagefiles_path = '/gogamechen1/%s/package/%s/pfiles'
-    packagefile_path = '/gogamechen1/%s/package/%s/pfiles/%s'
+    packagefiles_path = '/gogamechen1/package/%s/pfiles'
+    packagefile_path = '/gogamechen1/package/%s/pfiles/%s'
 
     def objfiles_index(self, body=None):
         resp, results = self.get(action=self.objfiles_path, body=body)

@@ -634,6 +634,8 @@ class PackageFileReuest(BaseContorller):
 
     def delete(self, req, package_id, pfile_id, body=None):
         body = body or {}
+        package_id = int(package_id)
+        pfile_id = int(pfile_id)
         session = endpoint_session()
         query = model_query(session, PackageFile, filter=PackageFile.pfile_id == pfile_id)
         pfile = query.one()

@@ -122,7 +122,7 @@ class PackageFile(TableBase):
     # 安装包版本号
     gversion = sa.Column(VARCHAR(64), nullable=False)
     address = sa.Column(VARCHAR(200), nullable=True)
-    utime = sa.Column(INTEGER(unsigned=True), nullable=False)
+    uptime = sa.Column(INTEGER(unsigned=True), nullable=False)
     status = sa.Column(VARCHAR(16), ENUM(*manager_common.DOWNFILESTATUS),
                        default=manager_common.DOWNFILE_FILEOK, nullable=False)
     desc = sa.Column(VARCHAR(256), nullable=True)
