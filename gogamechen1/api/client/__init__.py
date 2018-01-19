@@ -281,7 +281,7 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
 
     # -----------package api-----------------
     def package_all(self):
-        resp, results = self.post(action=self.all_packages_path)
+        resp, results = self.get(action=self.all_packages_path)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='list all package fail',
                                             code=resp.status_code,
@@ -289,7 +289,8 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
         return results
 
     def package_create(self, group_id, resource_id, package_name, mark,
-                       body):
+                       body=None):
+        body = body or {}
         body.update({'resource_id': resource_id, 'group_id': group_id,
                      'package_name': package_name, 'mark': mark})
         resp, results = self.post(action=self.packages_path % str(group_id), body=body)
@@ -300,7 +301,7 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
-    def package_index(self, group_id, body):
+    def package_index(self, group_id, body=None):
         resp, results = self.get(action=self.packages_path % str(group_id), body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='list %d package fail:%d' %

@@ -195,6 +195,8 @@ class GroupReuest(BaseContorller):
         for entity in appentitys:
             entityinfo = emaps.get(entity.entity)
             metadata = entityinfo.get('metadata')
+            if not metadata:
+                raise ValueError('Can not get agent metadata for %d' % entity.entity)
             ports = entityinfo.get('ports')
             chiefs.append(dict(entity=entity.entity,
                                objtype=entity.objtype,

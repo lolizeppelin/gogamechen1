@@ -346,7 +346,7 @@ class PackageReuest(BaseContorller):
             }
     }
 
-    def shows(self, req, body=None):
+    def packages(self, req, body=None):
         session = endpoint_session(readonly=True)
         query = model_query(session, Package, filter=Package.status == common.ENABLE)
         query = query.options(joinedload(Package.files, innerjoin=False))

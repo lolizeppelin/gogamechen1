@@ -24,6 +24,8 @@ Requires:       python-goperation >= 1.0
 Requires:       python-goperation < 1.1
 Requires:       python-gopdb >= 1.0
 Requires:       python-gopdb < 1.1
+Requires:       python-gopcdn > 1.0
+Requires:       python-gopcdn < 1.1
 
 %description
 xiaochen go game operation

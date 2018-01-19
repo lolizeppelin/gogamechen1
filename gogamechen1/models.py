@@ -140,7 +140,7 @@ class Package(TableBase):
     resource_id = sa.Column(INTEGER(unsigned=True), nullable=False)
     # 资源引用id
     quote_id = sa.Column(INTEGER(unsigned=True), nullable=False)
-    # 包名,唯一
+    # 包名,一般情况下唯一
     package_name = sa.Column(VARCHAR(200), nullable=False)
     # 游戏服务器组id
     group_id = sa.Column(sa.ForeignKey('groups.group_id', ondelete="RESTRICT", onupdate='RESTRICT'),
