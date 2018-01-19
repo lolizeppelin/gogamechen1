@@ -27,7 +27,7 @@ class Routers(router.RoutersBase):
                                        member_prefix='/{uuid}',
                                        collection_actions=COLLECTION_ACTIONS,
                                        member_actions=MEMBER_ACTIONS)
-        # collection.member.link('send', method='POST')
+        collection.member.link('send', method='POST')
 
         resource_name = 'package'
         collection_name = resource_name + 's'

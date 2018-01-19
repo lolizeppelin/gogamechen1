@@ -9,6 +9,7 @@ class GogameChen1DBClient(GopDBClient):
 
     objfiles_path = '/gogamechen1/objfiles'
     objfile_path = '/gogamechen1/objfiles/%s'
+    objfile_path_ex = '/gogamechen1/objfiles/%s/%s'
 
     groups_path = '/gogamechen1/groups'
     group_path = '/gogamechen1/groups/%s'
@@ -71,6 +72,14 @@ class GogameChen1DBClient(GopDBClient):
         resp, results = self.delete(action=self.objfile_path % uuid)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='delete gogamechen1 objfiles fail:%d' % results['resultcode'],
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def objfile_send(self, uuid, objtype):
+        resp, results = self.retryable_post(action=self.objfile_path_ex % (uuid, 'send'))
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='send gogamechen1 objfiles fail:%d' % results['resultcode'],
                                             code=resp.status_code,
                                             resone=results['result'])
         return results

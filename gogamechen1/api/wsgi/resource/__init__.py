@@ -26,9 +26,11 @@ from simpleservice.rpc.exceptions import MessagingTimeout
 from simpleservice.rpc.exceptions import NoSuchMethod
 
 import goperation
+from goperation.utils import safe_func_wrapper
 from goperation.manager import common as manager_common
 from goperation.manager.exceptions import CacheStoneError
 from goperation.manager.utils import resultutils
+from goperation.manager.utils import targetutils
 from goperation.manager.wsgi.contorller import BaseContorller
 from goperation.manager.wsgi.entity.controller import EntityReuest
 from goperation.manager.wsgi.file.controller import FileReuest
@@ -43,7 +45,7 @@ from gogamechen1 import common
 from gogamechen1 import utils
 
 from gogamechen1.api import endpoint_session
-from gogamechen1.models import GameArea
+from gogamechen1.models import AppEntity
 from gogamechen1.models import ObjtypeFile
 from gogamechen1.models import Package
 from gogamechen1.models import PackageFile
@@ -72,18 +74,6 @@ group_controller = GroupReuest()
 CONF = cfg.CONF
 
 CDNRESOURCE = {}
-
-
-def areas_map(group_id):
-    session = endpoint_session(readonly=True)
-    query = model_query(session, GameArea, filter=GameArea.group_id == group_id)
-    maps = {}
-    for _areas in query:
-        try:
-            maps[_areas.entity].append(_areas.area_id)
-        except KeyError:
-            maps[_areas.entity] = [_areas.area_id, ]
-    return maps
 
 
 def _map_resources(resource_ids):
@@ -298,6 +288,34 @@ class ObjtypeFileReuest(BaseContorller):
         objfile = query.one()
         return objfile['uuid']
 
+    def send(self, req, uuid, body=None):
+        """call by client, and asyncrequest
+        send file to agents
+        """
+        body = body or {}
+        objtype = body.get('objtype')
+        session = endpoint_session(readonly=True)
+        query = model_query(session, AppEntity.agent_id)
+        if objtype:
+            query = query.filter(AppEntity.objtype == objtype)
+        agents = []
+        for r in query:
+            agents.append(r[0])
+        agents = list(set(agents))
+        asyncrequest = self.create_asyncrequest(body)
+        target = targetutils.target_endpoint(common.NAME)
+        rpc_method = 'getfile'
+        rpc_args = {'mark': uuid, 'timeout': asyncrequest.deadline - 1}
+        rpc_ctxt = {}
+        rpc_ctxt.setdefault('agents', agents)
+
+        def wapper():
+            self.send_asyncrequest(asyncrequest, target,
+                                   rpc_ctxt, rpc_method, rpc_args)
+
+        goperation.threadpool.add_thread(safe_func_wrapper, wapper, LOG)
+        return resultutils.results(result='Send file to %s agents thread spawning' % common.NAME,
+                                   data=[asyncrequest.to_dict()])
 
 @singleton.singleton
 class PackageReuest(BaseContorller):
