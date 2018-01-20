@@ -13,8 +13,14 @@
 # Gopcdn resource for objfile (integer value)
 #objfile_resource = <None>
 
-# Gopcdn resource for packages (integer value)
+# Gopcdn resource for packages files (integer value)
 #package_resource = <None>
+
+# Game resource change notify url (Url address)
+#notify_resource_url = <None>
+
+# Game areas change notify url (Url address)
+#notify_areas_url = <None>
 
 # The SQLAlchemy connection string to use to connect to the database. (string
 # value)
