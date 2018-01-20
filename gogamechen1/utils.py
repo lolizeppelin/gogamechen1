@@ -11,12 +11,12 @@ def find_process(procnames=None):
         procnames = [procnames, ]
     procnames = procnames or common.ALLTYPES
     pids = []
-    for proc in psutil.process_iter(attrs=['pid', 'exe', 'cmdline', 'username', 'cwd']):
+    for proc in psutil.process_iter(attrs=['pid', 'name', 'exe', 'username', 'cwd']):
         info = proc.info
-        if info.get('exe') in procnames:
+        if info.get('exe') and info.get('name') in procnames:
             pids.append(dict(pid=info.get('pid'),
                              exe=info.get('exe'),
-                             # cmdline=[cmd for cmd in info.get('cmdline')],
+                             name=info.get('name'),
                              pwd=info.get('cwd'),
                              username=info.get('username')))
     return pids
