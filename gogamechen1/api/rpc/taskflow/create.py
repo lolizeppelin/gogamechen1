@@ -19,14 +19,12 @@ from goperation.taskflow import common as task_common
 
 from gogamechen1 import common
 
-
 CONF = cfg.CONF
 
 LOG = logging.getLogger(__name__)
 
 
 class GogameMiddle(EntityMiddleware):
-
     def __init__(self, entity, endpoint, objtype):
         super(GogameMiddle, self).__init__(entity, endpoint)
         self.objtype = objtype
@@ -36,7 +34,6 @@ class GogameMiddle(EntityMiddleware):
 
 
 class GogameCreateDatabase(Database):
-
     def __init__(self, **kwargs):
         super(GogameCreateDatabase, self).__init__(backup=None, update=None, **kwargs)
         self.database_id = kwargs['database_id']
@@ -47,7 +44,6 @@ class GogameCreateDatabase(Database):
 
 
 class GogameDatabaseCreateTask(StandardTask):
-
     @property
     def taskname(self):
         return self.__class__.__name__ + '-' + self.database.subtype
@@ -119,7 +115,6 @@ def create_db_flowfactory(app, store):
 
 
 class GogameAppCreate(application.AppCreateBase):
-
     def __init__(self, middleware, timeout):
         super(GogameAppCreate, self).__init__(middleware)
         self.timeout = timeout
@@ -170,7 +165,7 @@ def create_entity(appendpoint, entity, objtype, databases,
                                   databases=_database)
 
     book = LogBook(name='create_%s_%d' % (appendpoint.namespace, entity))
-    store = dict(objfile=objfile,  chiefs=chiefs, download_timeout=timeout)
+    store = dict(objfile=objfile, chiefs=chiefs, download_timeout=timeout)
     taskflow_session = sqlite.get_taskflow_session()
     create_flow = pipe.flow_factory(taskflow_session, applications=[app, ], store=store,
                                     db_flow_factory=create_db_flowfactory)

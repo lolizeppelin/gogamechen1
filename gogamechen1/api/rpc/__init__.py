@@ -1,4 +1,6 @@
+# -*- coding:utf-8 -*-
 import os
+import sys
 import time
 import shutil
 import json
@@ -42,7 +44,7 @@ from gogamechen1.api.rpc.config import gmserver_group
 from gogamechen1.api.rpc.config import register_opts
 from gogamechen1.api.rpc.config import agent_opts
 
-from gogamechen1.api.rpc import taskflow
+from gogamechen1.api.rpc.taskflow import create as taskcreate
 
 if systemutils.POSIX:
     from simpleutil.utils.systemutils import posix
@@ -190,32 +192,45 @@ class Application(AppEndpointBase):
     def _get_ports(self, entity):
         return sorted([port for port in self.entitys_map[entity]])
 
-    def _entity_process(self, entity):
+    def _entity_process(self, entity, pids=None):
         entityinfo = self.konwn_appentitys.get(entity)
         if not entityinfo:
-            return
+            return ValueError('Entity info not found')
         objtype = entityinfo.get('objtype')
         _pid = entityinfo.get('pid')
         if _pid:
             try:
                 p = psutil.Process(pid=_pid)
-                if self._esure(entity, objtype, p.username(), p.cwd()):
-                    info = dict(pid=p.pid, exe=p.exe(), pwd=p.cwd(), username=p.username())
+                info = dict(pid=p.pid, name=p.name(), exe=p.exe(), pwd=p.cwd(), username=p.username())
+                # pid正确
+                if self._esure(entity, objtype, info):
                     setattr(p, 'info', info)
                     return p
+                # pid错误
+                else:
+                    _pid = None
             except psutil.NoSuchProcess:
                 _pid = None
         if not _pid:
-            _pid = self._find_from_pids(entity, objtype)
+            # 重新找pid
+            _pid = self._find_from_pids(entity, objtype, pids=pids)
+        # 还是没有对应pid
         if not _pid:
             self.konwn_appentitys[entity]['pid'] = None
+            # 程序不存在
             return None
         try:
+            # 再次验证pid
             p = psutil.Process(pid=_pid)
-            info = dict(pid=p.pid, exe=p.exe(), pwd=p.cwd(), username=p.username())
-            setattr(p, 'info', info)
-            self.konwn_appentitys[entity]['pid'] = _pid
-            return p
+            info = dict(pid=p.pid, name=p.name(), exe=p.exe(), pwd=p.cwd(), username=p.username())
+            if self._esure(entity, objtype, info):
+                setattr(p, 'info', info)
+                self.konwn_appentitys[entity]['pid'] = _pid
+                return p
+            else:
+                # 还是验证错误
+                self.konwn_appentitys[entity]['pid'] = None
+                return None
         except psutil.NoSuchProcess:
             self.konwn_appentitys[entity]['pid'] = None
             return None
@@ -266,10 +281,10 @@ class Application(AppEndpointBase):
         timeout = timeout if timeout else 30
         overtime = int(time.time()) + timeout
         dst = self.apppath(entity)
-        waiter = zlibutils.async_extract(src=objfile, dst=dst , timeout=timeout,
-                                        fork=functools.partial(safe_fork, self.entity_user(entity),
-                                                               self.entity_group(entity)))
-                                       # exclude=self._exclude(objtype))
+        # 异步解压,没有报错说明解压开始
+        waiter = zlibutils.async_extract(src=objfile, dst=dst, timeout=timeout,
+                                         fork=functools.partial(safe_fork, self.entity_user(entity),
+                                                                self.entity_group(entity)))
         def _postdo():
             LOG.debug('wait %s extract to %s' % (objfile, dst))
             waiter.wait()
@@ -293,9 +308,11 @@ class Application(AppEndpointBase):
             self.flush_config(entity, databases, opentime, chiefs)
 
         threadpool.add_thread(_postdo)
+        # 返回解压waiter对象
         return waiter
 
     def start_entity(self, entity, **kwargs):
+        pids = kwargs.get('pids')
         objtype = self.konwn_appentitys[entity].get('objtype')
         user = self.entity_user(entity)
         group = self.entity_group(entity)
@@ -307,6 +324,8 @@ class Application(AppEndpointBase):
             raise ValueError('Execute targe %s not exist' % EXEC)
         args = [EXEC, ]
         with self.lock(entity):
+            if self._entity_process(entity, pids=pids):
+                raise ValueError('Entity is running')
             pid = safe_fork(user=user, group=group)
             if pid == 0:
                 ppid = os.fork()
@@ -315,9 +334,10 @@ class Application(AppEndpointBase):
                     os.closerange(3, systemutils.MAXFD)
                     os.chdir(pwd)
                     with open(logfile, 'ab') as f:
-                        os.dup2(f.fileno(), 1)
-                        os.dup2(f.fileno(), 2)
-                    os.execv(EXEC, args)
+                        os.dup2(f.fileno(), sys.stdout.fileno())
+                        os.dup2(f.fileno(), sys.stderr.fileno())
+                    # 小陈的so放在bin目录中
+                    os.execve(EXEC, args, {'LD_LIBRARY_PATH': os.path.join(pwd, 'bin')})
                 else:
                     os._exit(0)
             else:
@@ -347,11 +367,14 @@ class Application(AppEndpointBase):
                 os.makedirs(confdir, mode=0755)
                 systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
                 with self._allocate_port(entity, objtype, None) as ports:
-                    middleware = taskflow.create_entity(self, entity, objtype, databases,
-                                                        chiefs, objfile, timeout)
+                    middleware = taskcreate.create_entity(self, entity, objtype, databases,
+                                                          chiefs, objfile, timeout)
                     if not middleware.success:
                         if middleware.waiter:
-                            middleware.waiter.stop()
+                            try:
+                                middleware.waiter.stop()
+                            except Exception as e:
+                                LOG.error('Stop waiter catch error %s' % e.__class__.__name__)
                         LOG.error('create middleware result %s' % str(middleware))
                         raise RpcEntityError(endpoint=common.NAME, entity=entity,
                                              reason=str(middleware))
@@ -479,11 +502,13 @@ class Application(AppEndpointBase):
                                               ctxt=ctxt,
                                               result='start entitys fail, no entitys found')
         details = []
+        # 启动前进程快照
+        proc_snapshot_before = utils.find_process()
         for entity in entitys:
 
             def safe_wapper(target_id):
                 try:
-                    self.start_entity(target_id)
+                    self.start_entity(target_id, pids=proc_snapshot_before)
                     details.append(dict(detail_id=target_id,
                                         resultcode=manager_common.RESULT_SUCCESS,
                                         result='start entity %d success' % target_id
@@ -506,6 +531,16 @@ class Application(AppEndpointBase):
             eventlet.sleep(0.5)
             if int(time.time()) > overtime:
                 break
+        # 启动后进程快照
+        proc_snapshot_after = utils.find_process()
+        # 确认启动成功
+        for detail in details:
+            entity = detail.get('detail_id')
+            # 确认entity进程
+            if not self._entity_process(entity, proc_snapshot_after):
+                detail['resultcode'] = manager_common.RESULT_ERROR
+                detail['result'] = 'process not exist after start entity %d' % entity
+
         responsed_entitys = set([detail.get('detail_id') for detail in details])
         for no_response_entity in (entitys - responsed_entitys):
             details.append(dict(detail_id=no_response_entity,
