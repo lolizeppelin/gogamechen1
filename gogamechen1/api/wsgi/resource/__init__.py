@@ -94,8 +94,6 @@ def _map_resources(resource_ids):
                 etype = resource.get('etype')
                 version = resource.get('version')
                 metadata = resource.get('metadata')
-                prefix = urllib.pathname2url(os.path.join(etype, name))
-
                 if internal:
                     if not metadata:
                         raise ValueError('Agent %d not online, get domain entity fail' % agent_id)
@@ -113,17 +111,16 @@ def _map_resources(resource_ids):
                 schema = 'http'
                 if port == 443:
                     schema = 'https'
-                urls = []
+                netlocs = []
                 for host in hostnames:
                     if port in (80, 443):
-                        httpbase = '%s://%s' % (schema, host)
+                        netloc = '%s://%s' % (schema, host)
                     else:
-                        httpbase = '%s://%s:%d' % (schema, host, port)
-                    httpbase = urlparse.urljoin(httpbase, prefix)
-                    urls.append(httpbase)
+                        netloc = '%s://%s:%d' % (schema, host, port)
+                    netlocs.append(netloc)
                 CDNRESOURCE.setdefault(resource_id, dict(name=name, etype=etype, agent_id=agent_id,
                                                          internal=internal, version=version,
-                                                         urls=urls, port=port, prefix=prefix,
+                                                         netlocs=netlocs, port=port,
                                                          domains=domains))
 
 
@@ -136,13 +133,15 @@ def resource_cache_map(resource_id):
     return CDNRESOURCE[resource_id]
 
 
-def resource_url(resource_id, fileinfo):
-    if not resource_id:
-        raise ValueError('resource_id is None')
-    filename = fileinfo.get('filename')
+def resource_url(resource_id, fileinfo=None):
     resource = resource_cache_map(resource_id)
-    url = resource.get('urls')[0]
-    return urlparse.urljoin(url, filename)
+    etype = resource.get('etype')
+    name = resource.get('name')
+    paths = [etype, name]
+    if fileinfo:
+        paths.append(fileinfo.get('filename'))
+    path = urllib.pathname2url(os.path.join(*paths))
+    return [urlparse.urljoin(netloc, path) for netloc in resource.get('netlocs')]
 
 
 def gopcdn_upload(req, resource_id, body, fileinfo, notify=None):
@@ -223,16 +222,15 @@ class ObjtypeFileReuest(BaseContorller):
             resource_id = CONF[common.NAME].objfile_resource
             if not resource_id:
                 raise InvalidArgument('Both address and resource_id is None')
+            address = resource_url(resource_id, fileinfo)[0]
             # 上传结束后通知
             notify = {'success': dict(action='/files/%s' % uuid,
                                       method='PUT',
                                       body=dict(status=manager_common.DOWNFILE_FILEOK)),
                       'fail': dict(action='/gogamechen1/objfiles/%s' % uuid,
                                    method='DELETE')}
-
             uri = gopcdn_upload(req, resource_id, body,
                                 fileinfo=fileinfo, notify=notify)
-            address = resource_url(resource_id, fileinfo)
             status = manager_common.DOWNFILE_UPLOADING
         else:
             status = manager_common.DOWNFILE_FILEOK
@@ -383,7 +381,7 @@ class PackageReuest(BaseContorller):
                              magic=jsonutils.loads_as_bytes(package.magic) if package.magic else None,
                              desc=package.desc,
                              resource=dict(version=resource.get('version'),
-                                           urls=resource.get('urls'),
+                                           urls=resource_url(package.resource_id),
                                            resource_id=package.resource_id,
                                            ),
                              login=dict(local_ip=group.get('local_ip'),
@@ -461,7 +459,7 @@ class PackageReuest(BaseContorller):
                                               resource=dict(version=resource.get('version'),
                                                             resource_id=package.resource_id,
                                                             quote_id=package.quote_id,
-                                                            urls=resource.get('urls'),
+                                                            urls=resource_url(package.resource_id),
                                                             )
                                               )])
 
@@ -479,7 +477,7 @@ class PackageReuest(BaseContorller):
                                               etype=resource.get('etype'),
                                               name=resource.get('name'),
                                               version=resource.get('version'),
-                                              urls=resource.get('urls'),
+                                              urls=resource_url(package.resource_id),
                                               mark=package.mark,
                                               status=package.status,
                                               magic=jsonutils.loads_as_bytes(package.magic)
@@ -613,7 +611,7 @@ class PackageFileReuest(BaseContorller):
             fileinfo = body.pop('fileinfo', None)
             if not fileinfo:
                 raise InvalidArgument('Both fileinfo and address is none')
-            address = resource_url(resource_id, fileinfo)
+            address = resource_url(resource_id, fileinfo)[0]
             # 上传结束后通知
             with session.begin():
                 pfile = PackageFile(package_id=package_id, ftype=ftype,

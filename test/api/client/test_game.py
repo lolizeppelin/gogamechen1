@@ -26,49 +26,9 @@ httpclient = ManagerClient(wsgi_url, wsgi_port, timeout=30)
 
 client = GogameChen1DBClient(httpclient)
 
-
-def file_create(path):
-    md5 = digestutils.filemd5(path)
-    crc32 = digestutils.filecrc32(path)
-    size = os.path.getsize(path)
-    ext = os.path.split(path)[1][1:]
-    body = {'size': size,
-            'crc32': crc32,
-            'md5': md5,
-            'ext': os.path.splitext(path)[1][1:],
-            }
-
-    ret = client.objfile_create(common.GMSERVER, 'appfile', '1001', body=body)['data'][0]
-
-    print 'create cdn result %s' % str(ret)
-
-    uri = ret.get('uri')
-    import time
-    time.sleep(0.1)
-    ws = create_connection("ws://%s:%d" % (uri.get('ipaddr'), uri.get('port')),
-                           subprotocols=["binary"])
-    print "connect websocket success"
-    with open(path, 'rb') as f:
-        while True:
-            buffer = f.read(4096)
-            if buffer:
-                ws.send(buffer)
-            else:
-                print 'file send finish'
-                break
-
-
-def file_index():
-    print client.objfiles_index()
-
-
-def send_file(agent_id, uuid):
-    print client.send_file_to_agents(agent_id=agent_id, file_id=uuid,
-                                     body={'request_time': int(time.time())})
-
-
 def group_index_test():
-    print client.groups_index()
+    for r in client.groups_index()['data']:
+        print r
 
 
 def group_create_test():
@@ -85,7 +45,6 @@ def group_map_test(group_id):
 
 def group_delete(group_id):
     print client.group_delete(group_id=group_id)
-
 
 
 def game_index():
@@ -123,12 +82,11 @@ def gm_show(entity):
     print client.gm_show(group_id=1, entity=entity, detail=True)
 
 
-path = r'C:\Users\loliz_000\Desktop\zhuomian5\charge.dat'
+def game_start(entitys):
+    print client.game_start(group_id=1, entitys=entitys, body={'request_time': int(time.time())})
 
-file_create(path)
 
-# file_index()
-# send_file(agent_id=6, uuid='ed3c683c-64a7-45d3-b149-c156ce3af508')
+
 
 # group_create_test()
 # group_index_test()
@@ -142,14 +100,16 @@ file_create(path)
 # game_show(3)
 
 # crosss_create()
-# cross_show(entity=1)
+cross_show(entity=2)
 # cross_delete(5)
 
 # gm_create()
 # gm_delete(entity=4)
-# gm_show(entity=2)
+gm_show(entity=1)
 
 
 # print client.quotes(endpoint='gogamechen1', entitys=[1,2,3,4,5])
 
 # print client.reset(group_id=1, objtype='publicsvr', entity=5)
+
+game_start(entitys='all')
