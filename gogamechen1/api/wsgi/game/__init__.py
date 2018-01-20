@@ -218,7 +218,7 @@ class GroupReuest(BaseContorller):
                                group_id=entity.group_id,
                                ports=ports,
                                local_ip=metadata.get('local_ip'),
-                               hostnames=metadata.get('hostnames'),
+                               dnsnames=metadata.get('dnsnames'),
                                external_ips=metadata.get('external_ips'))
                           )
         return chiefs
@@ -250,7 +250,7 @@ class GroupReuest(BaseContorller):
                             areaname=area.areaname,
                             entity=appentity.entity,
                             external_ips=emaps[appentity.entity]['metadata']['external_ips'],
-                            hostnames=emaps[appentity.entity]['metadata'].get('hostnames'),
+                            dnsnames=emaps[appentity.entity]['metadata'].get('dnsnames'),
                             port=emaps[appentity.entity]['ports'][0])
                 areas.append(info)
         return areas

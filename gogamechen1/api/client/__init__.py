@@ -18,6 +18,7 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
 
     games_path = '/gogamechen1/group/%s/gamesvr/entitys'
     game_path = '/gogamechen1/group/%s/gamesvr/entitys/%s'
+    game_path_ex = '/gogamechen1/group/%s/gamesvr/entitys/%s/%s'
 
     gms_path = '/gogamechen1/group/%s/loginsvr/entitys'
     gm_path = '/gogamechen1/group/%s/loginsvr/entitys/%s'
@@ -32,6 +33,7 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
     all_packages_path = '/gogamechen1/packages'
     packages_path = '/gogamechen1/group/%s/packages'
     package_path = '/gogamechen1/group/%s/packages/%s'
+    package_path_ex = '/gogamechen1/group/%s/packages/%s/%s'
 
     packagefiles_path = '/gogamechen1/package/%s/pfiles'
     packagefile_path = '/gogamechen1/package/%s/pfiles/%s'
@@ -137,6 +139,14 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
+    def group_areas(self, group_id, body=None):
+        resp, results = self.get(action=self.group_path_ex % (str(group_id), 'areas'), body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='get gogamechen1 group areas fail:%d' % results['resultcode'],
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
     # -----------bond database api-----------------
     def bondto(self, entity, databases):
         resp, results = self.post(action=self.bond_path % str(entity), body=dict(databases=databases),
@@ -199,6 +209,14 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                     body=dict(clean=clean))
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='delete gogamechen1 gameserver fail:%d' % results['resultcode'],
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def game_start(self, group_id, entitys, body=None):
+        resp, results = self.post(action=self.game_path_ex % (str(group_id), str(entitys), 'start'), body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='start gogamechen1 gameserver fail:%d' % results['resultcode'],
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
@@ -284,6 +302,16 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
         resp, results = self.get(action=self.all_packages_path)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='list all package fail',
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def package_resource_upgrade(self, group_id, package_id, version):
+        resp, results = self.get(action=self.package_path_ex % (str(group_id), package_id, 'upgrade'),
+                                 body=dict(version=version))
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='upgrade %d package resource fail:%d' %
+                                                    (group_id, results['resultcode']),
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
