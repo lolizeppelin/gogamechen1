@@ -276,17 +276,17 @@ class Application(AppEndpointBase):
             self.konwn_appentitys.pop(entity, None)
             systemutils.drop_user(self.entity_user(entity))
 
-    def create_entity(self, entity, objtype, objfile, timeout,
+    def create_entity(self, entity, objtype, appfile, timeout,
                       databases, chiefs):
         timeout = timeout if timeout else 30
         overtime = int(time.time()) + timeout
         dst = self.apppath(entity)
         # 异步解压,没有报错说明解压开始
-        waiter = zlibutils.async_extract(src=objfile, dst=dst, timeout=timeout,
+        waiter = zlibutils.async_extract(src=appfile, dst=dst, timeout=timeout,
                                          fork=functools.partial(safe_fork, self.entity_user(entity),
                                                                 self.entity_group(entity)))
         def _postdo():
-            LOG.debug('wait %s extract to %s' % (objfile, dst))
+            LOG.debug('wait %s extract to %s' % (appfile, dst))
             waiter.wait()
             while entity not in self.konwn_appentitys:
                 if int(time.time()) > overtime:
@@ -348,12 +348,12 @@ class Application(AppEndpointBase):
 
     def rpc_create_entity(self, ctxt, entity, **kwargs):
         timeout = count_timeout(ctxt, kwargs)
-        objfile = kwargs.pop('objfile')
+        appfile = kwargs.pop('appfile')
         chiefs = kwargs.pop('chiefs', None)
         objtype = kwargs.pop('objtype')
         databases = kwargs.pop('databases')
-        objfile = self.filemanager.get(objfile, download=False)
-        gfile.check(objtype, objfile)
+        appfile = self.filemanager.get(appfile, download=False)
+        gfile.check(objtype, appfile)
 
         entity = int(entity)
         with self.lock(entity):
@@ -368,7 +368,7 @@ class Application(AppEndpointBase):
                 systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
                 with self._allocate_port(entity, objtype, None) as ports:
                     middleware = taskcreate.create_entity(self, entity, objtype, databases,
-                                                          chiefs, objfile, timeout)
+                                                          chiefs, appfile, timeout)
                     if not middleware.success:
                         if middleware.waiter:
                             try:
@@ -407,8 +407,8 @@ class Application(AppEndpointBase):
                                                       opentime=kwargs.pop('opentime'),
                                                       pid=None))
 
-    def rpc_reset_entity(self, ctxt, entity, objfile,
-                      databases, chiefs, **kwargs):
+    def rpc_reset_entity(self, ctxt, entity, appfile,
+                         databases, chiefs, **kwargs):
         timeout = count_timeout(ctxt, kwargs)
         entity = int(entity)
         _start = time.time()
@@ -426,9 +426,9 @@ class Application(AppEndpointBase):
                     self.client.ports_add(agent_id=self.manager.agent_id, endpoint=common.NAME,
                                           entity=entity, ports=ports)
                     LOG.info('Miss port of %s.%d, success allocate' % (objtype, entity))
-            if objfile:
-                objfile = self.filemanager.get(objfile, download=False)
-                gfile.check(objtype, objfile)
+            if appfile:
+                appfile = self.filemanager.get(appfile, download=False)
+                gfile.check(objtype, appfile)
                 apppath = self.apppath(entity)
                 cfile = self._objconf(entity, objtype)
                 confdir = os.path.split(cfile)[0]
@@ -449,7 +449,7 @@ class Application(AppEndpointBase):
                         json.dump(oldcf, f)
                 used = time.time() - _start
                 timeout -= used
-                waiter = zlibutils.async_extract(src=objfile, dst=apppath , timeout=timeout,
+                waiter = zlibutils.async_extract(src=appfile, dst=apppath, timeout=timeout,
                                                  fork=functools.partial(safe_fork, self.entity_user(entity),
                                                                         self.entity_group(entity)))
                 waiter()

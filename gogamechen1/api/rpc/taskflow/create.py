@@ -119,14 +119,14 @@ class GogameAppCreate(application.AppCreateBase):
         super(GogameAppCreate, self).__init__(middleware)
         self.timeout = timeout
 
-    def execute(self, objfile, chiefs=None):
+    def execute(self, appfile, chiefs=None):
         if self.middleware.is_success(self.taskname):
             return
         appendpoint = self.middleware.reflection()
         # 创建实体
         self.middleware.waiter = appendpoint.create_entity(self.middleware.entity,
                                                            self.middleware.objtype,
-                                                           objfile, self.timeout,
+                                                           appfile, self.timeout,
                                                            self.middleware.databases, chiefs)
 
     def revert(self, result, **kwargs):
@@ -137,7 +137,7 @@ class GogameAppCreate(application.AppCreateBase):
 
 
 def create_entity(appendpoint, entity, objtype, databases,
-                  chiefs, objfile, timeout):
+                  chiefs, appfile, timeout):
     middleware = GogameMiddle(endpoint=appendpoint, entity=entity, objtype=objtype)
 
     conf = CONF['%s.%s' % (common.NAME, objtype)]
@@ -165,7 +165,7 @@ def create_entity(appendpoint, entity, objtype, databases,
                                   databases=_database)
 
     book = LogBook(name='create_%s_%d' % (appendpoint.namespace, entity))
-    store = dict(objfile=objfile, chiefs=chiefs, download_timeout=timeout)
+    store = dict(appfile=appfile, chiefs=chiefs, download_timeout=timeout)
     taskflow_session = sqlite.get_taskflow_session()
     create_flow = pipe.flow_factory(taskflow_session, applications=[app, ], store=store,
                                     db_flow_factory=create_db_flowfactory)
