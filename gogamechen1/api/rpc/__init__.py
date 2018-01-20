@@ -348,11 +348,10 @@ class Application(AppEndpointBase):
 
     def rpc_create_entity(self, ctxt, entity, **kwargs):
         timeout = count_timeout(ctxt, kwargs)
-        appfile = kwargs.pop('appfile')
         chiefs = kwargs.pop('chiefs', None)
         objtype = kwargs.pop('objtype')
         databases = kwargs.pop('databases')
-        appfile = self.filemanager.get(appfile, download=False)
+        appfile = self.filemanager.get(kwargs.pop(common.APPFILE), download=False)
         gfile.check(objtype, appfile)
 
         entity = int(entity)

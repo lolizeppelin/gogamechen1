@@ -267,10 +267,10 @@ class GroupReuest(BaseContorller):
 class AppEntityReuest(BaseContorller):
 
     CREATEAPPENTITY = {'type': 'object',
-                       'required': ['objfile'],
+                       'required': [common.APPFILE],
                        'properties': {
-                           'objfile': {'type': 'string', 'format': 'uuid',
-                                       'description': '需要下载的文件的uuid'},
+                           common.APPFILE: {'type': 'string', 'format': 'uuid',
+                                            'description': '需要下载的文件的uuid'},
                            'agent_id': {'type': 'integer', 'minimum': 1,
                                         'description': '程序安装的目标机器,不填自动分配'},
                            'opentime': {'type': 'integer', 'minimum': 1514736000,
@@ -282,14 +282,19 @@ class AppEntityReuest(BaseContorller):
                        }
 
     UPGRADE = {'type': 'object',
-               'required': ['timeout'],
+               'required': ['timeout', 'objfiles'],
                'properties': {
-                   'appfile': {'oneOf': [{'type': 'string', 'format': 'uuid'}, {'type': 'null'}],
-                               'description': '更新程序文件所需文件'},
-                   'datadb': {'oneOf': [{'type': 'string', 'format': 'uuid'}, {'type': 'null'}],
-                              'description': '更新游戏库所需文件'},
-                   'logdb': {'oneOf': [{'type': 'string', 'format': 'uuid'}, {'type': 'null'}],
-                             'description': '更新日志库所需文件'},
+                   'objfiles': {
+                       'type': 'object',
+                       'properties': {
+                           # 'appfile': {'oneOf': [{'type': 'string', 'format': 'uuid'}, {'type': 'null'}],
+                           #             'description': '更新程序文件所需文件'},
+                           common.APPFILE: {'type': 'string', 'format': 'uuid',
+                                            'description': '更新程序文件所需文件'},
+                           common.DATADB: {'type': 'string', 'format': 'uuid', 'description': '更新游戏库所需文件'},
+                           common.LOGDB: {'type': 'string', 'format': 'uuid', 'description': '更新日志库所需文件'},
+                       }
+                   },
                    'request_time': {'type': 'integer', 'description': '异步请求时间'},
                    'timeout': {'type': 'integer', 'minimum': 30, 'maxmum': 600,
                                'description': '更新超时时间'}}
@@ -437,7 +442,7 @@ class AppEntityReuest(BaseContorller):
         if objtype == common.GAMESERVER and not opentime:
             raise InvalidArgument('%s need opentime' % objtype)
         # 安装文件信息
-        objfile = body.pop('objfile')
+        appfile = body.pop(common.APPFILE)
         LOG.info('Try find agent and database for entity')
         # 选择实例运行服务器
         agent_id = self._agentselect(req, objtype, **body)
@@ -539,7 +544,7 @@ class AppEntityReuest(BaseContorller):
                     cross_id = cross.entity
             # 完整的rpc数据包
             body = dict(objtype=objtype,
-                        objfile=objfile,
+                        appfile=appfile,
                         databases=databases,
                         chiefs=chiefs)
 
@@ -872,8 +877,8 @@ class AppEntityReuest(BaseContorller):
 
     def upgrade(self, req, group_id, objtype, entity, body=None):
         body = body or {}
-        if len(body) < 3:
-            raise InvalidArgument('Not file found for upgrade')
+        if not body.get('objfiles'):
+            raise InvalidArgument('Not objfile found for upgrade')
         timeout = body.pop('timeout')
         body.update({'finishtime': int(time.time() + timeout)})
         body.setdefault('objtype', objtype)
@@ -887,7 +892,7 @@ class AppEntityReuest(BaseContorller):
         group_id = int(group_id)
         entity = int(entity)
         # 重置文件信息,为空表示不需要重置文件
-        objfile = body.pop('objfile', None)
+        appfile = body.pop(common.APPFILE, None)
         # 查询entity信息
         session = endpoint_session()
         query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
@@ -987,12 +992,12 @@ class AppEntityReuest(BaseContorller):
             target.namespace = common.NAME
             rpc = get_client()
             finishtime, timeout = rpcfinishtime()
-            if objfile:
+            if appfile:
                 finishtime += 30
                 timeout += 35
             rpc_ret = rpc.call(target, ctxt={'finishtime': finishtime, 'agents': [agent_id, ]},
                                msg={'method': 'reset_entity',
-                                    'args': dict(entity=entity, objfile=objfile,
+                                    'args': dict(entity=entity, appfile=appfile,
                                                  databases=databases, chiefs=chiefs)},
                                timeout=timeout)
             if not rpc_ret:
