@@ -6,8 +6,8 @@ from gogamechen1 import common
 
 CONF = cfg.CONF
 
-REGEXUSER = re.compile('^%s$' % common.REGEXUSER)
-REGEXPASS = re.compile('^%s$' % common.REGEXPASS)
+REGEXUSER = '^%s$' % common.REGEXUSER
+REGEXPASS = '^%s$' % common.REGEXPASS
 
 agent_opts = [
     cfg.IntOpt('agent_affinity',
