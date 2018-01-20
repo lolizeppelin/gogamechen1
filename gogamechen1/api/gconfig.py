@@ -33,17 +33,14 @@ HOSTORIP_LIMIT = '[a-z0-9-.]'
 SCHEMA_LIMIT = '[a-z]+?[a-z0-9-_]*?[a-z0-9]'
 CHARACTER_LIMIT = '[a-z0-9]'
 
-DBURIREGX = re.compile('(%s+?):(%s+?):@tcp\((%s+?):([0-9]+?)\)/(%s+?)\?charset=(%s+?)$' % \
+DBURIREGX = re.compile('(%s+?):(%s+?)@tcp\((%s+?):([0-9]+?)\)/(%s+?)\?charset=(%s+?)$' % \
                        (USER_LIMIT, PASSWORD_LIMIT, HOSTORIP_LIMIT, SCHEMA_LIMIT, CHARACTER_LIMIT))
 
 
 def deacidizing(cfile, subtype):
-    if subtype == common.DATADB:
-        uri = load(cfile).get('DB')
-    elif subtype == common.LOGDB:
-        uri = load(cfile).get('LogDB')
-    else:
-        raise ValueError('subtype error, can no deacidizing database')
+    uri = load(cfile).get(MAPS[subtype])
+    if not uri:
+        raise ValueError('Database uri is None')
     match = re.match(DBURIREGX, uri)
     if not match:
         raise ValueError('deacidizing uri fail')
