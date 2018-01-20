@@ -20,6 +20,7 @@ BuildRequires:  python-setuptools >= 11.0
 
 Requires:       python >= 2.6.6
 Requires:       python < 3.0
+Requires:       python-simplejson >= 2.1.0
 Requires:       python-goperation >= 1.0
 Requires:       python-goperation < 1.1
 Requires:       python-gopdb >= 1.0

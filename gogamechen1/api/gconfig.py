@@ -1,5 +1,5 @@
 import re
-import json
+import simplejson as json
 from gogamechen1 import common
 from collections import OrderedDict
 
