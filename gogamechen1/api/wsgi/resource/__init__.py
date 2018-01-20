@@ -373,10 +373,6 @@ class PackageReuest(BaseContorller):
             info = dict(dict(package_id=package.package_id,
                              package_name=package.package_name,
                              group_id=package.group_id,
-                             local_ip=group.get('local_ip'),
-                             external_ips=group.get('external_ips'),
-                             ports=group.get('ports'),
-                             objtype=group.get('objtype'),
                              etype=resource.get('etype'),
                              name=resource.get('name'),
                              version=resource.get('version'),
@@ -385,12 +381,16 @@ class PackageReuest(BaseContorller):
                              status=package.status,
                              magic=jsonutils.loads_as_bytes(package.magic) if package.magic else None,
                              desc=package.desc,
+                             login=dict(local_ip=group.get('local_ip'),
+                                        ports=group.get('ports'),
+                                        objtype=group.get('objtype'),
+                                        external_ips=group.get('external_ips'),
+                                        ),
                              files=[dict(ftype=pfile.ftype,
                                          address=pfile.address,
-                                         desc=pfile.gversion,
+                                         gversion=pfile.gversion,
                                          uptime=pfile.uptime,
                                          status=pfile.status) for pfile in package.files])
-
                         )
             data.append(info)
 
