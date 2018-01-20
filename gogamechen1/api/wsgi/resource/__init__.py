@@ -189,6 +189,7 @@ class ObjtypeFileReuest(BaseContorller):
             filters.append(ObjtypeFile.objtype == objtype)
         if subtype:
             filters.append(ObjtypeFile.subtype == subtype)
+
         session = endpoint_session(readonly=True)
         columns = [ObjtypeFile.uuid,
                    ObjtypeFile.objtype,
@@ -200,7 +201,7 @@ class ObjtypeFileReuest(BaseContorller):
                                            columns=columns,
                                            counter=ObjtypeFile.uuid,
                                            order=order, desc=desc,
-                                           filter=filters,
+                                           filter=and_(*filters) if filters else None,
                                            page_num=page_num)
         return results
 
