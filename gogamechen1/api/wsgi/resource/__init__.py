@@ -377,12 +377,14 @@ class PackageReuest(BaseContorller):
                              group_id=package.group_id,
                              etype=resource.get('etype'),
                              name=resource.get('name'),
-                             version=resource.get('version'),
-                             urls=resource.get('urls'),
                              mark=package.mark,
                              status=package.status,
                              magic=jsonutils.loads_as_bytes(package.magic) if package.magic else None,
                              desc=package.desc,
+                             resource=dict(version=resource.get('version'),
+                                           urls=resource.get('urls'),
+                                           resource_id=package.resource_id,
+                                           ),
                              login=dict(local_ip=group.get('local_ip'),
                                         ports=group.get('ports'),
                                         objtype=group.get('objtype'),
@@ -448,7 +450,19 @@ class PackageReuest(BaseContorller):
                               desc=desc)
             session.add(package)
             session.flush()
-        return resultutils.results(result='Add a new package success')
+
+        return resultutils.results(result='Add a new package success',
+                                   data=[dict(package_id=package.package_id,
+                                              group_id=package.group_id,
+                                              package_name=package.package_name,
+                                              name=resource.get('name'),
+                                              etype=resource.get('etype'),
+                                              resource=dict(version=resource.get('version'),
+                                                            resource_id=package.resource_id,
+                                                            quote_id=package.quote_id,
+                                                            urls=resource.get('urls'),
+                                                            )
+                                              )])
 
     def show(self, req, group_id, package_id, body=None):
         session = endpoint_session(readonly=True)
