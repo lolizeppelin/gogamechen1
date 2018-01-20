@@ -560,7 +560,7 @@ class Application(AppEndpointBase):
     def rpc_stop_entitys(self, ctxt, entitys, **kwargs):
         entitys = argutils.map_to_int(entitys) & set(self.entitys)
         if not entitys:
-            # stop with signal.SIGINT
+            # stop process with signal.SIGINT
             return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                               resultcode=manager_common.RESULT_ERROR,
                                               ctxt=ctxt,
@@ -587,3 +587,14 @@ class Application(AppEndpointBase):
                                           resultcode=manager_common.RESULT_SUCCESS,
                                           ctxt=ctxt,
                                           result='change entity opentime success')
+
+    def rpc_upgrade_entitys(self, ctxt, entitys, **kwargs):
+        entitys = argutils.map_to_int(entitys) & set(self.entitys)
+        if not entitys:
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='upgrade entity fail, no entitys found')
+        details = []
+        # 启动前进程快照
+        proc_snapshot_before = utils.find_process()

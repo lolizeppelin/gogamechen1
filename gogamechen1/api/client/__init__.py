@@ -221,6 +221,14 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
+    def game_upgrade(self, group_id, entitys, body=None):
+        resp, results = self.post(action=self.game_path_ex % (str(group_id), str(entitys), 'upgrade'), body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='upgrade gogamechen1 gameserver fail:%d' % results['resultcode'],
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
     # -----------gm server api-----------------
     def gms_index(self, group_id, body=None):
         resp, results = self.get(action=self.gms_path % str(group_id), body=body)

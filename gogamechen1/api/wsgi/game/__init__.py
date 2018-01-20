@@ -2,6 +2,7 @@
 import six
 import time
 import requests
+import inspect
 import eventlet
 import webob.exc
 from six.moves import zip
@@ -93,6 +94,7 @@ def areas_map(group_id):
 
 @singleton.singleton
 class GroupReuest(BaseContorller):
+
     def index(self, req, body=None):
         body = body or {}
         order = body.pop('order', None)
@@ -263,6 +265,7 @@ class GroupReuest(BaseContorller):
 
 @singleton.singleton
 class AppEntityReuest(BaseContorller):
+
     CREATEAPPENTITY = {'type': 'object',
                        'required': ['objfile'],
                        'properties': {
@@ -277,6 +280,20 @@ class AppEntityReuest(BaseContorller):
                            'zone': {'type': 'string', 'description': '安装区域,默认zone为all'},
                            'databases': {'type': 'object', 'description': '程序使用的数据库,不填自动分配'}}
                        }
+
+    UPGRADE = {'type': 'object',
+               'required': ['timeout'],
+               'properties': {
+                   'appfile': {'oneOf': [{'type': 'string', 'format': 'uuid'}, {'type': 'null'}],
+                               'description': '更新程序文件所需文件'},
+                   'datadb': {'oneOf': [{'type': 'string', 'format': 'uuid'}, {'type': 'null'}],
+                              'description': '更新游戏库所需文件'},
+                   'logdb': {'oneOf': [{'type': 'string', 'format': 'uuid'}, {'type': 'null'}],
+                             'description': '更新日志库所需文件'},
+                   'request_time': {'type': 'integer', 'description': '异步请求时间'},
+                   'timeout': {'type': 'integer', 'minimum': 30, 'maxmum': 600,
+                               'description': '更新超时时间'}}
+               }
 
     def _entityinfo(self, req, entity):
         entityinfo = entity_controller.show(req=req, entity=entity,
@@ -778,6 +795,7 @@ class AppEntityReuest(BaseContorller):
                                               objtype=_entity.objtype) for _entity in query])
 
     def _async_bluck_rpc(self, action, group_id, objtype, entity, body):
+        caller = inspect.stack()[0][3]
         body = body or {}
         group_id = int(group_id)
         if entity == 'all':
@@ -811,7 +829,7 @@ class AppEntityReuest(BaseContorller):
                                    rpc_ctxt, rpc_method, rpc_args)
 
         threadpool.add_thread(safe_func_wrapper, wapper, LOG)
-        return resultutils.results(result='gogamechen1 %s entitys spawning' % objtype,
+        return resultutils.results(result='gogamechen1 %s entitys %s spawning' % (objtype, caller),
                                    data=[asyncrequest.to_dict()])
 
     def start(self, req, group_id, objtype, entity, body=None):
@@ -851,6 +869,18 @@ class AppEntityReuest(BaseContorller):
 
     def status(self, req, group_id, objtype, entity, body=None):
         return self._async_bluck_rpc('start', group_id, objtype, entity, body)
+
+    def upgrade(self, req, group_id, objtype, entity, body=None):
+        body = body or {}
+        if len(body) < 3:
+            raise InvalidArgument('Not file found for upgrade')
+        timeout = body.pop('timeout')
+        body.update({'finishtime': int(time.time() + timeout)})
+        body.setdefault('objtype', objtype)
+        return self._async_bluck_rpc('upgrade', group_id, objtype, entity, body)
+
+    def flushconfig(self, req, group_id, objtype, entity, body=None):
+        return self._async_bluck_rpc('flushconfig', group_id, objtype, entity, body)
 
     def reset(self, req, group_id, objtype, entity, body=None):
         body = body or {}
@@ -958,8 +988,8 @@ class AppEntityReuest(BaseContorller):
             rpc = get_client()
             finishtime, timeout = rpcfinishtime()
             if objfile:
-                finishtime += 15
-                timeout += 15
+                finishtime += 30
+                timeout += 35
             rpc_ret = rpc.call(target, ctxt={'finishtime': finishtime, 'agents': [agent_id, ]},
                                msg={'method': 'reset_entity',
                                     'args': dict(entity=entity, objfile=objfile,

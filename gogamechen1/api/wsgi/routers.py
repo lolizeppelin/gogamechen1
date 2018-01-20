@@ -106,3 +106,4 @@ class Routers(router.RoutersBase):
         collection.member.link('opentime', method='PUT')
         # collection.member.link('hotfix', method='POST')
         collection.member.link('upgrade', method='POST')
+        collection.member.link('flushconfig', method='POST')

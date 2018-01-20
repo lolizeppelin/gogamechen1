@@ -1,3 +1,4 @@
+import re
 import json
 from gogamechen1 import common
 from collections import OrderedDict
@@ -16,7 +17,7 @@ def load(cfile):
         return json.load(f, object_pairs_hook=OrderedDict)
 
 
-def _format_database_url(subtype, database):
+def _format_database_url(database):
     info = dict(user=database.get('user'),
                 passwd=database.get('passwd'),
                 host=database.get('host'),
@@ -24,6 +25,35 @@ def _format_database_url(subtype, database):
                 schema=database.get('schema'),
                 character_set=database.get('character_set'))
     return '%(user)s:%(passwd)s@tcp(%(host)s:%(port)d)/%(schema)s?charset=%(character_set)s' % info
+
+
+USER_LIMIT = common.REGEXUSER
+PASSWORD_LIMIT = common.REGEXPASS
+HOSTORIP_LIMIT = '[a-z0-9-.]'
+SCHEMA_LIMIT = '[a-z]+?[a-z0-9-_]*?[a-z0-9]'
+CHARACTER_LIMIT = '[a-z0-9]'
+
+DBURIREGX = re.compile('(%s+?):(%s+?):@tcp\((%s+?):([0-9]+?)\)/(%s+?)\?charset=(%s+?)$' % \
+                       (USER_LIMIT, PASSWORD_LIMIT, HOSTORIP_LIMIT, SCHEMA_LIMIT, CHARACTER_LIMIT))
+
+
+def deacidizing(cfile, subtype):
+    if subtype == common.DATADB:
+        uri = load(cfile).get('DB')
+    elif subtype == common.LOGDB:
+        uri = load(cfile).get('LogDB')
+    else:
+        raise ValueError('subtype error, can no deacidizing database')
+    match = re.match(DBURIREGX, uri)
+    if not match:
+        raise ValueError('deacidizing uri fail')
+    info = dict(user=match.group(1),
+                passwd=match.group(2),
+                host=match.group(3),
+                port=int(match.group(4)),
+                schema=match.group(5),
+                character_set=match.group(6))
+    return info
 
 
 def _format_chiefs(chiefs):
@@ -45,12 +75,12 @@ def format_databases(objtype, cfile, databases):
     if databases:
         for subtype in subtypes:
             database = databases[subtype]
-            _databases.setdefault(subtype, _format_database_url(subtype, database))
+            _databases.setdefault(subtype, _format_database_url(database))
     else:
         conf = load(cfile)
         for subtype in subtypes:
             database = conf.pop(MAPS[subtype])
-            _databases.setdefault(subtype, _format_database_url(subtype, database))
+            _databases.setdefault(subtype, _format_database_url(database))
     return _databases
 
 
