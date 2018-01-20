@@ -388,7 +388,7 @@ class PackageReuest(BaseContorller):
                              login=dict(local_ip=group.get('local_ip'),
                                         ports=group.get('ports'),
                                         objtype=group.get('objtype'),
-                                        hostnames=group.get('hostnames'),
+                                        dnsnames=group.get('dnsnames'),
                                         external_ips=group.get('external_ips'),
                                         ),
                              files=[dict(ftype=pfile.ftype,
