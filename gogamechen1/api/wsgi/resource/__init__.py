@@ -131,6 +131,8 @@ def resource_cache_map(resource_id):
     """cache  resource info"""
     if resource_id not in CDNRESOURCE:
         _map_resources(resource_ids=[resource_id, ])
+    if resource_id not in CDNRESOURCE:
+        raise InvalidArgument('Resource not exit')
     return CDNRESOURCE[resource_id]
 
 
@@ -384,6 +386,7 @@ class PackageReuest(BaseContorller):
                              login=dict(local_ip=group.get('local_ip'),
                                         ports=group.get('ports'),
                                         objtype=group.get('objtype'),
+                                        hostnames=group.get('hostnames'),
                                         external_ips=group.get('external_ips'),
                                         ),
                              files=[dict(ftype=pfile.ftype,
@@ -428,7 +431,9 @@ class PackageReuest(BaseContorller):
         session = endpoint_session()
         with session.begin():
             # 确认cdn资源
-            cdnresource_controller.show(req, resource_id)
+            resource = resource_cache_map(resource_id)
+            if resource.get('internal'):
+                raise InvalidArgument('Resource is internal resrouce')
             # 确认group
             group_controller.show(req, group_id)
             # 创建引用
