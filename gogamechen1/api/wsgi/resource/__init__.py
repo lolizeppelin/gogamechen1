@@ -52,6 +52,8 @@ from gogamechen1.models import Package
 from gogamechen1.models import PackageFile
 from gogamechen1.api.wsgi.game import GroupReuest
 
+from gogamechen1.api.wsgi.notify import notify
+
 LOG = logging.getLogger(__name__)
 
 FAULT_MAP = {InvalidArgument: webob.exc.HTTPClientError,
@@ -370,6 +372,8 @@ class PackageReuest(BaseContorller):
             resource = resource_cache_map(resource_id=package.resource_id)
             info = dict(dict(package_id=package.package_id,
                              package_name=package.package_name,
+                             group_id=package.group_id,
+                             local_ip=group.get('local_ip'),
                              external_ips=group.get('external_ips'),
                              ports=group.get('ports'),
                              objtype=group.get('objtype'),
@@ -486,6 +490,7 @@ class PackageReuest(BaseContorller):
                 default_magic = jsonutils.loads_as_bytes(package.magic) if package.magic else {}
                 default_magic.update(magic)
                 package.magic = jsonutils.dumps(default_magic)
+        notify.resource()
         return resultutils.results('Update package success')
 
     def delete(self, req, group_id, package_id, body=None):
@@ -500,7 +505,16 @@ class PackageReuest(BaseContorller):
             session.flush()
         # 删除缓存
         CDNRESOURCE.pop(package_id, None)
+        notify.resource()
         return resultutils.results('Delete package success')
+
+    def upgrade(self, req, group_id, package_id, body=None):
+        session = endpoint_session(readonly=True)
+        query = model_query(session, Package, filter=Package.package_id == package_id)
+        package = query.one()
+        result = cdnresource_controller.upgrade(req, resource_id=package.group_id)
+        notify.resource()
+        return result
 
 
 @singleton.singleton
@@ -514,10 +528,14 @@ class PackageFileReuest(BaseContorller):
                 'gversion': {'type': 'string', 'description': '安装包版本号'},
                 'timeout': {'oneOf': [{'type': 'integer', 'minimum': 30}, {'type': 'null'}],
                             'description': '上传超时时间'},
-                'impl': {'oneOf': [{'type': 'string'}, {'type': 'null'}]},
-                'auth': {'oneOf': [{'type': 'string'}, {'type': 'object'}, {'type': 'null'}]},
-                'address': {'oneOf': [{'type': 'string'}, {'type': 'null'}]},
-                'fileinfo': {'oneOf': [cdncommon.FILEINFOSCHEMA, {'type': 'null'}]},
+                'impl': {'oneOf': [{'type': 'string'}, {'type': 'null'}],
+                         'description': '上传方式,默认为websocket'},
+                'auth': {'oneOf': [{'type': 'string'}, {'type': 'object'}, {'type': 'null'}],
+                         'description': '上传认证相关信息'},
+                'address': {'oneOf': [{'type': 'string'}, {'type': 'null'}],
+                            'description': '文件地址, 这个字段为空才需要主动上传'},
+                'fileinfo': {'oneOf': [cdncommon.FILEINFOSCHEMA, {'type': 'null'}],
+                             'description': '通用file信息结构'},
                 'desc': {'oneOf': [{'type': 'string'},
                                    {'type': 'null'}]},
             }
@@ -585,11 +603,12 @@ class PackageFileReuest(BaseContorller):
                 session.add(pfile)
                 session.flush()
                 url = '/%s/package/%d/pfiles/%d' % (common.NAME, package_id, pfile.pfile_id)
-                notify = {'success': dict(action=url, method='PUT',
-                                          body=dict(status=manager_common.DOWNFILE_FILEOK)),
-                          'fail': dict(action=url, method='DELETE')}
+                _notify = {'success': dict(action=url, method='PUT',
+                                           body=dict(status=manager_common.DOWNFILE_FILEOK)),
+                           'fail': dict(action=url, method='DELETE')}
                 uri = gopcdn_upload(req, resource_id, body,
-                                    fileinfo=fileinfo, notify=notify)
+                                    fileinfo=fileinfo, notify=_notify)
+        notify.resource()
         return resultutils.results('add package file  for %d success' % package_id,
                                    data=[dict(pfile_id=pfile.pfile_id, uri=uri)])
 
@@ -614,6 +633,8 @@ class PackageFileReuest(BaseContorller):
 
     def update(self, req, package_id, pfile_id, body=None):
         body = body or {}
+        package_id = int(package_id)
+        pfile_id = int(pfile_id)
         status = body.get('status')
         session = endpoint_session()
         query = model_query(session, PackageFile, filter=PackageFile.pfile_id == pfile_id)
@@ -629,6 +650,7 @@ class PackageFileReuest(BaseContorller):
             if quote_id:
                 data.setdefault('quote_id', quote_id)
             query.update(data)
+        notify.resource()
         return resultutils.results('update package file  for %d success' % package_id,
                                    data=[dict(pfile_id=pfile_id)])
 
@@ -654,5 +676,6 @@ class PackageFileReuest(BaseContorller):
 
         session.delete(pfile)
         session.flush()
+        notify.resource()
         return resultutils.results('delete package file  for %d success' % package_id,
                                    data=[dict(pfile_id=pfile_id)])

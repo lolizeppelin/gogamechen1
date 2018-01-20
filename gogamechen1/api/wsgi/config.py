@@ -8,6 +8,10 @@ resource_opts = [
                help='Gopcdn resource for objfile'),
     cfg.IntOpt('package_resource',
                help='Gopcdn resource for packages'),
+    cfg.UrlOpt('notify_resource_url',
+               help='Game resource change notify url'),
+    cfg.UrlOpt('notify_areas_url',
+               help='Game areas for packages'),
 ]
 
 

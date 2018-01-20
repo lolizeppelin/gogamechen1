@@ -43,8 +43,7 @@ class Routers(router.RoutersBase):
                                        member_prefix='/{package_id}',
                                        collection_actions=COLLECTION_ACTIONS,
                                        member_actions=MEMBER_ACTIONS)
-        # collection.member.link('file', name='add_package_file', method='POST', action='add_file')
-        # collection.member.link('file', name='add_package_file', method='DELETE', action='delete_file')
+        collection.member.link('upgrade', method='PUT')
 
         resource_name = 'pfile'
         collection_name = resource_name + 's'
@@ -57,6 +56,7 @@ class Routers(router.RoutersBase):
                                        member_prefix='/{pfile_id}',
                                        collection_actions=COLLECTION_ACTIONS,
                                        member_actions=MEMBER_ACTIONS)
+
 
         resource_name = 'group'
         collection_name = resource_name + 's'
@@ -71,6 +71,7 @@ class Routers(router.RoutersBase):
                                        member_actions=MEMBER_ACTIONS)
         collection.member.link('maps', method='GET')
         collection.member.link('chiefs', method='GET')
+        collection.member.link('areas', method='GET')
         collection.member.link('start', method='POST')
         collection.member.link('stop', method='POST')
         collection.member.link('status', method='POST')

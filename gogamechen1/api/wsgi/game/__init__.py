@@ -1,9 +1,11 @@
 # -*- coding:utf-8 -*-
 import six
 import time
+import requests
 import eventlet
 import webob.exc
 from six.moves import zip
+from collections import OrderedDict
 
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm.exc import MultipleResultsFound
@@ -53,6 +55,9 @@ from gogamechen1.models import AppEntity
 from gogamechen1.models import GameArea
 from gogamechen1.models import AreaDatabase
 
+from gogamechen1.api.wsgi.notify import notify
+
+
 LOG = logging.getLogger(__name__)
 
 FAULT_MAP = {InvalidArgument: webob.exc.HTTPClientError,
@@ -82,6 +87,7 @@ def areas_map(group_id):
             maps[_areas.entity].append(_areas.area_id)
         except KeyError:
             maps[_areas.entity] = [_areas.area_id, ]
+    session.close()
     return maps
 
 
@@ -127,6 +133,7 @@ class GroupReuest(BaseContorller):
             session.flush()
         except DBDuplicateEntry:
             raise InvalidArgument('Group name duplicate')
+        notify.areas(_group.group_id)
         return resultutils.results(result='create group success',
                                    data=[dict(group_id=_group.group_id,
                                               name=_group.name,
@@ -141,7 +148,7 @@ class GroupReuest(BaseContorller):
         joins = joinedload(Group.entitys, innerjoin=False)
         if detail:
             joins = joins.joinedload(AppEntity.areas, innerjoin=False)
-        query.options(joins)
+        query = query.options(joins)
         _group = query.one()
         group_info = dict(group_id=_group.group_id,
                           name=_group.name,
@@ -168,13 +175,21 @@ class GroupReuest(BaseContorller):
         group_id = int(group_id)
         session = endpoint_session()
         query = model_query(session, Group, filter=Group.group_id == group_id)
-        query.options(joinedload(Group.entitys, innerjoin=False))
+        query = query.options(joinedload(Group.entitys, innerjoin=False))
         _group = query.one()
         if _group.entitys:
             raise InvalidArgument('Group has entitys, can not be delete')
         query.delete()
+        notify.areas(group_id)
         return resultutils.results(result='delete group success',
                                    data=[dict(group_id=_group.group_id, name=_group.name)])
+
+    def maps(self, req, group_id, body=None):
+        body = body or {}
+        group_id = int(group_id)
+        maps = areas_map(group_id)
+        return resultutils.results(result='get group areas map success',
+                                   data=[dict(entity=k, areas=v) for k, v in maps])
 
     def _chiefs(self, group_ids=None, cross=True):
         if cross:
@@ -216,12 +231,33 @@ class GroupReuest(BaseContorller):
         return resultutils.results(result='get group chiefs success',
                                    data=self._chiefs(group_ids, cross))
 
-    def maps(self, req, group_id, body=None):
-        body = body or {}
+    def _areas(self, group_id):
+        session = endpoint_session(readonly=True)
+        query = model_query(session, AppEntity,
+                            filter=and_(AppEntity.group_id == group_id,
+                                        AppEntity.objtype == common.GAMESERVER))
+        query = query.options(joinedload(AppEntity.areas))
+        appentitys = query.all()
+        entitys = []
+        for appentity in appentitys:
+            entitys.append(appentity.entity)
+        emaps = entity_controller.shows(common.NAME, entitys, ports=True, metadata=True)
+        areas = []
+        for appentity in appentitys:
+            for area in appentity.areas:
+                info = dict(area_id=area.area_id,
+                            areaname=area.areaname,
+                            entity=appentity.entity,
+                            external_ips=emaps[appentity.entity]['metadata']['external_ips'],
+                            host=emaps[appentity.entity]['metadata']['host'],
+                            port=emaps[appentity.entity]['ports'][0])
+                areas.append(info)
+        return areas
+
+    def areas(self, req, group_id, body=None):
         group_id = int(group_id)
-        maps = areas_map(group_id)
-        return resultutils.results(result='get group areas map success',
-                                   data=[dict(entity=k, areas=v) for k, v in maps])
+        return resultutils.results(result='list group areas success',
+                                   data=self._areas(group_id))
 
 
 @singleton.singleton
@@ -524,6 +560,7 @@ class AppEntityReuest(BaseContorller):
                                   _entity.get('entity'), common.NAME, objtype=objtype,
                                   opentime=opentime,
                                   group_id=group_id, areas=[next_area, ])
+            notify.areas(group_id)
             return resultutils.results(result='create %s entity success' % objtype,
                                        data=[_result, ])
 
@@ -582,7 +619,7 @@ class AppEntityReuest(BaseContorller):
                 query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
                 # AppEntity.objtype == objtype,
                 # AppEntity.group_id == group_id))
-                query.options(joinedload(AppEntity.databases, innerjoin=False))
+                query = query.options(joinedload(AppEntity.databases, innerjoin=False))
                 _entity = query.one()
                 if _entity.status == common.OK:
                     raise InvalidArgument('Entity is active, unactive before delete it')
@@ -658,6 +695,7 @@ class AppEntityReuest(BaseContorller):
                     threadpool.add_thread(_rollback)
                     raise e
                 query.delete()
+        notify.areas(group_id)
         return resultutils.results(result='delete %s:%d success' % (objtype, entity),
                                    data=[dict(entity=entity, objtype=objtype,
                                               ports=ports, metadata=metadata)])
@@ -779,6 +817,35 @@ class AppEntityReuest(BaseContorller):
         return self._async_bluck_rpc('start', group_id, objtype, entity, body)
 
     def stop(self, req, group_id, objtype, entity, body=None):
+        body = body or {}
+        kill = body.get('kill', False)
+        if objtype == common.GAMESERVER and not kill:
+            session = endpoint_session(readonly=True)
+            entitys = set()
+            for _entity in model_query(session, AppEntity,
+                                       filter=and_(AppEntity.objtype == common.GAMESERVER,
+                                                   AppEntity.group_id == group_id)):
+                entitys.add(_entity.entity)
+            if entity != 'all':
+                entitys = list(entitys)
+            else:
+                targits = argutils.map_to_int(entity)
+                if targits - entitys:
+                    raise InvalidArgument('Entity not exist')
+                entitys = targits
+            query = model_query(session, AppEntity, filter=and_(AppEntity.objtype == common.GMSERVER,
+                                                                AppEntity.group_id == group_id))
+            gm = query.one()
+            entityinfo = entity_controller.show(req=req, entity=gm.entity,
+                                                endpoint=common.NAME,
+                                                body={'ports': True})['data'][0]
+            message = body.get('message') or ''
+            port = entityinfo.get('port')[0]
+            ipaddr = entityinfo.get('metadata').get('loacl_ip')
+            url = 'http://%s:%d/closegameserver' % (ipaddr, port)
+            body = jsonutils.dumps_as_bytes(OrderedDict(RealSvrIds=list(entitys),
+                                                        Msg=message, DelayTime=0))
+            requests.post(url, data=body, timeout=5)
         return self._async_bluck_rpc('start', group_id, objtype, entity, body)
 
     def status(self, req, group_id, objtype, entity, body=None):
@@ -793,7 +860,7 @@ class AppEntityReuest(BaseContorller):
         # 查询entity信息
         session = endpoint_session()
         query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
-        query.options(joinedload(AppEntity.databases, innerjoin=False))
+        query = query.options(joinedload(AppEntity.databases, innerjoin=False))
         _entity = query.one()
         if _entity.objtype != objtype:
             raise InvalidArgument('Entity is not %s' % objtype)
