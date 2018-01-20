@@ -1,9 +1,13 @@
+import re
 import copy
 from simpleutil.config import cfg
 
 from gogamechen1 import common
 
 CONF = cfg.CONF
+
+REGEXUSER = re.compile('^%s$' % common.REGEXUSER)
+REGEXPASS = re.compile('^%s$' % common.REGEXPASS)
 
 agent_opts = [
     cfg.IntOpt('agent_affinity',
@@ -19,14 +23,18 @@ agent_opts = [
 
 datadb_opts = [
     cfg.StrOpt('datadb_user',
+               regex=REGEXUSER,
                help='data db rw user name'),
     cfg.StrOpt('datadb_passwd',
                required=True,
+               regex=REGEXPASS,
                secret=True,
                help='data db rw user passwd'),
     cfg.StrOpt('datadb_ro_user',
+               regex=REGEXUSER,
                help='data db ro user name'),
     cfg.StrOpt('datadb_ro_passwd',
+               regex=REGEXPASS,
                required=True,
                secret=True,
                help='data db ro user passwd'),
@@ -35,14 +43,18 @@ datadb_opts = [
 
 logdb_opts = [
     cfg.StrOpt('logdb_user',
+               regex=REGEXUSER,
                help='logdb db rw user name'),
     cfg.StrOpt('logdb_passwd',
+               regex=REGEXPASS,
                required=True,
                secret=True,
                help='logdb db rw user passwd'),
     cfg.StrOpt('logdb_ro_user',
+               regex=REGEXUSER,
                help='logdb db ro user name'),
     cfg.StrOpt('logdb_ro_passwd',
+               regex=REGEXPASS,
                required=True,
                secret=True,
                help='logdb db ro user passwd'),

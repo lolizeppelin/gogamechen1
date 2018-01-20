@@ -1,5 +1,7 @@
 NAME = 'gogamechen1'
 
+REGEXUSER = '[A-Za-z]+?[A-Za-z-_0-9]*?[A-Za-z0-9]'
+REGEXPASS = '[a-zA-Z0-9-_.]'
 
 GAMESERVER = 'gamesvr'
 GMSERVER = 'loginsvr'
