@@ -80,7 +80,7 @@ def format_opentime(objtype, cfile, opentime):
 
 def gamesvr_make(logpath, local_ip, ports, entity, areas, databases, opentime, chiefs):
     conf = OrderedDict()
-    conf.setdefault('LogLevel', 'info')
+    conf.setdefault('LogLevel', 'release')
     conf.setdefault('LogPath', logpath)
     conf.setdefault('TCPAddr', '%s:%d' % ('0.0.0.0', ports[0]))
     conf.setdefault('RealServerId', entity)
@@ -95,7 +95,7 @@ def gamesvr_make(logpath, local_ip, ports, entity, areas, databases, opentime, c
 
 def loginsvr_make(logpath, local_ip, ports, entity, databases):
     conf = OrderedDict()
-    conf.setdefault('LogLevel', 'info')
+    conf.setdefault('LogLevel', 'release')
     conf.setdefault('LogPath', logpath)
     conf.setdefault('WSAddr', '%s:%d' % (local_ip, ports[1]))
     conf.setdefault('ListenAddr', '%s:%d' % (local_ip, ports[0]))
@@ -105,7 +105,7 @@ def loginsvr_make(logpath, local_ip, ports, entity, databases):
 
 def publicsvr_make(logpath, local_ip, ports, entity, databases):
     conf = OrderedDict()
-    conf.setdefault('LogLevel', 'info')
+    conf.setdefault('LogLevel', 'release')
     conf.setdefault('LogPath', logpath)
     conf.setdefault('ListenAddr', '%s:%d' % (local_ip, ports[0]))
     conf.setdefault('DB', databases[common.DATADB])
