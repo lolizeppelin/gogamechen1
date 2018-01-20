@@ -1,5 +1,31 @@
-# def upgrade_entity(appendpoint, entity, objtype, databases,
-#                   chiefs, objfile, timeout):
+# -*- coding:utf-8 -*-
+from simpleutil.config import cfg
+from simpleutil.log import log as logging
+
+from simpleflow.api import load
+from simpleflow.types import failure
+from simpleflow.storage import Connection
+from simpleflow.patterns import unordered_flow as uf
+from simpleflow.storage.middleware import LogBook
+from simpleflow.engines.engine import ParallelActionEngine
+
+from goperation.manager.rpc.agent import sqlite
+from goperation.manager.rpc.agent.application.taskflow.middleware import EntityMiddleware
+from goperation.manager.rpc.agent.application.taskflow import application
+from goperation.manager.rpc.agent.application.taskflow.database import Database
+from goperation.manager.rpc.agent.application.taskflow.base import StandardTask
+from goperation.manager.rpc.agent.application.taskflow import pipe
+from goperation.taskflow import common as task_common
+
+from gogamechen1 import common
+
+CONF = cfg.CONF
+
+LOG = logging.getLogger(__name__)
+
+
+def upgrade_entity(appendpoint, entity, objfiles, timeout):
+    pass
 #     middleware = GogameMiddle(endpoint=appendpoint, entity=entity, objtype=objtype)
 #
 #     conf = CONF['%s.%s' % (common.NAME, objtype)]

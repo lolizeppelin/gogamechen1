@@ -10,37 +10,20 @@ from simpleflow.storage.middleware import LogBook
 from simpleflow.engines.engine import ParallelActionEngine
 
 from goperation.manager.rpc.agent import sqlite
-from goperation.manager.rpc.agent.application.taskflow.middleware import EntityMiddleware
 from goperation.manager.rpc.agent.application.taskflow import application
-from goperation.manager.rpc.agent.application.taskflow.database import Database
+
 from goperation.manager.rpc.agent.application.taskflow.base import StandardTask
 from goperation.manager.rpc.agent.application.taskflow import pipe
 from goperation.taskflow import common as task_common
 
 from gogamechen1 import common
+from gogamechen1.api.rpc.taskflow import GogameMiddle
+from gogamechen1.api.rpc.taskflow import GogameCreateDatabase
+
 
 CONF = cfg.CONF
 
 LOG = logging.getLogger(__name__)
-
-
-class GogameMiddle(EntityMiddleware):
-    def __init__(self, entity, endpoint, objtype):
-        super(GogameMiddle, self).__init__(entity, endpoint)
-        self.objtype = objtype
-        self.databases = {}
-        self.dberrors = []
-        self.waiter = None
-
-
-class GogameCreateDatabase(Database):
-    def __init__(self, **kwargs):
-        super(GogameCreateDatabase, self).__init__(backup=None, update=None, **kwargs)
-        self.database_id = kwargs['database_id']
-        self.source = kwargs['source']
-        self.subtype = kwargs['subtype']
-        self.ro_user = kwargs['ro_user']
-        self.ro_passwd = kwargs['ro_passwd']
 
 
 class GogameDatabaseCreateTask(StandardTask):
@@ -146,7 +129,7 @@ def create_entity(appendpoint, entity, objtype, databases,
     for subtype in databases:
         database_id = databases[subtype]
         schema = '%s_%s_%s_%d' % (common.NAME, objtype, subtype, entity)
-        # 默认认证
+        # 默认认证后缀
         postfix = '-%d' % entity
         auth = dict(user=conf.get('%s_%s' % (subtype, 'user')) + postfix,
                     passwd=conf.get('%s_%s' % (subtype, 'passwd')),
@@ -155,7 +138,8 @@ def create_entity(appendpoint, entity, objtype, databases,
                     source='%s/%s' % (appendpoint.manager.ipnetwork.network,
                                       appendpoint.manager.ipnetwork.netmask))
         LOG.debug('Create schema %s in %d with auth %s' % (schema, database_id, str(auth)))
-        _database.append(GogameCreateDatabase(database_id=database_id, schema=schema,
+        _database.append(GogameCreateDatabase(backup=None, update=None,
+                                              database_id=database_id, schema=schema,
                                               character_set='utf8',
                                               subtype=subtype,
                                               host=None, port=None, **auth))
