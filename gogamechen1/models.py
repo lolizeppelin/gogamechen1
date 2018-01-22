@@ -58,7 +58,7 @@ class AreaDatabase(TableBase):
 
 class GameArea(TableBase):
     area_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
-    areaname = sa.Column(VARCHAR(128), default=None, nullable=False)
+    areaname = sa.Column(VARCHAR(128), nullable=False)
     group_id = sa.Column(sa.ForeignKey('groups.group_id', ondelete="RESTRICT", onupdate='RESTRICT'),
                          nullable=False, primary_key=True)
     entity = sa.Column(sa.ForeignKey('appentitys.entity', ondelete="RESTRICT", onupdate='RESTRICT'),
