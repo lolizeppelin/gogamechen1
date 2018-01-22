@@ -77,7 +77,7 @@ def format_databases(objtype, cfile, databases):
         conf = load(cfile)
         for subtype in subtypes:
             database = conf.pop(MAPS[subtype])
-            _databases.setdefault(subtype, _format_database_url(database))
+            _databases.setdefault(subtype, database)
     return _databases
 
 
