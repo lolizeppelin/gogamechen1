@@ -12,8 +12,9 @@ resource_opts = [
                help='Game resource change notify url'),
     cfg.UrlOpt('notify_areas_url',
                help='Game areas change notify url'),
+    cfg.UrlOpt('notify_entity_url',
+               help='Game entity change notify url'),
 ]
-
 
 
 def register_opts(group):

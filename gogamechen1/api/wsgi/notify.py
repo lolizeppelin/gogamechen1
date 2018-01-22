@@ -7,8 +7,15 @@ CONF = cfg.CONF
 
 
 class FrontNotify(HttpNotify):
+    def entity(self, group_id, objtype, entity):
+        self._do('entity', replace={'params': {'group_id': group_id,
+                                               'objtype': objtype,
+                                               'entity': entity,
+                                               }})
+
     def areas(self, group_id):
-        self._do('appentity', replace={'params': {'group_id': group_id}})
+        self._do('areas', replace={'params': {'group_id': group_id}})
+
 
     def resource(self):
         self._do('resource')
@@ -17,9 +24,18 @@ class FrontNotify(HttpNotify):
 FrontInfo = {}
 
 if CONF[common.NAME].notify_resource_url:
-    FrontInfo.setdefault('resource', dict(url=CONF[common.NAME].notify_resource_url, method='POST'))
+    FrontInfo.setdefault('resource', dict(url=CONF[common.NAME].notify_resource_url, method='POST',
+                                          params={'m': 'Admin', 'c': 'Package', 'a': 'notify'},
+                                          timeout=10))
 
-if CONF[common.NAME].notify_resource_url:
-    FrontInfo.setdefault('areas', dict(url=CONF[common.NAME].notify_areas_url, method='POST'))
+if CONF[common.NAME].notify_areas_url:
+    FrontInfo.setdefault('areas', dict(url=CONF[common.NAME].notify_areas_url, method='POST',
+                                       params={'m': 'Admin', 'c': 'GameServerGroup', 'a': 'notify'},
+                                       timeout=10))
+
+if CONF[common.NAME].notify_entity_url:
+    FrontInfo.setdefault('entity', dict(url=CONF[common.NAME].notify_entity_url, method='POST',
+                                        params={'m': 'Admin', 'c': 'Entity', 'a': 'notify'},
+                                        timeout=10))
 
 notify = FrontNotify(FrontInfo)

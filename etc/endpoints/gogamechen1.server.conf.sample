@@ -22,6 +22,9 @@
 # Game areas change notify url (Url address)
 #notify_areas_url = <None>
 
+# Game entity change notify url (Url address)
+#notify_entity_url = <None>
+
 # The SQLAlchemy connection string to use to connect to the database. (string
 # value)
 #connection = <None>
