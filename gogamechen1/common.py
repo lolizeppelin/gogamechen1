@@ -6,7 +6,7 @@ REGEXPASS = '[a-zA-Z0-9-_.]'
 GAMESERVER = 'gamesvr'
 GMSERVER = 'loginsvr'
 CROSSSERVER = 'publicsvr'
-ALLTYPES = set([GAMESERVER, GMSERVER, CROSSSERVER])
+ALLTYPES = frozenset([GAMESERVER, GMSERVER, CROSSSERVER])
 
 DATADB = 'datadb'
 LOGDB = 'logdb'
