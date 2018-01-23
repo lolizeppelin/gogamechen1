@@ -110,13 +110,17 @@ def _map_resources(resource_ids):
 
         cache = get_cache()
         scores = cache.zrangebyscore(name=cdncommon.CACHESETNAME,
-                                     min=earliest, withscores=True, score_cast_func=int)
+                                     min=str(earliest), max='+inf',
+                                     withscores=True, score_cast_func=int)
         if scores:
             for data in scores:
                 resource_id = int(data[0])
                 update_at = int(data[1])
-                if update_at > cache_base[resource_id]:
-                    CDNRESOURCE.pop(resource_id, None)
+                try:
+                    if update_at > cache_base[resource_id]:
+                        CDNRESOURCE.pop(resource_id, None)
+                except KeyError:
+                    continue
 
     missed = need - set(CDNRESOURCE.keys())
 
