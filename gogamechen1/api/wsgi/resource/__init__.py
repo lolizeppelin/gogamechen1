@@ -345,6 +345,7 @@ class PackageReuest(BaseContorller):
         'properties':
             {
                 'magic': {'type': 'object'},
+                'extension': {'type': 'extension'},
                 'desc': {'type': 'string'},
                 'status': {'type': 'integer', 'enum': [common.ENABLE, common.DISENABLE]}
             }
@@ -379,6 +380,7 @@ class PackageReuest(BaseContorller):
                              mark=package.mark,
                              status=package.status,
                              magic=jsonutils.loads_as_bytes(package.magic) if package.magic else None,
+                             extension=jsonutils.loads_as_bytes(package.extension) if package.extension else None,
                              resource=dict(version=resource.get('version'),
                                            urls=resource_url(package.resource_id),
                                            resource_id=package.resource_id,
@@ -413,7 +415,8 @@ class PackageReuest(BaseContorller):
                                                     Package.resource_id,
                                                     Package.mark,
                                                     Package.status,
-                                                    Package.magic],
+                                                    Package.magic,
+                                                    Package.extension],
                                            counter=Package.package_id,
                                            order=order,
                                            filter=Package.group_id == group_id,
@@ -482,6 +485,8 @@ class PackageReuest(BaseContorller):
                                               status=package.status,
                                               magic=jsonutils.loads_as_bytes(package.magic)
                                               if package.magic else None,
+                                              extension=jsonutils.loads_as_bytes(package.extension)
+                                              if package.extension else None,
                                               desc=package.desc,
                                               files=[dict(ftype=pfile.ftype,
                                                           address=pfile.address,
@@ -497,6 +502,7 @@ class PackageReuest(BaseContorller):
         body = body or {}
         jsonutils.schema_validate(body, self.UPDATESCHEMA)
         magic = body.get('magic')
+        extension = body.get('extension')
         status = body.get('status')
         desc = body.get('desc')
         session = endpoint_session()
@@ -510,6 +516,11 @@ class PackageReuest(BaseContorller):
                 default_magic = jsonutils.loads_as_bytes(package.magic) if package.magic else {}
                 default_magic.update(magic)
                 package.magic = jsonutils.dumps(default_magic)
+            if extension:
+                default_extension = jsonutils.loads_as_bytes(package.extension) if package.extension else {}
+                default_extension.update(extension)
+                package.extension = jsonutils.dumps(default_extension)
+            session.flush()
         notify.resource()
         return resultutils.results('Update package success')
 

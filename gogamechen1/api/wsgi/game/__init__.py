@@ -931,6 +931,8 @@ class AppEntityReuest(BaseContorller):
 
     def flushconfig(self, req, group_id, objtype, entity, body=None):
         body = body or {}
+        body.pop('opentime', None)
+        body.pop('chiefs', None)
         if objtype == common.GAMESERVER:
             gm = body.pop(common.GAMESERVER, False)
             if gm:
@@ -951,10 +953,6 @@ class AppEntityReuest(BaseContorller):
                                        local_ip=maps.get(gm.entity).get('metadata').get('local_ip')
                                        ))
                 body.update({'chiefs': chiefs})
-        else:
-            raise InvalidArgument('chiefs just for %s' % common.GAMESERVER)
-
-
         return self._async_bluck_rpc('flushconfig', group_id, objtype, entity, body)
 
     def reset(self, req, group_id, objtype, entity, body=None):

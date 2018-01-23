@@ -152,6 +152,8 @@ class Package(TableBase):
     desc = sa.Column(VARCHAR(256), nullable=True)
     # 特殊标记
     magic = sa.Column(BLOB, nullable=True)
+    # 扩展字段
+    extension = sa.Column(BLOB, nullable=True)
     files = orm.relationship(PackageFile, backref='package', lazy='select',
                              cascade='delete,delete-orphan,save-update')
     __table_args__ = (
