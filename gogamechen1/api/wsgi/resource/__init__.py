@@ -78,22 +78,32 @@ group_controller = GroupReuest()
 
 CONF = cfg.CONF
 
+
+class ResourceTTLCache(cachetools.TTLCache):
+    def __init__(self, maxsize, ttl):
+        cachetools.TTLCache.__init__(self, maxsize, ttl)
+
+    def expiretime(self, key):
+        link = self.__getlink(key)
+        return link.expire
+
 # CDNRESOURCE = {}
-CDNRESOURCE = cachetools.TTLCache(maxsize=1000, ttl=cdncommon.CACHETIME)
+CDNRESOURCE = ResourceTTLCache(maxsize=1000, ttl=cdncommon.CACHETIME)
 
 
 def _map_resources(resource_ids):
+    # 删除过期缓存
     CDNRESOURCE.expire()
+
     need = set(resource_ids)
     provides = set(CDNRESOURCE.keys())
-
     notmiss = need & provides
 
     if notmiss:
         cache_base = {}
         earliest = int(time.time())
         for resource_id in notmiss:
-            update_at = int(time.time()) - CDNRESOURCE[resource_id].expire
+            update_at = int(time.time()) - CDNRESOURCE.expiretime(resource_id)
             if update_at < earliest:
                 earliest = update_at
             cache_base[resource_id] = update_at
