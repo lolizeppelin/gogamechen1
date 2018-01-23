@@ -14,7 +14,7 @@ from sqlalchemy.sql import and_
 from simpleutil.common.exceptions import InvalidArgument
 from simpleutil.log import log as logging
 from simpleutil.utils import jsonutils
-from simpleutil.utils import argutils
+from simpleutil.utils import cachetools
 from simpleutil.utils import uuidutils
 from simpleutil.utils import singleton
 from simpleutil.config import cfg
@@ -30,6 +30,7 @@ import goperation
 from goperation.utils import safe_func_wrapper
 from goperation.manager import common as manager_common
 from goperation.manager.exceptions import CacheStoneError
+from goperation.manager.api import get_cache
 from goperation.manager.utils import resultutils
 from goperation.manager.utils import targetutils
 from goperation.manager.wsgi.contorller import BaseContorller
@@ -77,11 +78,38 @@ group_controller = GroupReuest()
 
 CONF = cfg.CONF
 
-CDNRESOURCE = {}
+# CDNRESOURCE = {}
+CDNRESOURCE = cachetools.TTLCache(maxsize=1000, ttl=cdncommon.CACHETIME)
 
 
 def _map_resources(resource_ids):
-    missed = set(resource_ids) - set(CDNRESOURCE.keys())
+    CDNRESOURCE.expire()
+    need = set(resource_ids)
+    provides = set(CDNRESOURCE.keys())
+
+    notmiss = need & provides
+
+    if notmiss:
+        cache_base = {}
+        earliest = int(time.time())
+        for resource_id in notmiss:
+            update_at = int(time.time()) - CDNRESOURCE[resource_id].expire
+            if update_at < earliest:
+                earliest = update_at
+            cache_base[resource_id] = update_at
+
+        cache = get_cache()
+        scores = cache.zrangebyscore(name=cdncommon.CACHESETNAME,
+                                     min=earliest, withscores=True, score_cast_func=int)
+        if scores:
+            for data in scores:
+                resource_id = int(data[0])
+                update_at = int(data[1])
+                if update_at > cache_base[resource_id]:
+                    CDNRESOURCE.pop(resource_id, None)
+
+    missed = need - set(CDNRESOURCE.keys())
+
     if missed:
         with goperation.tlock('gogamechen1-cdnresource'):
             resources = cdnresource_controller._shows(resource_ids=missed, domains=True, metadatas=True)
@@ -255,7 +283,6 @@ class ObjtypeFileReuest(BaseContorller):
                                                       status=status))
             except DBDuplicateEntry:
                 raise InvalidArgument('File info Duplicate error')
-
         return resultutils.results('creat file for %s success' % objtype,
                                    data=[dict(uuid=objtype_file.uuid, uri=uri)])
 
@@ -403,7 +430,6 @@ class PackageReuest(BaseContorller):
                                     if pfile.status == manager_common.DOWNFILE_FILEOK])
                         )
             data.append(info)
-
         return resultutils.results(result='list packages success', data=data)
 
     def index(self, req, group_id, body=None):
@@ -538,8 +564,6 @@ class PackageReuest(BaseContorller):
             # 删除资源引用
             cdnquote_controller.delete(req, package.resource_id, package.quote_id)
             session.flush()
-        # 删除缓存
-        CDNRESOURCE.pop(package_id, None)
         notify.resource()
         return resultutils.results('Delete package success')
 

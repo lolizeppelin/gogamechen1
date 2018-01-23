@@ -52,7 +52,7 @@ class GoGameLock(object):
             try:
                 while int(time.time()*1000) < overtime:
                     with client.pipeline() as pipe:
-                        pipe.multi()
+                        # pipe.multi()
                         for _id in areas:
                             pipe.sismember(key, str(_id))
                         results = pipe.execute()
