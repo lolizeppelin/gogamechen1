@@ -84,7 +84,7 @@ class ResourceTTLCache(cachetools.TTLCache):
         cachetools.TTLCache.__init__(self, maxsize, ttl)
 
     def expiretime(self, key):
-        link = self.__getlink(key)
+        link = self._TTLCache__links[key]
         return link.expire
 
 # CDNRESOURCE = {}
