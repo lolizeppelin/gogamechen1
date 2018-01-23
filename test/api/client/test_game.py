@@ -55,6 +55,11 @@ def game_show(entity):
     print client.game_show(group_id=1, entity=entity)
 
 
+def game_status(entitys):
+    print client.game_status(group_id=1, entitys=entitys, body=dict(request_time=int(time.time())))
+
+
+
 def game_create():
     print client.games_create(group_id=1, body={'objfile': {'subtype': 'appfile', 'version': '20180104.002'},
                                                 'opentime': int(time.time())})
@@ -98,18 +103,22 @@ def game_start(entitys):
 # game_index()
 # game_create()
 # game_show(3)
+# game_status('all')
 
 # crosss_create()
-cross_show(entity=2)
+# cross_show(entity=2)
 # cross_delete(5)
 
 # gm_create()
 # gm_delete(entity=4)
-gm_show(entity=1)
+# gm_show(entity=1)
 
 
 # print client.quotes(endpoint='gogamechen1', entitys=[1,2,3,4,5])
 
 # print client.reset(group_id=1, objtype='publicsvr', entity=5)
 
-game_start(entitys='all')
+# game_start(entitys='all')
+
+
+# print client.async_show(request_id='1045f147-38c0-4c04-9366-99eeba3fb941', body={'details': True})

@@ -504,6 +504,20 @@ class Application(AppEndpointBase):
                                           resultcode=resultcode,
                                           result=result)
 
+    def rpc_opentime_entity(self, ctxt, entity, opentime):
+        if entity not in self.entitys:
+            raise RpcCtxtException('Entity %d not exist' % entity)
+        objtype = self.konwn_appentitys[entity].get('objtype')
+        if objtype != common.GAMESERVER:
+            raise ValueError('%s has no opentime conf' % object)
+        with self.lock(entity=[entity]):
+            self.konwn_appentitys[entity]['opentime'] = opentime
+            self.flush_config(entity, opentime=opentime)
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          resultcode=manager_common.RESULT_SUCCESS,
+                                          ctxt=ctxt,
+                                          result='change entity opentime success')
+
     def rpc_start_entitys(self, ctxt, entitys, **kwargs):
         timeout = count_timeout(ctxt, kwargs)
         overtime = timeout + time.time()
@@ -664,21 +678,53 @@ class Application(AppEndpointBase):
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           ctxt=ctxt,
                                           resultcode=manager_common.RESULT_SUCCESS,
-                                          result='Get entity sttus success', details=details)
+                                          result='Get entity status success', details=details)
 
-    def rpc_opentime_entity(self, ctxt, entity, opentime):
-        if entity not in self.entitys:
-            raise RpcCtxtException('Entity %d not exist' % entity)
-        objtype = self.konwn_appentitys[entity].get('objtype')
-        if objtype != common.GAMESERVER:
-            raise ValueError('%s has no opentime conf' % object)
-        with self.lock(entity=[entity]):
-            self.konwn_appentitys[entity]['opentime'] = opentime
-            self.flush_config(entity, opentime=opentime)
+    def rpc_flushconfig_entitys(self, ctxt, entitys):
+        entitys = argutils.map_to_int(entitys) & set(self.entitys)
+        if not entitys:
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='upgrade entity fail, no entitys found')
+        details = []
+        # 启动前进程快照
+        proc_snapshot_before = utils.find_process()
+        with self.locks(entitys):
+            for entity in entitys:
+                if self._entity_process(entity, proc_snapshot_before):
+                    for entity in entitys:
+                        details.append(dict(detail_id=entity,
+                                            resultcode=manager_common.RESULT_SUCCESS,
+                                            result='upgrade not executed, some entity is running'))
+                    return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                                      resultcode=manager_common.RESULT_ERROR,
+                                                      ctxt=ctxt,
+                                                      result='flushconfig entity fail, entity %d running' % entity,
+                                                      details=details)
+            for entity in entitys:
+                objtype = self._objtype(entity)
+                try:
+                    self.flush_config(entity)
+                    details.append(dict(detail_id=entity,
+                                        resultcode=manager_common.RESULT_SUCCESS,
+                                        result='%s entity %d flush config success' % (objtype, entity)))
+                except Exception:
+                    self.flush_config(entity)
+                    details.append(dict(detail_id=entity,
+                                        resultcode=manager_common.RESULT_SUCCESS,
+                                        result='%s entity %d flush config fail' % (objtype, entity)))
+
+        if all([False if detail.get('resultcode') else True for detail in details]):
+            resultcode = manager_common.RESULT_SUCCESS
+        else:
+            resultcode = manager_common.RESULT_NOT_ALL_SUCCESS
+
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                          resultcode=manager_common.RESULT_SUCCESS,
                                           ctxt=ctxt,
-                                          result='change entity opentime success')
+                                          resultcode=resultcode,
+                                          result='Flush entity config success', details=details)
+
 
     def rpc_upgrade_entitys(self, ctxt, entitys, **kwargs):
         entitys = argutils.map_to_int(entitys) & set(self.entitys)

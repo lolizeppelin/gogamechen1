@@ -221,6 +221,22 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
+    def game_stop(self, group_id, entitys, body=None):
+        resp, results = self.post(action=self.game_path_ex % (str(group_id), str(entitys), 'stop'), body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='start gogamechen1 gameserver fail:%d' % results['resultcode'],
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def game_status(self, group_id, entitys, body=None):
+        resp, results = self.get(action=self.game_path_ex % (str(group_id), str(entitys), 'status'), body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='start gogamechen1 gameserver fail:%d' % results['resultcode'],
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
     def game_upgrade(self, group_id, entitys, body=None):
         resp, results = self.post(action=self.game_path_ex % (str(group_id), str(entitys), 'upgrade'), body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
@@ -228,6 +244,17 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
+
+    def game_flushconfig(self, group_id, entitys, body=None):
+        resp, results = self.put(action=self.game_path_ex % (str(group_id), str(entitys), 'flushconfig'),
+                                 body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(
+                message='flushconfig gogamechen1 gameserver fail:%d' % results['resultcode'],
+                code=resp.status_code,
+                resone=results['result'])
+        return results
+
 
     # -----------gm server api-----------------
     def gms_index(self, group_id, body=None):

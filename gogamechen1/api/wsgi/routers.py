@@ -72,11 +72,11 @@ class Routers(router.RoutersBase):
         collection.member.link('maps', method='GET')
         collection.member.link('chiefs', method='GET')
         collection.member.link('areas', method='GET')
-        collection.member.link('start', method='POST')
-        collection.member.link('stop', method='POST')
-        collection.member.link('status', method='POST')
-        # collection.member.link('hotfix', method='POST')
+        # collection.member.link('start', method='POST')
+        # collection.member.link('stop', method='POST')
+        # collection.member.link('status', method='GET')
         # collection.member.link('upgrade', method='POST')
+        # collection.member.link('hotfix', method='POST')
 
         resource_name = 'entity'
         collection_name = resource_name + 's'
@@ -102,8 +102,8 @@ class Routers(router.RoutersBase):
         collection.member.link('reset', method='POST')
         collection.member.link('start', method='POST')
         collection.member.link('stop', method='POST')
-        collection.member.link('status', method='POST')
+        collection.member.link('status', method='GET')
         collection.member.link('opentime', method='PUT')
-        # collection.member.link('hotfix', method='POST')
         collection.member.link('upgrade', method='POST')
-        collection.member.link('flushconfig', method='POST')
+        collection.member.link('flushconfig', method='PUT')
+        # collection.member.link('hotfix', method='POST')
