@@ -12,13 +12,13 @@ from simpleflow.engines.engine import ParallelActionEngine
 from goperation.manager.rpc.agent import sqlite
 from goperation.manager.rpc.agent.application.taskflow import application
 
-from goperation.manager.rpc.agent.application.taskflow.base import StandardTask
+from goperation.manager.rpc.agent.application.taskflow.application import AppCreateBase
 from goperation.manager.rpc.agent.application.taskflow import pipe
 from goperation.taskflow import common as task_common
 
 from gogamechen1 import common
 from gogamechen1.api.rpc.taskflow import GogameMiddle
-from gogamechen1.api.rpc.taskflow import GogameCreateDatabase
+from gogamechen1.api.rpc.taskflow import GogameDatabase
 
 
 CONF = cfg.CONF
@@ -26,7 +26,7 @@ CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
 
 
-class GogameDatabaseCreateTask(StandardTask):
+class GogameDatabaseCreateTask(AppCreateBase):
     @property
     def taskname(self):
         return self.__class__.__name__ + '-' + self.database.subtype
@@ -138,11 +138,11 @@ def create_entity(appendpoint, entity, objtype, databases,
                     source='%s/%s' % (appendpoint.manager.ipnetwork.network,
                                       appendpoint.manager.ipnetwork.netmask))
         LOG.debug('Create schema %s in %d with auth %s' % (schema, database_id, str(auth)))
-        _database.append(GogameCreateDatabase(backup=None, update=None,
-                                              database_id=database_id, schema=schema,
-                                              character_set='utf8',
-                                              subtype=subtype,
-                                              host=None, port=None, **auth))
+        _database.append(GogameDatabase(backup=None, update=None,
+                                        database_id=database_id, schema=schema,
+                                        character_set='utf8',
+                                        subtype=subtype,
+                                        host=None, port=None, **auth))
 
     app = application.Application(middleware,
                                   createtask=GogameAppCreate(middleware, timeout),

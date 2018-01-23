@@ -7,15 +7,14 @@ class GogameMiddle(EntityMiddleware):
         super(GogameMiddle, self).__init__(entity, endpoint)
         self.objtype = objtype
         self.databases = {}
-        self.dberrors = []
         self.waiter = None
 
 
-class GogameCreateDatabase(Database):
+class GogameDatabase(Database):
     def __init__(self, **kwargs):
-        super(GogameCreateDatabase, self).__init__(**kwargs)
-        self.database_id = kwargs['database_id']
-        self.source = kwargs['source']
-        self.subtype = kwargs['subtype']
-        self.ro_user = kwargs['ro_user']
-        self.ro_passwd = kwargs['ro_passwd']
+        super(GogameDatabase, self).__init__(**kwargs)
+        self.database_id = kwargs.get('database_id')
+        self.source = kwargs.get('source')
+        self.subtype = kwargs.get('subtype')
+        self.ro_user = kwargs.get('ro_user')
+        self.ro_passwd = kwargs.get('ro_passwd')

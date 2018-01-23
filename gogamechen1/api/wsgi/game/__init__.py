@@ -273,31 +273,58 @@ class AppEntityReuest(BaseContorller):
                                             'description': '需要下载的文件的uuid'},
                            'agent_id': {'type': 'integer', 'minimum': 1,
                                         'description': '程序安装的目标机器,不填自动分配'},
+                           'zone': {'type': 'string', 'description': '自动分配的安装区域,默认zone为all'},
                            'opentime': {'type': 'integer', 'minimum': 1514736000,
                                         'description': '开服时间, gameserver专用参数'},
                            'cross_id': {'type': 'integer', 'minimum': 1,
                                         'description': '跨服程序的实体id,gameserver专用参数'},
-                           'zone': {'type': 'string', 'description': '安装区域,默认zone为all'},
+                           'areaname': {'type': 'string', 'description': '区服名称, gameserver专用参数'},
                            'databases': {'type': 'object', 'description': '程序使用的数据库,不填自动分配'}}
                        }
 
+    OBJFILES = {'type': 'object',
+                'properties': {
+                    common.APPFILE: {
+                        'type': 'object',
+                        'required': ['uuid', 'timeout'],
+                        'properties': {'uuid': {'type': 'string', 'format': 'uuid',
+                                                'description': '更新程序文件所需文件'},
+                                       'timeout': {'type': 'integer', 'minimum': 5, 'maxmum': 300,
+                                                   'description': '更新超时时间'},
+                                       'backup': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
+                                                  'description': '是否更新前备份程序,默认是'},
+                                       'rollback': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
+                                                    'description': '是否连带回滚(其他步骤失败数据库也回滚),默认否'},
+                                       }},
+                    common.DATADB: {
+                        'type': 'object',
+                        'required': ['uuid', 'timeout'],
+                        'properties': {
+                            'uuid': {'type': 'string', 'format': 'uuid', 'description': '更新游戏库所需文件'},
+                            'timeout': {'type': 'integer', 'minimum': 60, 'maxmum': 1200,
+                                        'description': '更新超时时间'},
+                            'backup': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
+                                       'description': '是否更新前备份游戏数据库,默认否'},
+                            'rollback': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
+                                         'description': '是否连带回滚(其他步骤失败数据库也回滚),默认否'}}},
+                    common.LOGDB: {
+                        'type': 'object',
+                        'required': ['uuid', 'timeout'],
+                        'properties': {
+                            'uuid': {'type': 'string', 'format': 'uuid', 'description': '更新日志库所需文件'},
+                            'timeout': {'type': 'integer', 'minimum': 90, 'maxmum': 3600,
+                                        'description': '更新超时时间'},
+                            'backup': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
+                                       'description': '是否更新前备份日志数据库,默认否'},
+                            'rollback': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
+                                         'description': '是否连带回滚(其他步骤失败数据库也回滚),默认否'}}},}
+                }
+
     UPGRADE = {'type': 'object',
-               'required': ['timeout', 'objfiles'],
+               'required': ['request_time', 'objfiles'],
                'properties': {
-                   'objfiles': {
-                       'type': 'object',
-                       'properties': {
-                           # 'appfile': {'oneOf': [{'type': 'string', 'format': 'uuid'}, {'type': 'null'}],
-                           #             'description': '更新程序文件所需文件'},
-                           common.APPFILE: {'type': 'string', 'format': 'uuid',
-                                            'description': '更新程序文件所需文件'},
-                           common.DATADB: {'type': 'string', 'format': 'uuid', 'description': '更新游戏库所需文件'},
-                           common.LOGDB: {'type': 'string', 'format': 'uuid', 'description': '更新日志库所需文件'},
-                       }
-                   },
-                   'request_time': {'type': 'integer', 'description': '异步请求时间'},
-                   'timeout': {'type': 'integer', 'minimum': 30, 'maxmum': 600,
-                               'description': '更新超时时间'}}
+                   'objfiles': OBJFILES,
+                   'request_time': {'type': 'integer', 'description': '异步请求时间'}}
                }
 
     def _entityinfo(self, req, entity):
@@ -439,8 +466,10 @@ class AppEntityReuest(BaseContorller):
         cross_id = body.pop('cross_id', None)
         # 开服时间, gameserver专用
         opentime = body.pop('opentime', None)
-        if objtype == common.GAMESERVER and not opentime:
-            raise InvalidArgument('%s need opentime' % objtype)
+        areaname = body.pop('areaname', None)
+        if objtype == common.GAMESERVER:
+            if not areaname or not opentime:
+                raise InvalidArgument('%s need opentime and areaname' % objtype)
         # 安装文件信息
         appfile = body.pop(common.APPFILE)
         LOG.info('Try find agent and database for entity')
@@ -567,6 +596,9 @@ class AppEntityReuest(BaseContorller):
                     # 插入area数据
                     query = model_query(session, Group, filter=Group.group_id == group_id)
                     gamearea = GameArea(area_id=_group.lastarea + 1,
+                                        areaname=areaname.decode('utf-8')
+                                        if isinstance(areaname, six.binary_type)
+                                        else areaname,
                                         group_id=_group.group_id,
                                         entity=appentity.entity)
                     session.add(gamearea)
@@ -584,6 +616,7 @@ class AppEntityReuest(BaseContorller):
                                   opentime=opentime,
                                   group_id=group_id, areas=[next_area, ])
             notify.areas(group_id)
+            notify.entity(group_id, objtype, entity)
             return resultutils.results(result='create %s entity success' % objtype,
                                        data=[_result, ])
 
@@ -606,7 +639,9 @@ class AppEntityReuest(BaseContorller):
                                               objtype=objtype, group_id=_entity.group_id,
                                               opentime=_entity.opentime,
                                               status=_entity.status,
-                                              areas=[area.area_id for area in _entity.areas],
+                                              areas=[dict(area_id=area.area_id,
+                                                          areaname=area.areaname.encode('utf-8'),
+                                                          ) for area in _entity.areas],
                                               databases=[dict(quote_id=database.quote_id,
                                                               database_id=database.database_id,
                                                               host=database.host,
@@ -877,10 +912,15 @@ class AppEntityReuest(BaseContorller):
 
     def upgrade(self, req, group_id, objtype, entity, body=None):
         body = body or {}
-        if not body.get('objfiles'):
+        jsonutils.schema_validate(body, self.UPGRADE)
+        objfiles = body.get('objfiles')
+        if objfiles:
             raise InvalidArgument('Not objfile found for upgrade')
-        timeout = body.pop('timeout')
-        body.update({'finishtime': int(time.time() + timeout)})
+        finishtime = int(time.time()) + 5
+        for objfile in objfiles:
+            finishtime += objfile.get('timeout')
+        body.update({'finishtime': finishtime,
+                     'deadline': finishtime + 60})
         body.setdefault('objtype', objtype)
         return self._async_bluck_rpc('upgrade', group_id, objtype, entity, body)
 

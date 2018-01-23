@@ -97,10 +97,6 @@ class Application(AppEndpointBase):
     def apppathname(self):
         return 'gogame'
 
-    @property
-    def logpathname(self):
-        return 'log'
-
     def entity_user(self, entity):
         return 'gogamechen1-%d' % entity
 
@@ -164,8 +160,16 @@ class Application(AppEndpointBase):
             if self._esure(entity, objtype, proc):
                 return proc.get('pid')
 
-    def _objconf(self, entity, objtype):
+    def _objtype(self, entity):
+        return self.konwn_appentitys[entity].get('objtype')
+
+    def _objconf(self, entity, objtype=None):
+        if not objtype:
+            objtype = self._objtype(entity)
         return os.path.join(self.apppath(entity), 'conf', '%s.json' % objtype)
+
+    def local_database_info(self, entity, subtype):
+        return gconfig.deacidizing(self._objtype(entity), common.DATADB)
 
     @contextlib.contextmanager
     def _allocate_port(self, entity, objtype, ports):
@@ -239,7 +243,7 @@ class Application(AppEndpointBase):
                      opentime=None, chiefs=None):
         eventlet.sleep(0.01)
         try:
-            objtype = self.konwn_appentitys[entity].get('objtype')
+            objtype = self._objtype(entity)
             areas = self.konwn_appentitys[entity].get('areas')
             cfile = self._objconf(entity, objtype)
             posts = self._get_ports(entity)
@@ -313,7 +317,7 @@ class Application(AppEndpointBase):
 
     def start_entity(self, entity, **kwargs):
         pids = kwargs.get('pids')
-        objtype = self.konwn_appentitys[entity].get('objtype')
+        objtype = self._objtype(entity)
         user = self.entity_user(entity)
         group = self.entity_group(entity)
         pwd = self.apppath(entity)
