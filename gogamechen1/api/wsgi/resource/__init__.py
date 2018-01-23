@@ -396,7 +396,9 @@ class PackageReuest(BaseContorller):
                                          address=pfile.address,
                                          gversion=pfile.gversion,
                                          uptime=pfile.uptime,
-                                         status=pfile.status) for pfile in package.files])
+                                         status=pfile.status)
+                                    for pfile in package.files
+                                    if pfile.status == manager_common.DOWNFILE_FILEOK])
                         )
             data.append(info)
 
@@ -617,6 +619,7 @@ class PackageFileReuest(BaseContorller):
                                     address=address, desc=desc)
                 session.add(pfile)
                 session.flush()
+            notify.resource()
         else:
             resource_id = CONF[common.NAME].package_resource
             if not resource_id:
@@ -639,7 +642,6 @@ class PackageFileReuest(BaseContorller):
                            'fail': dict(action=url, method='DELETE')}
                 uri = gopcdn_upload(req, resource_id, body,
                                     fileinfo=fileinfo, notify=_notify)
-        notify.resource()
         return resultutils.results('add package file  for %d success' % package_id,
                                    data=[dict(pfile_id=pfile.pfile_id, uri=uri)])
 
@@ -679,7 +681,7 @@ class PackageFileReuest(BaseContorller):
         with session.begin():
             data = {'status': status}
             if quote_id:
-                data.setdefault('quote_id', quote_id)
+                data.update({'quote_id': quote_id})
             query.update(data)
         notify.resource()
         return resultutils.results('update package file  for %d success' % package_id,
