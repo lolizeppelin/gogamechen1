@@ -59,6 +59,14 @@ def game_status(entitys):
     print client.game_status(group_id=1, entitys=entitys, body=dict(request_time=int(time.time())))
 
 
+def game_stop(entitys):
+    print client.game_stop(group_id=1, entitys=entitys, body=dict(request_time=int(time.time()),
+                                                                  kill=True))
+
+
+def game_flushconf(entitys):
+    print client.game_flushconfig(group_id=1, entitys=entitys, body=dict(request_time=int(time.time())))
+
 
 def game_create():
     print client.games_create(group_id=1, body={'objfile': {'subtype': 'appfile', 'version': '20180104.002'},
@@ -81,6 +89,10 @@ def gm_create():
 
 def gm_delete(entity):
     print client.gm_delete(group_id=1, entity=entity, clean='delete')
+
+
+def gm_flushconf(entity):
+    print client.gm_flushconfig(group_id=1, entity=entity, body={'request_time': int(time.time())})
 
 
 def gm_show(entity):
@@ -119,6 +131,11 @@ def game_start(entitys):
 # print client.reset(group_id=1, objtype='publicsvr', entity=5)
 
 # game_start(entitys='all')
+# game_flushconf(entitys='all')
+# game_status(entitys='all')
+# game_stop(entitys='all')
+
+gm_flushconf(entity='all')
 
 
-# print client.async_show(request_id='1045f147-38c0-4c04-9366-99eeba3fb941', body={'details': True})
+# print client.async_show(request_id='dacb9c5e-0364-48aa-ad4b-548205aaa2cd', body={'details': True})

@@ -950,7 +950,7 @@ class AppEntityReuest(BaseContorller):
                                        ports=maps.get(gm.entity).get('ports'),
                                        local_ip=maps.get(gm.entity).get('metadata').get('local_ip')
                                        ))
-                body.update({'chiefs', chiefs})
+                body.update({'chiefs': chiefs})
         else:
             raise InvalidArgument('chiefs just for %s' % common.GAMESERVER)
 

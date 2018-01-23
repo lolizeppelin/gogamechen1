@@ -22,9 +22,11 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
 
     gms_path = '/gogamechen1/group/%s/loginsvr/entitys'
     gm_path = '/gogamechen1/group/%s/loginsvr/entitys/%s'
+    gm_path_ex = '/gogamechen1/group/%s/loginsvr/entitys/%s/%s'
 
     crosss_path = '/gogamechen1/group/%s/publicsvr/entitys'
     cross_path = '/gogamechen1/group/%s/publicsvr/entitys/%s'
+    cross_path_ex = '/gogamechen1/group/%s/publicsvr/entitys/%s/%s'
 
     bond_path = '/gogamechen1/entity/%s'
     appentitys_path = '/gogamechen1/entitys'
@@ -293,6 +295,17 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
+
+    def gm_flushconfig(self, group_id, entity, body=None):
+        resp, results = self.put(action=self.gm_path_ex % (str(group_id), str(entity), 'flushconfig'),
+                                 body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(
+                message='flushconfig gogamechen1 gameserver fail:%d' % results['resultcode'],
+                code=resp.status_code,
+                resone=results['result'])
+        return results
+
 
     # -----------cross server api-----------------
     def crosss_index(self, group_id, body=None):
