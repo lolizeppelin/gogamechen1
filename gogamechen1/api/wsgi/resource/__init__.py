@@ -325,6 +325,7 @@ class ObjtypeFileReuest(BaseContorller):
 
 @singleton.singleton
 class PackageReuest(BaseContorller):
+
     CREATESCHEMA = {
         'type': 'object',
         'required': ['resource_id', 'package_name', 'mark'],
@@ -360,8 +361,8 @@ class PackageReuest(BaseContorller):
         resource_ids = set()
         group_ids = set()
         for package in packages:
-            resource_ids.add(str(package.resource_id))
-            group_ids.add(str(package.group_id))
+            resource_ids.add(package.resource_id)
+            group_ids.add(package.group_id)
         # 异步更新resources缓存
         th = eventlet.spawn(_map_resources, resource_ids=resource_ids)
         groups = group_controller._chiefs(list(group_ids), cross=False)
@@ -429,7 +430,7 @@ class PackageReuest(BaseContorller):
     def create(self, req, group_id, body=None):
         body = body or {}
         jsonutils.schema_validate(body, self.CREATESCHEMA)
-        resource_id = body.pop('resource_id')
+        resource_id = int(body.pop('resource_id'))
         package_name = body.pop('package_name')
         group_id = int(group_id)
         mark = body.pop('mark')
