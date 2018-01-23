@@ -64,12 +64,14 @@ def _format_chiefs(cfile, chiefs):
     new = {}
 
     for chief in (common.GMSERVER, common.CROSSSERVER):
-        port = chiefs[chief]['ports'][0]
-        if chief == common.GMSERVER:
-            if len(chiefs[chief]['ports']) != 2:
-                raise ValueError('Port count of %s is not 2' % chief)
-            port = chiefs[chief]['ports'][1]
-        new.setdefault(chief, '%s:%d' % (chiefs[chief]['local_ip'], port))
+        if chief in chiefs:
+            port = chiefs[chief]['ports'][0]
+            if chief == common.GMSERVER:
+                if len(chiefs[chief]['ports']) != 2:
+                    raise ValueError('Port count of %s is not 2' % chief)
+                port = chiefs[chief]['ports'][1]
+            new.setdefault(chief, '%s:%d' % (chiefs[chief]['local_ip'], port))
+
     _chiefs = OrderedDict()
     for chief in (common.GMSERVER, common.CROSSSERVER):
         if chief in new:

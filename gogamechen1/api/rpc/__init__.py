@@ -711,9 +711,8 @@ class Application(AppEndpointBase):
                                         resultcode=manager_common.RESULT_SUCCESS,
                                         result='%s entity %d flush config success' % (objtype, entity)))
                 except Exception:
-                    self.flush_config(entity)
                     details.append(dict(detail_id=entity,
-                                        resultcode=manager_common.RESULT_SUCCESS,
+                                        resultcode=manager_common.RESULT_ERROR,
                                         result='%s entity %d flush config fail' % (objtype, entity)))
 
         if all([False if detail.get('resultcode') else True for detail in details]):

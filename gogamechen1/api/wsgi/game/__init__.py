@@ -934,7 +934,7 @@ class AppEntityReuest(BaseContorller):
         body.pop('opentime', None)
         body.pop('chiefs', None)
         if objtype == common.GAMESERVER:
-            gm = body.pop(common.GAMESERVER, False)
+            gm = body.pop(common.GMSERVER, False)
             if gm:
                 chiefs = {}
                 session = endpoint_session()
