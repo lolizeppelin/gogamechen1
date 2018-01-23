@@ -680,7 +680,7 @@ class Application(AppEndpointBase):
                                           resultcode=manager_common.RESULT_SUCCESS,
                                           result='Get entity status success', details=details)
 
-    def rpc_flushconfig_entitys(self, ctxt, entitys):
+    def rpc_flushconfig_entitys(self, ctxt, entitys, **kwargs):
         entitys = argutils.map_to_int(entitys) & set(self.entitys)
         if not entitys:
             return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
@@ -705,7 +705,8 @@ class Application(AppEndpointBase):
             for entity in entitys:
                 objtype = self._objtype(entity)
                 try:
-                    self.flush_config(entity)
+                    self.flush_config(entity, opentime=kwargs.get('opentime'),
+                                      chiefs=kwargs.get('chiefs'))
                     details.append(dict(detail_id=entity,
                                         resultcode=manager_common.RESULT_SUCCESS,
                                         result='%s entity %d flush config success' % (objtype, entity)))
@@ -724,7 +725,6 @@ class Application(AppEndpointBase):
                                           ctxt=ctxt,
                                           resultcode=resultcode,
                                           result='Flush entity config success', details=details)
-
 
     def rpc_upgrade_entitys(self, ctxt, entitys, **kwargs):
         entitys = argutils.map_to_int(entitys) & set(self.entitys)

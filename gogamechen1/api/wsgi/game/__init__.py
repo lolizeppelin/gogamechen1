@@ -8,6 +8,8 @@ import webob.exc
 from six.moves import zip
 from collections import OrderedDict
 
+from sqlalchemy import func
+from sqlalchemy import desc
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm.exc import MultipleResultsFound
 from sqlalchemy.orm.exc import NoResultFound
@@ -928,6 +930,31 @@ class AppEntityReuest(BaseContorller):
         return self._async_bluck_rpc('upgrade', group_id, objtype, entity, body)
 
     def flushconfig(self, req, group_id, objtype, entity, body=None):
+        body = body or {}
+        if objtype == common.GAMESERVER:
+            gm = body.pop(common.GAMESERVER, False)
+            if gm:
+                chiefs = {}
+                session = endpoint_session()
+                query = model_query(session, AppEntity,
+                                    filter=and_(AppEntity.group_id == group_id,
+                                                AppEntity.objtype == common.GMSERVER))
+                gm = query.one()
+                # query = model_query(session, (AppEntity.cross_id, func.count(AppEntity.cross_id)),
+                #                     filter=and_(AppEntity.group_id == group_id, AppEntity.objtype == common.GMSERVER))
+                # query.group_by(AppEntity.cross_id).order_by(func.count(AppEntity.cross_id))
+                # 获取实体相关服务器信息(端口/ip)
+                maps = entity_controller.shows(endpoint=common.NAME, entitys=[gm.entity])
+                chiefs.setdefault(common.GMSERVER,
+                                  dict(entity=gm.entity,
+                                       ports=maps.get(gm.entity).get('ports'),
+                                       local_ip=maps.get(gm.entity).get('metadata').get('local_ip')
+                                       ))
+                body.update({'chiefs', chiefs})
+        else:
+            raise InvalidArgument('chiefs just for %s' % common.GAMESERVER)
+
+
         return self._async_bluck_rpc('flushconfig', group_id, objtype, entity, body)
 
     def reset(self, req, group_id, objtype, entity, body=None):

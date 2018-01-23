@@ -1,4 +1,5 @@
 import re
+import os
 import simplejson as json
 from gogamechen1 import common
 from collections import OrderedDict
@@ -53,14 +54,30 @@ def deacidizing(cfile, subtype):
     return info
 
 
-def _format_chiefs(chiefs):
-    _chiefs = OrderedDict()
+def _format_chiefs(cfile, chiefs):
+    if os.path.exists(cfile):
+        conf = load(cfile)
+        old = conf.pop('ConnAddrs')
+    else:
+        old = {}
+
+    new = {}
+
     for chief in (common.GMSERVER, common.CROSSSERVER):
+        port = chiefs[chief]['ports'][0]
         if chief == common.GMSERVER:
             if len(chiefs[chief]['ports']) != 2:
                 raise ValueError('Port count of %s is not 2' % chief)
-        _chiefs.setdefault(chief, '%s:%d' % (chiefs[chief]['local_ip'],
-                                             chiefs[chief]['ports'][0]))
+            port = chiefs[chief]['ports'][1]
+        new.setdefault(chief, '%s:%d' % (chiefs[chief]['local_ip'], port))
+    _chiefs = OrderedDict()
+    for chief in (common.GMSERVER, common.CROSSSERVER):
+        if chief in new:
+            _chiefs.setdefault(chief, new[chief])
+        elif chief in old:
+            _chiefs.setdefault(chief, old[chief])
+        else:
+            raise ValueError('chief %s config can not be found' % chief)
     return _chiefs
 
 
@@ -87,7 +104,7 @@ def format_chiefs(objtype, cfile, chiefs):
     if not cfile and not chiefs:
         raise ValueError('No chiefs found')
     if chiefs:
-        return _format_chiefs(chiefs)
+        return _format_chiefs(cfile, chiefs)
     else:
         conf = load(cfile)
         return conf.pop('ConnAddrs')
@@ -124,8 +141,8 @@ def loginsvr_make(logpath, local_ip, ports, entity, databases):
     conf = OrderedDict()
     conf.setdefault('LogLevel', 'release')
     conf.setdefault('LogPath', logpath)
-    conf.setdefault('WSAddr', '%s:%d' % (local_ip, ports[1]))
-    conf.setdefault('ListenAddr', '%s:%d' % (local_ip, ports[0]))
+    conf.setdefault('WSAddr', '%s:%d' % (local_ip, ports[0]))
+    conf.setdefault('ListenAddr', '%s:%d' % (local_ip, ports[1]))
     conf.setdefault('DB', databases[common.DATADB])
     return conf
 
