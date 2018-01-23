@@ -379,7 +379,6 @@ class PackageReuest(BaseContorller):
                              mark=package.mark,
                              status=package.status,
                              magic=jsonutils.loads_as_bytes(package.magic) if package.magic else None,
-                             desc=package.desc,
                              resource=dict(version=resource.get('version'),
                                            urls=resource_url(package.resource_id),
                                            resource_id=package.resource_id,
@@ -488,7 +487,9 @@ class PackageReuest(BaseContorller):
                                                           address=pfile.address,
                                                           uptime=pfile.uptime,
                                                           status=pfile.status,
-                                                          desc=pfile.gversion, ) for pfile in package.files])
+                                                          gversion=pfile.gversion,
+                                                          desc=pfile.desc,
+                                                          ) for pfile in package.files])
                                          ]
                                    )
 
