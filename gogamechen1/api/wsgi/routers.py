@@ -44,6 +44,13 @@ class Routers(router.RoutersBase):
                                        collection_actions=COLLECTION_ACTIONS,
                                        member_actions=MEMBER_ACTIONS)
         collection.member.link('upgrade', method='PUT')
+        # add cdn resource file
+        collection.member.link('remark', name='add_remark', method='POST', action='add_remark')
+        # delete cdn resource file
+        collection.member.link('remark', name='del_remark', method='DELETE', action='del_remark')
+        # list cdn resource file
+        collection.member.link('remark', name='list_remarks', method='GET', action='list_remarks')
+
 
         resource_name = 'pfile'
         collection_name = resource_name + 's'

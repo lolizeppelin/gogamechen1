@@ -109,6 +109,15 @@ class Group(TableBase):
     )
 
 
+class PackageRemark(TableBase):
+    remark_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True, autoincrement=True)
+    package_id = sa.Column(sa.ForeignKey('packages.package_id', ondelete="RESTRICT", onupdate='RESTRICT'),
+                           nullable=False)
+    rtime = sa.Column(INTEGER(unsigned=True), nullable=False)
+    username = sa.Column(VARCHAR(64), nullable=False)
+    message = sa.Column(VARCHAR(512), nullable=False)
+
+
 class PackageFile(TableBase):
     # 包文件id
     pfile_id = sa.Column(INTEGER(unsigned=True), nullable=False,

@@ -50,6 +50,7 @@ from gogamechen1.models import AppEntity
 from gogamechen1.models import ObjtypeFile
 from gogamechen1.models import Package
 from gogamechen1.models import PackageFile
+from gogamechen1.models import PackageRemark
 from gogamechen1.api.wsgi.game import GroupReuest
 
 from gogamechen1.api.wsgi.notify import notify
@@ -542,12 +543,58 @@ class PackageReuest(BaseContorller):
         return resultutils.results('Delete package success')
 
     def upgrade(self, req, group_id, package_id, body=None):
+        body = body or {}
         session = endpoint_session(readonly=True)
         query = model_query(session, Package, filter=Package.package_id == package_id)
         package = query.one()
-        result = cdnresource_controller.upgrade(req, resource_id=package.group_id)
-        notify.resource()
+        result = cdnresource_controller.upgrade(req, resource_id=package.group_id, body=body)
+        asyncinfo = result['data'][0]
+        eventlet.spawn_after(asyncinfo['deadline'], notify.resource)
         return result
+
+    def add_remark(self, req, package_id, body=None):
+        body = body or {}
+        if 'username' not in body:
+            raise InvalidArgument('username not found')
+        if 'message' not in body:
+            raise InvalidArgument('message not found')
+        package_id = int(package_id)
+        session = endpoint_session()
+        remark = PackageRemark(package_id=package_id,
+                               rtime=int(time.time()),
+                               username=str(body.get('username')),
+                               message=str(body.get('message')))
+        session.add(remark)
+        session.flush()
+        return resultutils.results(result='Add remark success')
+
+    def del_remark(self, req, package_id, body=None):
+        body = body or {}
+        remark_id = int(body.pop('remark_id'))
+        session = endpoint_session()
+        query = model_query(session, PackageRemark, filter=and_(PackageRemark.package_id == package_id,
+                                                                PackageRemark.remark_id == remark_id))
+        query.delete()
+        return resultutils.results(result='Delete remark success')
+
+    def list_remarks(self, req, package_id, body=None):
+        body = body or {}
+        page_num = int(body.pop('page_num', 0))
+        session = endpoint_session(readonly=True)
+        results = resultutils.bulk_results(session,
+                                           model=PackageRemark,
+                                           columns=[PackageRemark.rtime,
+                                                    PackageRemark.username,
+                                                    PackageRemark.message,
+                                                    ],
+                                           counter=PackageRemark.remark_id,
+                                           filter=PackageRemark.package_id == package_id,
+                                           order=PackageRemark.rtime,
+                                           desc=True,
+                                           page_num=page_num,
+                                           limit=10,
+                                           )
+        return results
 
 
 @singleton.singleton
