@@ -27,7 +27,7 @@ class GogameStop(application.AppStopBase):
     pass
 
 
-def upgrade_entity(appendpoint, entitys, objfiles, objtype):
+def upgrade_entitys(appendpoint, entitys, objfiles, objtype):
     _objfiles = {}
     for subtype in (common.DATADB, common.LOGDB):
         if subtype in objfiles:
@@ -47,7 +47,8 @@ def upgrade_entity(appendpoint, entitys, objfiles, objtype):
         upinfo = objfiles[common.APPFILE]
         _objfiles[common.APPFILE] = application.AppUpgradeFile(source=upinfo['uuid'])
         if upinfo.get('backup', True):
-            backupfile = ''
+            backupfile = os.path.join(appendpoint.endpoint_backup,
+                                      '%s.%s.%d.zip' % (objtype, common.APPFILE, int(time.time())))
         rollback = upinfo.get('rollback', False)
         if rollback and not backupfile:
             raise ValueError('%s rollback need backupfile')
@@ -82,7 +83,7 @@ def upgrade_entity(appendpoint, entitys, objfiles, objtype):
 
     book = LogBook(name='upgrad_%s' % appendpoint.namespace)
     # store = dict(objfile=objfile, chiefs=chiefs, download_timeout=timeout)
-    store = dict(download_timeout=60, db_dump_timeout=300)
+    store = dict(download_timeout=60, db_dump_timeout=600)
     taskflow_session = sqlite.get_taskflow_session()
     upgrade_flow = pipe.flow_factory(taskflow_session,
                                      applications=applications,

@@ -2,6 +2,7 @@
 import os
 import sys
 import time
+import signal
 import shutil
 import json
 import contextlib
@@ -11,7 +12,6 @@ import psutil
 
 from simpleutil.utils import argutils
 from simpleutil.utils import singleton
-from simpleutil.utils import systemutils
 from simpleutil.log import log as logging
 from simpleutil.config import cfg
 
@@ -20,13 +20,11 @@ from simpleutil.utils import systemutils
 
 from goperation import threadpool
 from goperation.utils import safe_fork
-from goperation.utils import safe_func_wrapper
 from goperation.manager.api import get_http
 from goperation.manager import common as manager_common
 from goperation.manager.rpc.agent.application.base import AppEndpointBase
 
 from goperation.manager.utils import resultutils
-from goperation.manager.utils import validateutils
 from goperation.manager.rpc.exceptions import RpcCtxtException
 from goperation.manager.rpc.exceptions import RpcEntityError
 from goperation.manager.rpc.exceptions import RpcTargetLockException
@@ -45,6 +43,7 @@ from gogamechen1.api.rpc.config import register_opts
 from gogamechen1.api.rpc.config import agent_opts
 
 from gogamechen1.api.rpc.taskflow import create as taskcreate
+from gogamechen1.api.rpc.taskflow import upgrade as taskupgrade
 
 if systemutils.POSIX:
     from simpleutil.utils.systemutils import posix
@@ -347,8 +346,18 @@ class Application(AppEndpointBase):
             else:
                 posix.wait(pid)
 
-    def stop(self, entity):
-        pass
+    def stop_entity(self, entity, pids=None, kill=False):
+        with self.lock(entity):
+            p = self._entity_process(entity, pids)
+            if not p:
+                return
+            if not kill and self._objtype(entity) == common.GAMESERVER:
+                raise ValueError('Entity is running')
+            sig = signal.SIGINT
+            if kill:
+                sig = signal.SIGKILL
+            os.kill(p.pid, sig)
+            eventlet.sleep(1)
 
     def rpc_create_entity(self, ctxt, entity, **kwargs):
         timeout = count_timeout(ctxt, kwargs)
@@ -507,33 +516,35 @@ class Application(AppEndpointBase):
         details = []
         # 启动前进程快照
         proc_snapshot_before = utils.find_process()
+
+        def safe_wapper(target_id):
+            try:
+                self.start_entity(target_id, pids=proc_snapshot_before)
+                details.append(dict(detail_id=target_id,
+                                    resultcode=manager_common.RESULT_SUCCESS,
+                                    result='start entity %d success' % target_id
+                                    ))
+            except RpcTargetLockException as e:
+                details.append(dict(detail_id=target_id,
+                                    resultcode=manager_common.RESULT_ERROR,
+                                    result='start entity %d fail, %s' % (target_id, e.message)
+                                    ))
+            except Exception:
+                details.append(dict(detail_id=target_id,
+                                    resultcode=manager_common.RESULT_ERROR,
+                                    result='start entity %d fail' % target_id
+                                    ))
+                LOG.exception('Start entity %d fail' % target_id)
+
         for entity in entitys:
-
-            def safe_wapper(target_id):
-                try:
-                    self.start_entity(target_id, pids=proc_snapshot_before)
-                    details.append(dict(detail_id=target_id,
-                                        resultcode=manager_common.RESULT_SUCCESS,
-                                        result='start entity %d success' % target_id
-                                        ))
-                except RpcTargetLockException as e:
-                    details.append(dict(detail_id=target_id,
-                                        resultcode=manager_common.RESULT_ERROR,
-                                        result='start entity %d fail, %s' % (target_id, e.message)
-                                        ))
-                except Exception:
-                    details.append(dict(detail_id=target_id,
-                                        resultcode=manager_common.RESULT_ERROR,
-                                        result='start entity %d fail' % target_id
-                                        ))
-                    LOG.exception('Start entity %d fail' % target_id)
-
             eventlet.spawn_n(safe_wapper, entity)
 
         while len(details) < len(entitys):
             eventlet.sleep(0.5)
             if int(time.time()) > overtime:
                 break
+
+        responsed_entitys = set()
         # 启动后进程快照
         proc_snapshot_after = utils.find_process()
         # 确认启动成功
@@ -543,8 +554,8 @@ class Application(AppEndpointBase):
             if not self._entity_process(entity, proc_snapshot_after):
                 detail['resultcode'] = manager_common.RESULT_ERROR
                 detail['result'] = 'process not exist after start entity %d' % entity
+            responsed_entitys.add(entity)
 
-        responsed_entitys = set([detail.get('detail_id') for detail in details])
         for no_response_entity in (entitys - responsed_entitys):
             details.append(dict(detail_id=no_response_entity,
                                 resultcode=manager_common.RESULT_ERROR,
@@ -561,6 +572,8 @@ class Application(AppEndpointBase):
                                           result='Start entity end', details=details)
 
     def rpc_stop_entitys(self, ctxt, entitys, **kwargs):
+        timeout = count_timeout(ctxt, kwargs)
+        overtime = timeout + time.time()
         entitys = argutils.map_to_int(entitys) & set(self.entitys)
         if not entitys:
             # stop process with signal.SIGINT
@@ -568,6 +581,64 @@ class Application(AppEndpointBase):
                                               resultcode=manager_common.RESULT_ERROR,
                                               ctxt=ctxt,
                                               result='stop entitys fail, no entitys found')
+        delay = kwargs.get('delay')
+        if delay:
+            eventlet.sleep(min(delay, 30))
+        details = []
+        # 停止前进程快照
+        proc_snapshot_before = utils.find_process()
+
+        def safe_wapper(target_id):
+            try:
+                self.stop_entity(target_id, pids=proc_snapshot_before, kill=kwargs.get('kill'))
+                details.append(dict(detail_id=target_id,
+                                    resultcode=manager_common.RESULT_SUCCESS,
+                                    result='stop entity %d success' % target_id
+                                    ))
+            except RpcTargetLockException as e:
+                details.append(dict(detail_id=target_id,
+                                    resultcode=manager_common.RESULT_ERROR,
+                                    result='stop entity %d fail, %s' % (target_id, e.message)
+                                    ))
+            except Exception:
+                details.append(dict(detail_id=target_id,
+                                    resultcode=manager_common.RESULT_ERROR,
+                                    result='stop entity %d fail' % target_id
+                                    ))
+                LOG.exception('stop entity %d fail' % target_id)
+
+        for entity in entitys:
+            eventlet.spawn_n(safe_wapper, entity)
+
+        while len(details) < len(entitys):
+            eventlet.sleep(0.5)
+            if int(time.time()) > overtime:
+                break
+
+        responsed_entitys = set()
+        # 停止后进程快照
+        proc_snapshot_after = utils.find_process()
+        for detail in details:
+            entity = detail.get('detail_id')
+            if self._entity_process(entity, pids=proc_snapshot_after):
+                detail['resultcode'] = manager_common.RESULT_ERROR
+                detail['result'] = 'stop called, but process exist'
+            responsed_entitys.add(entity)
+
+        for no_response_entity in (entitys - responsed_entitys):
+            details.append(dict(detail_id=no_response_entity,
+                                resultcode=manager_common.RESULT_ERROR,
+                                result='stop entity %d overtime, result unkonwn' % no_response_entity
+                                ))
+        if all([False if detail.get('resultcode') else True for detail in details]):
+            resultcode = manager_common.RESULT_SUCCESS
+        else:
+            resultcode = manager_common.RESULT_NOT_ALL_SUCCESS
+
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          ctxt=ctxt,
+                                          resultcode=resultcode,
+                                          result='Stop entitys end', details=details)
 
     def rpc_status_entitys(self, ctxt, entitys, **kwargs):
         entitys = argutils.map_to_int(entitys) & set(self.entitys)
@@ -601,3 +672,18 @@ class Application(AppEndpointBase):
         details = []
         # 启动前进程快照
         proc_snapshot_before = utils.find_process()
+        with self.locks(entitys):
+            for entity in entitys:
+                if self._entity_process(entity, proc_snapshot_before):
+                    for entity in entitys:
+                        details.append(dict(detail_id=entity,
+                                            resultcode=manager_common.RESULT_SUCCESS,
+                                            result='upgrade not executed, some entity is running'))
+                    return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                                      resultcode=manager_common.RESULT_ERROR,
+                                                      ctxt=ctxt,
+                                                      result='upgrade entity fail, entity %d running' % entity,
+                                                      details=details)
+            middlewares = taskupgrade.upgrade_entitys(self, entitys, kwargs.get('objfiles'),
+                                                      kwargs.get('objtype'))
+        print middlewares

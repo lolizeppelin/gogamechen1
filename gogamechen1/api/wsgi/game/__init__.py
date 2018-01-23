@@ -905,10 +905,13 @@ class AppEntityReuest(BaseContorller):
             body = jsonutils.dumps_as_bytes(OrderedDict(RealSvrIds=list(entitys),
                                                         Msg=message, DelayTime=0))
             requests.post(url, data=body, timeout=5)
-        return self._async_bluck_rpc('start', group_id, objtype, entity, body)
+            body.update({'delay': 10})
+            finishtime, timeout = rpcfinishtime(body.get('request_time'))
+            body.update({'finishtime': finishtime + 10})
+        return self._async_bluck_rpc('stop', group_id, objtype, entity, body)
 
     def status(self, req, group_id, objtype, entity, body=None):
-        return self._async_bluck_rpc('start', group_id, objtype, entity, body)
+        return self._async_bluck_rpc('status', group_id, objtype, entity, body)
 
     def upgrade(self, req, group_id, objtype, entity, body=None):
         body = body or {}
