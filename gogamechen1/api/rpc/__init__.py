@@ -647,6 +647,24 @@ class Application(AppEndpointBase):
                                               resultcode=manager_common.RESULT_ERROR,
                                               ctxt=ctxt,
                                               result='status entitys fail, no entitys found')
+        proc_snapshot = utils.find_process()
+        details = []
+        for entity in entitys:
+            objtype = self._objtype(entity)
+            p = self._entity_process(entity, proc_snapshot)
+            if p:
+                details.append(dict(detail_id=entity,
+                                    resultcode=manager_common.RESULT_SUCCESS,
+                                    result='%s entity %d is running' % (objtype, entity)))
+            else:
+                details.append(dict(detail_id=entity,
+                                    resultcode=manager_common.RESULT_SUCCESS,
+                                    result='%s entity %d not running' % (objtype, entity)))
+
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          ctxt=ctxt,
+                                          resultcode=manager_common.RESULT_SUCCESS,
+                                          result='Get entity sttus success', details=details)
 
     def rpc_opentime_entity(self, ctxt, entity, opentime):
         if entity not in self.entitys:
