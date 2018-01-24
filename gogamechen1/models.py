@@ -80,8 +80,8 @@ class AppEntity(TableBase):
     opentime = sa.Column(INTEGER(unsigned=True), nullable=True)
     status = sa.Column(TINYINT(64), nullable=False, default=common.UNACTIVE)
     cross_id = sa.Column(INTEGER(unsigned=True), nullable=True)
-    version = sa.Column(VARCHAR(64), nullable=True)
-    vquote_id = sa.Column(INTEGER(unsigned=True), nullable=False, default=0)
+    rversion = sa.Column(VARCHAR(64), nullable=True)
+    rquote_id = sa.Column(INTEGER(unsigned=True), nullable=False, default=0)
     areas = orm.relationship(GameArea, backref='appentity', lazy='select',
                              cascade='delete,delete-orphan')
     databases = orm.relationship(AreaDatabase, backref='appentity', lazy='select',
