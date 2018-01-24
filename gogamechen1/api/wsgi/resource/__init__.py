@@ -39,7 +39,6 @@ from goperation.manager.wsgi.exceptions import RpcResultError
 
 from gopcdn import common as cdncommon
 from gopcdn.api.wsgi.resource import CdnResourceReuest
-from gopcdn.api.wsgi.resource import CdnQuoteRequest
 
 from gogamechen1 import common
 from gogamechen1 import utils
@@ -485,6 +484,7 @@ class PackageReuest(BaseContorller):
         return resultutils.results('Delete package success')
 
     def upgrade(self, req, group_id, package_id, body=None):
+        """更新资源版本"""
         body = body or {}
         session = endpoint_session(readonly=True)
         query = model_query(session, Package, filter=Package.package_id == package_id)

@@ -48,6 +48,8 @@ from gopdb import common as dbcommon
 from gopdb.api.wsgi.controller import SchemaReuest
 from gopdb.api.wsgi.controller import DatabaseReuest
 
+from gopcdn.api.wsgi.resource import CdnQuoteRequest
+
 from gogamechen1 import common
 from gogamechen1 import utils
 from gogamechen1.api import get_gamelock
@@ -77,6 +79,7 @@ FAULT_MAP = {InvalidArgument: webob.exc.HTTPClientError,
 entity_controller = EntityReuest()
 schema_controller = SchemaReuest()
 database_controller = DatabaseReuest()
+cdnquote_controller = CdnQuoteRequest()
 
 CONF = cfg.CONF
 
@@ -253,6 +256,7 @@ class GroupReuest(BaseContorller):
                 info = dict(area_id=area.area_id,
                             areaname=area.areaname,
                             entity=appentity.entity,
+                            rversion=appentity.rversion,
                             external_ips=emaps[appentity.entity]['metadata']['external_ips'],
                             dnsnames=emaps[appentity.entity]['metadata'].get('dnsnames'),
                             port=emaps[appentity.entity]['ports'][0])
@@ -426,6 +430,8 @@ class AppEntityReuest(BaseContorller):
                    AppEntity.group_id,
                    AppEntity.agent_id,
                    AppEntity.opentime,
+                   AppEntity.rversion,
+                   AppEntity.rquote_id,
                    AppEntity.status,
                    AppEntity.objtype]
 
@@ -660,6 +666,8 @@ class AppEntityReuest(BaseContorller):
                                               objtype=objtype, group_id=_entity.group_id,
                                               opentime=_entity.opentime,
                                               status=_entity.status,
+                                              rversion=_entity.rversion,
+                                              rquote_id=_entity.rquote_id,
                                               areas=[dict(area_id=area.area_id,
                                                           areaname=area.areaname.encode('utf-8'),
                                                           ) for area in _entity.areas],
@@ -681,6 +689,16 @@ class AppEntityReuest(BaseContorller):
     def update(self, req, group_id, objtype, entity, body=None):
         pass
 
+    def quote_version(self, req, group_id, objtype, entity, body=None):
+        pass
+        # glock = get_gamelock()
+        # with glock.arealock(group_id, areas):
+        #     pass
+        # notify.areas(group_id)
+
+    def unquote_version(self, req, group_id, objtype, entity, body=None):
+        pass
+
     def delete(self, req, group_id, objtype, entity, body=None):
         body = body or {}
         clean = body.pop('clean', 'unquote')
@@ -693,13 +711,21 @@ class AppEntityReuest(BaseContorller):
         metadata, ports = self._entityinfo(req=req, entity=entity)
         if not metadata:
             raise InvalidArgument('Agent offline, can not delete entity')
+        query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
+        query = query.options(joinedload(AppEntity.databases, innerjoin=False))
+        _entity = query.one()
+
+        # 移除资源绑定,这里后续出错也不需要回滚
+        if _entity.rquote_id:
+            version_id = cdnquote_controller.delete(req,
+                                                    quote_id=_entity.rquote_id)['data'][0].get('version_id')
+            LOG.info('Remove cdnresource quote of version id %d' % version_id)
+            _entity.rversion = None
+            _entity.rquote_id = 0
+            session.flush()
+
         with glock.grouplock(group=group_id):
             with session.begin():
-                query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
-                # AppEntity.objtype == objtype,
-                # AppEntity.group_id == group_id))
-                query = query.options(joinedload(AppEntity.databases, innerjoin=False))
-                _entity = query.one()
                 if _entity.status == common.OK:
                     raise InvalidArgument('Entity is active, unactive before delete it')
                 if _entity.objtype != objtype:
