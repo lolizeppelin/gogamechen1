@@ -80,7 +80,7 @@ class AppEntity(TableBase):
     opentime = sa.Column(INTEGER(unsigned=True), nullable=True)
     status = sa.Column(TINYINT(64), nullable=False, default=common.UNACTIVE)
     cross_id = sa.Column(INTEGER(unsigned=True), nullable=True)
-    # 资源版本优先级设置
+    # 资源版本优先级设置, key pakcage id  value  version
     versions = sa.Column(BLOB, nullable=True)
     areas = orm.relationship(GameArea, backref='appentity', lazy='select',
                              cascade='delete,delete-orphan')
@@ -150,7 +150,9 @@ class Package(TableBase):
     # 游戏资源引用id, 游戏下载资源引用的resource id
     resource_id = sa.Column(INTEGER(unsigned=True), nullable=False)
     # 游戏资源默认版本
-    version = sa.Column(VARCHAR(64), nullable=True)
+    rversion = sa.Column(VARCHAR(64), nullable=True)
+    # 默认版本引用id
+    rquote_id = quote_id = sa.Column(INTEGER(unsigned=True), nullable=False)
     # 包名,一般情况下唯一
     package_name = sa.Column(VARCHAR(200), nullable=False)
     # 游戏服务器组id

@@ -256,7 +256,7 @@ class GroupReuest(BaseContorller):
                 info = dict(area_id=area.area_id,
                             areaname=area.areaname,
                             entity=appentity.entity,
-                            rversion=appentity.rversion,
+                            versions=jsonutils.loads_as_bytes(appentity.versions) if appentity.versions else None,
                             external_ips=emaps[appentity.entity]['metadata']['external_ips'],
                             dnsnames=emaps[appentity.entity]['metadata'].get('dnsnames'),
                             port=emaps[appentity.entity]['ports'][0])
@@ -267,25 +267,6 @@ class GroupReuest(BaseContorller):
         group_id = int(group_id)
         return resultutils.results(result='list group areas success',
                                    data=self._areas(group_id))
-
-    def vquotes(self, req, group_id, body=None):
-        group_id = int(group_id)
-        session = endpoint_session(readonly=True)
-        query = model_query(session, Group, filter=Group.group_id == group_id)
-        query = query.options(joinedload(Group.entitys))
-        query = query.filter(AppEntity.vquote_id > 0)
-        group = query.one_or_none()
-        if not group:
-            return resultutils.results(result='list group packages quotes success')
-        versions = []
-        if group.versions:
-            v = jsonutils.loads_as_bytes(group.versions)
-            for version in v.keys():
-                versions.append(version)
-        for entity in group.entitys:
-            versions.append(entity.version)
-        return resultutils.results(result='list group packages quotes success',
-                                   data=list(set(versions)))
 
 
 @singleton.singleton
@@ -430,8 +411,6 @@ class AppEntityReuest(BaseContorller):
                    AppEntity.group_id,
                    AppEntity.agent_id,
                    AppEntity.opentime,
-                   AppEntity.rversion,
-                   AppEntity.rquote_id,
                    AppEntity.status,
                    AppEntity.objtype]
 
@@ -666,8 +645,8 @@ class AppEntityReuest(BaseContorller):
                                               objtype=objtype, group_id=_entity.group_id,
                                               opentime=_entity.opentime,
                                               status=_entity.status,
-                                              rversion=_entity.rversion,
-                                              rquote_id=_entity.rquote_id,
+                                              versions=jsonutils.loads_as_bytes(_entity.versions)
+                                              if _entity.versions else None,
                                               areas=[dict(area_id=area.area_id,
                                                           areaname=area.areaname.encode('utf-8'),
                                                           ) for area in _entity.areas],
@@ -716,13 +695,13 @@ class AppEntityReuest(BaseContorller):
         _entity = query.one()
 
         # 移除资源绑定,这里后续出错也不需要回滚
-        if _entity.rquote_id:
-            version_id = cdnquote_controller.delete(req,
-                                                    quote_id=_entity.rquote_id)['data'][0].get('version_id')
-            LOG.info('Remove cdnresource quote of version id %d' % version_id)
-            _entity.rversion = None
-            _entity.rquote_id = 0
-            session.flush()
+        # if _entity.rquote_id:
+        #     version_id = cdnquote_controller.delete(req,
+        #                                             quote_id=_entity.rquote_id)['data'][0].get('version_id')
+        #     LOG.info('Remove cdnresource quote of version id %d' % version_id)
+        #     _entity.rversion = None
+        #     _entity.rquote_id = 0
+        #     session.flush()
 
         with glock.grouplock(group=group_id):
             with session.begin():

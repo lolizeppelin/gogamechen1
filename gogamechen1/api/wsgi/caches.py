@@ -62,8 +62,8 @@ def map_resources(resource_ids):
 
     if missed:
         with goperation.tlock('gogamechen1-cdnresource'):
-            resources = cdnresource_controller._shows(resource_ids=missed,
-                                                      versions=True, domains=True, metadatas=True)
+            resources = cdnresource_controller.list(resource_ids=missed,
+                                                    versions=True, domains=True, metadatas=True)
             for resource in resources:
                 resource_id = resource.get('resource_id')
                 agent_id = resource.get('agent_id')

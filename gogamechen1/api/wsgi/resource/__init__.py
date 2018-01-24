@@ -39,6 +39,7 @@ from goperation.manager.wsgi.exceptions import RpcResultError
 
 from gopcdn import common as cdncommon
 from gopcdn.api.wsgi.resource import CdnResourceReuest
+from gopcdn.api.wsgi.resource import CdnQuoteRequest
 
 from gogamechen1 import common
 from gogamechen1 import utils
@@ -71,6 +72,7 @@ FAULT_MAP = {InvalidArgument: webob.exc.HTTPClientError,
 entity_controller = EntityReuest()
 file_controller = FileReuest()
 cdnresource_controller = CdnResourceReuest()
+cdnquote_controller = CdnQuoteRequest()
 
 group_controller = GroupReuest()
 
@@ -318,6 +320,7 @@ class PackageReuest(BaseContorller):
             resource = resource_cache_map(resource_id=package.resource_id)
             info = dict(dict(package_id=package.package_id,
                              package_name=package.package_name,
+                             rversion=package.rversion,
                              group_id=package.group_id,
                              etype=resource.get('etype'),
                              name=resource.get('name'),
@@ -357,6 +360,7 @@ class PackageReuest(BaseContorller):
                                            columns=[Package.package_id,
                                                     Package.package_name,
                                                     Package.group_id,
+                                                    Package.rversion,
                                                     Package.resource_id,
                                                     Package.mark,
                                                     Package.status,
@@ -386,7 +390,7 @@ class PackageReuest(BaseContorller):
             # 确认group
             group_controller.show(req, group_id)
             # 基本资源引用
-            cdnresource_controller.quote(req, resource_id)
+            # cdnresource_controller.quote(req, resource_id)
             package = Package(resource_id=resource_id,
                               package_name=package_name,
                               group_id=group_id,
@@ -420,6 +424,8 @@ class PackageReuest(BaseContorller):
                                    data=[dict(package_id=package.package_id,
                                               package_name=package.package_name,
                                               group=group,
+                                              rversion=package.rversion,
+                                              rquote_id=package.rquote_id,
                                               etype=resource.get('etype'),
                                               name=resource.get('name'),
                                               version=resource.get('version'),
@@ -448,6 +454,7 @@ class PackageReuest(BaseContorller):
         extension = body.get('extension')
         status = body.get('status')
         desc = body.get('desc')
+        version = body.get('version')
         session = endpoint_session()
         with session.begin():
             package = model_query(session, Package, filter=Package.package_id == package_id).one()
@@ -463,6 +470,18 @@ class PackageReuest(BaseContorller):
                 default_extension = jsonutils.loads_as_bytes(package.extension) if package.extension else {}
                 default_extension.update(extension)
                 package.extension = jsonutils.dumps(default_extension)
+            if version:
+                # 没有引用过默认version,添加资源引用
+                if not package.rquote_id:
+                    qresult = cdnresource_controller.vquote(req, resource_id=Package.resource_id)
+                    if qresult.get('resultcode') != manager_common.RESULT_SUCCESS:
+                        return qresult
+                    quote = qresult['data'][0]
+                    package.rversion = version
+                    package.rquote_id = quote.get('quote_id')
+                # 修改资源引用
+                else:
+                    cdnquote_controller.update(req, quote_id=package.rquote_id, body={'version': version})
             session.flush()
         notify.resource()
         return resultutils.results('Update package success')
@@ -470,15 +489,30 @@ class PackageReuest(BaseContorller):
     def delete(self, req, group_id, package_id, body=None):
         session = endpoint_session()
         package_id = int(package_id)
+        query = model_query(session, Package, filter=Package.package_id == package_id)
+        query = query.options(joinedload(Package.files))
         with session.begin():
-            package = model_query(session, Package, filter=Package.package_id == package_id).one()
+            package = query.one()
             if package.group_id != group_id:
                 raise InvalidArgument('Group id not match')
-            # 确认游戏区服是否有指定版本引用
-            if group_controller.vquotes(req=req, group_id=group_id)['data']:
-                raise InvalidArgument('Group still quote resource with version')
-            # 基本资源引用
-            cdnresource_controller.unquote(req, package.resource_id)
+            if package.files:
+                raise InvalidArgument('Package files exist')
+            checked = set()
+            # 确认组别中没有特殊version引用
+            for area in group_controller._areas(group_id=package.group_id):
+                entity = area.get('entity')
+                if entity in checked:
+                    continue
+                checked.add(entity)
+                versions = area.get('versions')
+                if versions:
+                    for version in versions:
+                        if version.get('package_id') == package_id:
+                            raise InvalidArgument('Entity %d set package %d, version %s' %
+                                                  (area.get('entity', package_id, version.get('version'))))
+            # 版本资源引用删除
+            if package.rquote_id:
+                cdnquote_controller.delete(req, package.rquote_id)
             session.flush()
         notify.resource()
         return resultutils.results('Delete package success')
