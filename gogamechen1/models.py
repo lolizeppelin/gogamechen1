@@ -126,8 +126,8 @@ class PackageFile(TableBase):
     # 包文件id
     pfile_id = sa.Column(INTEGER(unsigned=True), nullable=False,
                          primary_key=True, autoincrement=True)
-    # 引用id, 为0则为外部地址
-    quote_id = sa.Column(INTEGER(unsigned=True), nullable=False, default=0)
+    # 安装包引用的resource_id, 为0则为外部地址
+    resource_id = sa.Column(INTEGER(unsigned=True), nullable=False, default=0)
     package_id = sa.Column(sa.ForeignKey('packages.package_id', ondelete="RESTRICT", onupdate='RESTRICT'),
                            nullable=False)
     # 包类型
