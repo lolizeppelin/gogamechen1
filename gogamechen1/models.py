@@ -80,6 +80,8 @@ class AppEntity(TableBase):
     opentime = sa.Column(INTEGER(unsigned=True), nullable=True)
     status = sa.Column(TINYINT(64), nullable=False, default=common.UNACTIVE)
     cross_id = sa.Column(INTEGER(unsigned=True), nullable=True)
+    version = sa.Column(VARCHAR(64), nullable=True)
+    vquote_id = sa.Column(INTEGER(unsigned=True), nullable=False, default=0)
     areas = orm.relationship(GameArea, backref='appentity', lazy='select',
                              cascade='delete,delete-orphan')
     databases = orm.relationship(AreaDatabase, backref='appentity', lazy='select',
@@ -97,6 +99,8 @@ class Group(TableBase):
                          autoincrement=True)
     name = sa.Column(VARCHAR(64), default=None, nullable=False)
     lastarea = sa.Column(INTEGER(unsigned=True), nullable=False, default=0)
+    # 资源版本优先级设置
+    versions = sa.Column(BLOB, nullable=True)
     desc = sa.Column(VARCHAR(256), nullable=True)
     areas = orm.relationship(GameArea, backref='group', lazy='select',
                              cascade='delete,delete-orphan')
@@ -145,10 +149,8 @@ class PackageFile(TableBase):
 class Package(TableBase):
     package_id = sa.Column(INTEGER(unsigned=True), nullable=False,
                            primary_key=True, autoincrement=True)
-    # 安装包对应resource,是安装包所使用的资源,而不是安装包文件所在的资源
+    # 游戏资源引用id, 游戏下载资源引用的resource id
     resource_id = sa.Column(INTEGER(unsigned=True), nullable=False)
-    # 资源引用id
-    quote_id = sa.Column(INTEGER(unsigned=True), nullable=False)
     # 包名,一般情况下唯一
     package_name = sa.Column(VARCHAR(200), nullable=False)
     # 游戏服务器组id
@@ -156,6 +158,7 @@ class Package(TableBase):
                          nullable=False)
     # 标记
     mark = sa.Column(VARCHAR(32), nullable=False)
+    # 状态
     status = sa.Column(SMALLINT, nullable=False, default=common.ENABLE)
     # 说明
     desc = sa.Column(VARCHAR(256), nullable=True)
