@@ -14,7 +14,6 @@ from sqlalchemy.sql import and_
 from simpleutil.common.exceptions import InvalidArgument
 from simpleutil.log import log as logging
 from simpleutil.utils import jsonutils
-from simpleutil.utils import cachetools
 from simpleutil.utils import uuidutils
 from simpleutil.utils import singleton
 from simpleutil.config import cfg
@@ -30,7 +29,6 @@ import goperation
 from goperation.utils import safe_func_wrapper
 from goperation.manager import common as manager_common
 from goperation.manager.exceptions import CacheStoneError
-from goperation.manager.api import get_cache
 from goperation.manager.utils import resultutils
 from goperation.manager.utils import targetutils
 from goperation.manager.wsgi.contorller import BaseContorller
@@ -53,6 +51,8 @@ from gogamechen1.models import Package
 from gogamechen1.models import PackageFile
 from gogamechen1.models import PackageRemark
 from gogamechen1.api.wsgi.game import GroupReuest
+from gogamechen1.api.wsgi.caches import resource_cache_map
+from gogamechen1.api.wsgi.caches import map_resources
 
 from gogamechen1.api.wsgi.notify import notify
 
@@ -72,108 +72,10 @@ FAULT_MAP = {InvalidArgument: webob.exc.HTTPClientError,
 entity_controller = EntityReuest()
 file_controller = FileReuest()
 cdnresource_controller = CdnResourceReuest()
-cdnquote_controller = CdnQuoteRequest()
 
 group_controller = GroupReuest()
 
 CONF = cfg.CONF
-
-
-class ResourceTTLCache(cachetools.TTLCache):
-    def __init__(self, maxsize, ttl):
-        cachetools.TTLCache.__init__(self, maxsize, ttl)
-
-    def expiretime(self, key):
-        link = self._TTLCache__links[key]
-        return link.expire
-
-# CDNRESOURCE = {}
-CDNRESOURCE = ResourceTTLCache(maxsize=1000, ttl=cdncommon.CACHETIME)
-
-
-def _map_resources(resource_ids):
-    # 删除过期缓存
-    CDNRESOURCE.expire()
-
-    need = set(resource_ids)
-    provides = set(CDNRESOURCE.keys())
-    notmiss = need & provides
-
-    if notmiss:
-        cache_base = {}
-        earliest = int(time.time())
-        for resource_id in notmiss:
-            update_at = int(time.time()) - CDNRESOURCE.expiretime(resource_id)
-            if update_at < earliest:
-                earliest = update_at
-            cache_base[resource_id] = update_at
-
-        cache = get_cache()
-        scores = cache.zrangebyscore(name=cdncommon.CACHESETNAME,
-                                     min=str(earliest), max='+inf',
-                                     withscores=True, score_cast_func=int)
-        if scores:
-            for data in scores:
-                resource_id = int(data[0])
-                update_at = int(data[1])
-                try:
-                    if update_at > cache_base[resource_id]:
-                        CDNRESOURCE.pop(resource_id, None)
-                except KeyError:
-                    continue
-
-    missed = need - set(CDNRESOURCE.keys())
-
-    if missed:
-        with goperation.tlock('gogamechen1-cdnresource'):
-            resources = cdnresource_controller._shows(resource_ids=missed, domains=True, metadatas=True)
-            for resource in resources:
-                resource_id = resource.get('resource_id')
-                agent_id = resource.get('agent_id')
-                port = resource.get('port')
-                internal = resource.get('internal')
-                domains = resource.get('domains')
-                name = resource.get('name')
-                etype = resource.get('etype')
-                version = resource.get('version')
-                metadata = resource.get('metadata')
-                if internal:
-                    if not metadata:
-                        raise ValueError('Agent %d not online, get domain entity fail' % agent_id)
-                    hostnames = [metadata.get('local_ip')]
-                else:
-                    if not domains:
-                        if not metadata:
-                            raise ValueError('Agent %d not online get domain entity fail' % agent_id)
-                        if metadata.get('external_ips'):
-                            hostnames = metadata.get('external_ips')
-                        else:
-                            hostnames = [metadata.get('local_ip')]
-                    else:
-                        hostnames = domains
-                schema = 'http'
-                if port == 443:
-                    schema = 'https'
-                netlocs = []
-                for host in hostnames:
-                    if port in (80, 443):
-                        netloc = '%s://%s' % (schema, host)
-                    else:
-                        netloc = '%s://%s:%d' % (schema, host, port)
-                    netlocs.append(netloc)
-                CDNRESOURCE.setdefault(resource_id, dict(name=name, etype=etype, agent_id=agent_id,
-                                                         internal=internal, version=version,
-                                                         netlocs=netlocs, port=port,
-                                                         domains=domains))
-
-
-def resource_cache_map(resource_id):
-    """cache  resource info"""
-    if resource_id not in CDNRESOURCE:
-        _map_resources(resource_ids=[resource_id, ])
-    if resource_id not in CDNRESOURCE:
-        raise InvalidArgument('Resource not exit')
-    return CDNRESOURCE[resource_id]
 
 
 def resource_url(resource_id, fileinfo=None):
@@ -405,7 +307,7 @@ class PackageReuest(BaseContorller):
             resource_ids.add(package.resource_id)
             group_ids.add(package.group_id)
         # 异步更新resources缓存
-        th = eventlet.spawn(_map_resources, resource_ids=resource_ids)
+        th = eventlet.spawn(map_resources, resource_ids=resource_ids)
         groups = group_controller._chiefs(list(group_ids), cross=False)
         groups_maps = {}
         for group in groups:
@@ -484,11 +386,9 @@ class PackageReuest(BaseContorller):
                 raise InvalidArgument('Resource is internal resrouce')
             # 确认group
             group_controller.show(req, group_id)
-            # 创建引用
-            quote = cdnquote_controller.create(req, resource_id)['data'][0]
-            quote_id = quote.pop('quote_id')
+            # 基本资源引用
+            cdnresource_controller.quote(req, resource_id)
             package = Package(resource_id=resource_id,
-                              quote_id=quote_id,
                               package_name=package_name,
                               group_id=group_id,
                               mark=mark,
@@ -575,8 +475,11 @@ class PackageReuest(BaseContorller):
             package = model_query(session, Package, filter=Package.package_id == package_id).one()
             if package.group_id != group_id:
                 raise InvalidArgument('Group id not match')
-            # 删除资源引用
-            cdnquote_controller.delete(req, package.resource_id, package.quote_id)
+            # 确认游戏区服是否有指定版本引用
+            if group_controller.vquotes(req=req, group_id=group_id)['data']:
+                raise InvalidArgument('Group still quote resource with version')
+            # 基本资源引用
+            cdnresource_controller.unquote(req, package.resource_id)
             session.flush()
         notify.resource()
         return resultutils.results('Delete package success')
@@ -638,11 +541,14 @@ class PackageReuest(BaseContorller):
 
 @singleton.singleton
 class PackageFileReuest(BaseContorller):
+
     CREATESCHEMA = {
         'type': 'object',
         'required': ['ftype', 'gversion'],
         'properties':
             {
+                'resource_id': {'oneOf': [{'type': 'integer', 'minimum': 1}, {'type': 'null'}],
+                                'description': '安装包存放所引用的resource_id, 为0必须有外部地址'},
                 'ftype': {'type': 'string', 'description': '包类型,打包,小包,更新包等'},
                 'gversion': {'type': 'string', 'description': '安装包版本号'},
                 'timeout': {'oneOf': [{'type': 'integer', 'minimum': 30}, {'type': 'null'}],
@@ -707,12 +613,16 @@ class PackageFileReuest(BaseContorller):
                 session.flush()
             notify.resource()
         else:
-            resource_id = CONF[common.NAME].package_resource
+            resource_id = body.get('resource_id')
+            resource_id = resource_id or CONF[common.NAME].package_resource
             if not resource_id:
                 raise InvalidArgument('Both address and resource_id is None')
             fileinfo = body.pop('fileinfo', None)
             if not fileinfo:
                 raise InvalidArgument('Both fileinfo and address is none')
+            resource = resource_cache_map(resource_id)
+            if resource.get('internal'):
+                raise InvalidArgument('apk resource is internal resource')
             address = resource_url(resource_id, fileinfo)[0]
             # 上传结束后通知
             with session.begin():
@@ -760,14 +670,11 @@ class PackageFileReuest(BaseContorller):
         pfile = query.one()
         if pfile.package_id != package_id:
             raise InvalidArgument('Package File package id not match')
-        quote_id = 0
         if pfile.status == manager_common.DOWNFILE_UPLOADING and status == manager_common.DOWNFILE_FILEOK:
-            resource_id = CONF[common.NAME].package_resource
-            quote_id = cdnquote_controller.create(req, resource_id)['data'][0].get('quote_id')
+            if pfile.resource_id:
+                cdnresource_controller.quote(req, pfile.resource_id)
         with session.begin():
             data = {'status': status}
-            if quote_id:
-                data.update({'quote_id': quote_id})
             query.update(data)
         notify.resource()
         return resultutils.results('update package file  for %d success' % package_id,
@@ -782,14 +689,13 @@ class PackageFileReuest(BaseContorller):
         pfile = query.one()
         if pfile.package_id != package_id:
             raise InvalidArgument('Package File package id not match')
-        if pfile.quote_id:
-            resource_id = CONF[common.NAME].package_resource
+        if pfile.resource_id:
 
             def wapper():
                 try:
-                    cdnquote_controller.delete(req, resource_id, pfile.quote_id)
+                    cdnresource_controller.unquote(req, pfile.resource_id, pfile.quote_id)
                 except Exception:
-                    LOG.error('Delete quote_id %d from %d fail' % (pfile.quote_id, resource_id))
+                    LOG.error('Revmove quote from %d fail' % pfile.resource_id)
 
             eventlet.spawn_n(wapper)
 

@@ -264,6 +264,25 @@ class GroupReuest(BaseContorller):
         return resultutils.results(result='list group areas success',
                                    data=self._areas(group_id))
 
+    def vquotes(self, req, group_id, body=None):
+        group_id = int(group_id)
+        session = endpoint_session(readonly=True)
+        query = model_query(session, Group, filter=Group.group_id == group_id)
+        query = query.options(joinedload(Group.entitys))
+        query = query.filter(AppEntity.vquote_id > 0)
+        group = query.one_or_none()
+        if not group:
+            return resultutils.results(result='list group packages quotes success')
+        versions = []
+        if group.versions:
+            v = jsonutils.loads_as_bytes(group.versions)
+            for version in v.keys():
+                versions.append(version)
+        for entity in group.entitys:
+            versions.append(entity.version)
+        return resultutils.results(result='list group packages quotes success',
+                                   data=list(set(versions)))
+
 
 @singleton.singleton
 class AppEntityReuest(BaseContorller):
