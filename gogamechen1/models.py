@@ -80,8 +80,8 @@ class AppEntity(TableBase):
     opentime = sa.Column(INTEGER(unsigned=True), nullable=True)
     status = sa.Column(TINYINT(64), nullable=False, default=common.UNACTIVE)
     cross_id = sa.Column(INTEGER(unsigned=True), nullable=True)
-    rversion = sa.Column(VARCHAR(64), nullable=True)
-    rquote_id = sa.Column(INTEGER(unsigned=True), nullable=False, default=0)
+    # 资源版本优先级设置
+    versions = sa.Column(BLOB, nullable=True)
     areas = orm.relationship(GameArea, backref='appentity', lazy='select',
                              cascade='delete,delete-orphan')
     databases = orm.relationship(AreaDatabase, backref='appentity', lazy='select',
@@ -99,8 +99,6 @@ class Group(TableBase):
                          autoincrement=True)
     name = sa.Column(VARCHAR(64), default=None, nullable=False)
     lastarea = sa.Column(INTEGER(unsigned=True), nullable=False, default=0)
-    # 资源版本优先级设置
-    versions = sa.Column(BLOB, nullable=True)
     desc = sa.Column(VARCHAR(256), nullable=True)
     areas = orm.relationship(GameArea, backref='group', lazy='select',
                              cascade='delete,delete-orphan')
@@ -151,6 +149,8 @@ class Package(TableBase):
                            primary_key=True, autoincrement=True)
     # 游戏资源引用id, 游戏下载资源引用的resource id
     resource_id = sa.Column(INTEGER(unsigned=True), nullable=False)
+    # 游戏资源默认版本
+    version = sa.Column(VARCHAR(64), nullable=True)
     # 包名,一般情况下唯一
     package_name = sa.Column(VARCHAR(200), nullable=False)
     # 游戏服务器组id
