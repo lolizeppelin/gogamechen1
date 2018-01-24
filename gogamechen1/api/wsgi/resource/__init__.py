@@ -489,7 +489,7 @@ class PackageReuest(BaseContorller):
         session = endpoint_session(readonly=True)
         query = model_query(session, Package, filter=Package.package_id == package_id)
         package = query.one()
-        result = cdnresource_controller.upgrade(req, resource_id=package.group_id, body=body)
+        result = cdnresource_controller.upgrade(req, resource_id=package.resource_id, body=body)
         asyncinfo = result['data'][0]
         eventlet.spawn_after(asyncinfo['deadline'], notify.resource)
         return result
