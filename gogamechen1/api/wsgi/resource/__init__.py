@@ -161,13 +161,18 @@ class ObjtypeFileReuest(BaseContorller):
         version = body.pop('version')
 
         address = body.get('address')
-        fileinfo = body.pop('fileinfo')
+        fileinfo = body.pop('fileinfo', None)
+        if not fileinfo:
+            raise InvalidArgument('Both fileinfo and address is none')
 
         # 没有地址,通过gopcdn上传
         if not address:
             resource_id = CONF[common.NAME].objfile_resource
             if not resource_id:
                 raise InvalidArgument('Both address and resource_id is None')
+            resource = resource_cache_map(resource_id)
+            if not resource.get('internal'):
+                raise InvalidArgument('objtype file resource not a internal resource')
             address = resource_url(resource_id, fileinfo)[0]
             # 上传结束后通知
             notify = {'success': dict(action='/files/%s' % uuid,
@@ -582,7 +587,7 @@ class PackageFileReuest(BaseContorller):
         'properties':
             {
                 'resource_id': {'oneOf': [{'type': 'integer', 'minimum': 1}, {'type': 'null'}],
-                                'description': '安装包存放所引用的resource_id, 为0必须有外部地址'},
+                                'description': '安装包存放所引用的resource_id'},
                 'ftype': {'type': 'string', 'description': '包类型,打包,小包,更新包等'},
                 'gversion': {'type': 'string', 'description': '安装包版本号'},
                 'timeout': {'oneOf': [{'type': 'integer', 'minimum': 30}, {'type': 'null'}],
@@ -647,8 +652,7 @@ class PackageFileReuest(BaseContorller):
                 session.flush()
             notify.resource()
         else:
-            resource_id = body.get('resource_id')
-            resource_id = resource_id or CONF[common.NAME].package_resource
+            resource_id = body.get('resource_id') or CONF[common.NAME].package_resource
             if not resource_id:
                 raise InvalidArgument('Both address and resource_id is None')
             fileinfo = body.pop('fileinfo', None)
