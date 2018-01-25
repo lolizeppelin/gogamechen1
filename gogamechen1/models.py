@@ -152,9 +152,9 @@ class Package(TableBase):
     # 游戏资源默认版本
     rversion = sa.Column(VARCHAR(64), nullable=True)
     # 默认版本引用id
-    rquote_id = quote_id = sa.Column(INTEGER(unsigned=True), nullable=False)
+    rquote_id = sa.Column(INTEGER(unsigned=True), nullable=False)
     # 包名,一般情况下唯一
-    package_name = sa.Column(VARCHAR(200), nullable=False)
+    package_name = sa.Column(VARCHAR(64), nullable=False)
     # 游戏服务器组id
     group_id = sa.Column(sa.ForeignKey('groups.group_id', ondelete="RESTRICT", onupdate='RESTRICT'),
                          nullable=False)
@@ -171,6 +171,6 @@ class Package(TableBase):
     files = orm.relationship(PackageFile, backref='package', lazy='select',
                              cascade='delete,delete-orphan,save-update')
     __table_args__ = (
-        # sa.UniqueConstraint('package_name', name='package_unique'),
+        sa.UniqueConstraint('package_name', name='package_unique'),
         InnoDBTableBase.__table_args__
     )

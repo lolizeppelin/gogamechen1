@@ -333,7 +333,7 @@ class PackageReuest(BaseContorller):
                              status=package.status,
                              magic=jsonutils.loads_as_bytes(package.magic) if package.magic else None,
                              extension=jsonutils.loads_as_bytes(package.extension) if package.extension else None,
-                             resource=dict(version=resource.get('version'),
+                             resource=dict(versions=resource.get('versions'),
                                            urls=resource_url(package.resource_id),
                                            resource_id=package.resource_id,
                                            ),
@@ -411,7 +411,7 @@ class PackageReuest(BaseContorller):
                                               package_name=package.package_name,
                                               name=resource.get('name'),
                                               etype=resource.get('etype'),
-                                              resource=dict(version=resource.get('version'),
+                                              resource=dict(versions=resource.get('versions'),
                                                             resource_id=package.resource_id,
                                                             quote_id=package.quote_id,
                                                             urls=resource_url(package.resource_id),
@@ -423,7 +423,8 @@ class PackageReuest(BaseContorller):
         query = model_query(session, Package, filter=Package.package_id == package_id)
         query = query.options(joinedload(Package.files, innerjoin=False))
         package = query.one()
-        resource = cdnresource_controller.show(req, package.resource_id)['data'][0]
+        # 确认cdn资源
+        resource = resource_cache_map(package.resource_id)
         group = group_controller.show(req, package.group_id)['data'][0]
         return resultutils.results('Show package success',
                                    data=[dict(package_id=package.package_id,
@@ -433,7 +434,7 @@ class PackageReuest(BaseContorller):
                                               rquote_id=package.rquote_id,
                                               etype=resource.get('etype'),
                                               name=resource.get('name'),
-                                              version=resource.get('version'),
+                                              versions=resource.get('versions'),
                                               urls=resource_url(package.resource_id),
                                               mark=package.mark,
                                               status=package.status,
@@ -478,7 +479,8 @@ class PackageReuest(BaseContorller):
             if version:
                 # 没有引用过默认version,添加资源引用
                 if not package.rquote_id:
-                    qresult = cdnresource_controller.vquote(req, resource_id=Package.resource_id)
+                    qresult = cdnresource_controller.vquote(req, resource_id=Package.resource_id,
+                                                            body=dict(version=version))
                     if qresult.get('resultcode') != manager_common.RESULT_SUCCESS:
                         return qresult
                     quote = qresult['data'][0]

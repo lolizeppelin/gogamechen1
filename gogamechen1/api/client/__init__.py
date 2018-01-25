@@ -1,3 +1,4 @@
+import time
 from simpleservice.plugin.exceptions import ServerExecuteRequestError
 
 from gopdb.api.client import GopDBClient
@@ -354,9 +355,11 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
-    def package_resource_upgrade(self, group_id, package_id, version):
-        resp, results = self.get(action=self.package_path_ex % (str(group_id), package_id, 'upgrade'),
-                                 body=dict(version=version))
+    def package_resource_upgrade(self, group_id, package_id, version, timeout=60):
+        body = dict(version=version, request_time=int(time.time()),
+                    finishtime=int(time.time() + 60))
+        resp, results = self.put(action=self.package_path_ex % (str(group_id), package_id, 'upgrade'),
+                                 body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='upgrade %d package resource fail:%d' %
                                                     (group_id, results['resultcode']),
