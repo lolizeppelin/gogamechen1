@@ -49,7 +49,7 @@ DBAFFINITYS = {GAMESERVER: {DATADB: 1, LOGDB: 2},
 # package static var
 
 ENABLE = 1
-DISENABLE = 0
+DISABLE = 0
 
 ANY = 0
 ANDROID = 1

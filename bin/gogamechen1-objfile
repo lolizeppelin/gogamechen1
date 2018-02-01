@@ -1,0 +1,280 @@
+#!/usr/bin/python
+import time
+import logging
+import sys
+
+from simpleutil.config import cfg
+from simpleutil.utils import table
+
+from goperation.api.client.config import client_opts
+from goperation.api.client.config import index_opts
+from goperation.api.client import ManagerClient
+
+from goperation.api.client.utils import prepare_results
+from goperation.api.client.utils import wait_finish
+from goperation.api.client.utils import p_asyncrequest
+
+from gopcdn.utils import build_fileinfo
+from gogamechen1.api.client import GogameChen1DBClient
+
+CONF = cfg.CONF
+
+timeout_opts = [
+    cfg.IPOpt('timeout',
+              default=30,
+              help='Send file timeout'),
+]
+
+one_opts = [
+    cfg.StrOpt('uuid',
+               short='u',
+               required=True,
+               help='Target objfile uuid'),
+]
+
+game_type_opts = [
+    cfg.StrOpt('objtype',
+               short='o',
+               choices=['gamesvr', 'loginsvr', 'publicsvr'],
+               help='Game objtype objfile for')
+]
+
+sub_type_opts = [
+    cfg.StrOpt('subtype',
+               short='s',
+               choices=['datadb', 'logdb', 'appfile'],
+               help='Game subtype objfile for')
+]
+
+type_opts = game_type_opts + sub_type_opts
+
+create_opts = [
+    cfg.StrOpt('address',
+               help='File download address, if None, mean upload from local'),
+    cfg.StrOpt('file',
+               required=True,
+               help='File local path, will get file info from it'),
+    cfg.StrOpt('fversion',
+               required=True,
+               help='Uploade file version'),
+]
+
+
+def client(session=None):
+    return GogameChen1DBClient(httpclient=ManagerClient(url=CONF.gcenter, port=CONF.gcenter_port,
+                                                        retries=CONF.retries, timeout=CONF.apitimeout,
+                                                        token=CONF.trusted, session=session))
+
+
+def list():
+    CONF.register_cli_opts(index_opts)
+    CONF.register_cli_opts(type_opts)
+    CONF(project='cmd')
+    _client = client()
+
+    body = dict()
+    if CONF.objtype:
+        body.setdefault('objtype', CONF.objtype)
+    if CONF.subtype:
+        body.setdefault('subtype', CONF.subtype)
+    if not body:
+        body = None
+
+    code, result, data = prepare_results(_client.objfiles_index, body=body)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    objfile_heads = ['uuid', 'objtype', 'subtype', 'version']
+    print('\033[1;32;40m')
+    print 'List game objfiles success'
+    print('\033[0m')
+    tb = table.PleasantTable(ident=0, columns=objfile_heads, counter=True)
+    for objfile in data:
+        tb.add_row([objfile.get('uuid'), objfile.get('objtype'),
+                    objfile.get('subtype'), objfile.get('version')])
+    print tb.pformat()
+
+
+def create():
+    CONF.register_cli_opts(timeout_opts)
+    CONF.register_cli_opts(type_opts)
+    CONF.register_cli_opts(create_opts)
+    CONF(project='cmd')
+
+    if not CONF.address:
+        try:
+            import websocket
+        except ImportError:
+            print('\033[1;31;40m')
+            print 'python-websocket-client not install'
+            print('\033[0m')
+            sys.exit(1)
+
+    _client = client()
+    fileinfo = build_fileinfo(CONF.file)
+    timeout = build_fileinfo(CONF.timeout)
+    if not timeout:
+        timeout = 30
+    body = {'timeout': timeout}
+    if CONF.address:
+        body.setdefault('address', CONF.address)
+    code, result, data = prepare_results(_client.objfile_create, CONF.objtype, CONF.subtype,
+                                         CONF.fversion, fileinfo=fileinfo, body=body)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    info = data[0]
+    if not CONF.address:
+        print('\033[1;32;40m')
+        print 'Create objfile success'
+        print 'File uuid is %s' % info.get('uuid')
+        print('\033[0m')
+    else:
+        uri = info.get('uri')
+        print('\033[1;32;40m')
+        print 'Get upload file websocket uri success'
+        print 'uri is %s:%d' % (uri.get('ipaddr'), uri.get('port'))
+        print 'try connect websocket after 0.1 seconds'
+        print('\033[0m')
+        time.sleep(0.1)
+        ws = websocket.create_connection("ws://%s:%d" % (uri.get('ipaddr'), uri.get('port')),
+                                         subprotocols=["binary"])
+        print "connect websocket success, send file now"
+        _start = time.time()
+        with open(CONF.file, 'rb') as f:
+            while True:
+                buffer = f.read(4096)
+                if buffer:
+                    ws.send(buffer)
+                else:
+                    print 'file send finish, size %d, time use %d' % (fileinfo.get('size'),
+                                                                      int(time.time()) - _start)
+                    break
+
+
+def show():
+    CONF.register_cli_opts(one_opts)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.objfile_show, CONF.uuid)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    if not data:
+        print('\033[1;32;40m')
+        print 'Now objfile success'
+        print('\033[0m')
+    objfile = data[0]
+    fmarks = objfile.get('marks')
+    print('\033[1;32;40m')
+    print 'Show objfile success'
+    print 'uuid: %s' % fmarks.get('uuid')
+    print 'objtype: %s' % objfile.get('objtype')
+    print 'subtype: %s' % objfile.get('subtype')
+    print 'version: %s' % objfile.get('version')
+    print '-----------File Info-----------'
+    print 'downloader: %s' % objfile.get('downloader')
+    print 'address: %s' % objfile.get('address')
+    print 'uploadtime: %s' % objfile.get('uploadtime')
+    print '---------File deatils----------'
+    print 'ext: %s' % objfile.get('ext')
+    print 'size: %d' % objfile.get('size')
+    print 'md5: %s' % fmarks.get('md5')
+    print 'crc32: %s' % fmarks.get('crc32')
+    print('\033[0m')
+
+
+def delete():
+    CONF.register_cli_opts(one_opts)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.objfile_delete, CONF.uuid)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    objfile = data[0]
+    print('\033[1;32;40m')
+    print 'Delete objfile success'
+    print 'uuid: %s' % objfile.get('uuid')
+    print 'md5: %s' % objfile.get('md5')
+    print 'crc32: %s' % objfile.get('crc32')
+    print 'size: %d' % objfile.get('size')
+    print 'uploadtime: %s' % objfile.get('uploadtime')
+    print 'downloader: %s' % objfile.get('downloader')
+    print 'address: %s' % objfile.get('address')
+    print('\033[0m')
+
+
+def send():
+    CONF.register_cli_opts(one_opts)
+    CONF.register_cli_opts(game_type_opts)
+    CONF(project='cmd')
+    timeout = CONF.timeout
+    if not timeout:
+        timeout = 30
+    now = int(time.time())
+    body = {}
+    body.setdefault('request_time', now)
+    body.setdefault('finishtime', now + timeout)
+    _client = client()
+    code, result, data = prepare_results(_client.objfile_send, CONF.uuid, CONF.objtype, body=body)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    asyncrequest = data[0]
+    now = int(time.time())
+    request_id = asyncrequest.get('request_id')
+    sleep = asyncrequest.get('finishtime') - now
+    dead = asyncrequest.get('deadline') - now
+    print('\033[1;32;40m')
+    print 'Send objfile to agents async request %s has been sended' % request_id
+    print 'uuid: %s' % CONF.uuid
+    print 'objtype: %s' % CONF.objtype
+    print('\033[0m')
+    print 'Result will respon after %d, dead after %d' % (sleep, dead)
+    if not wait_finish(_client, asyncrequest):
+        print('\033[1;31;40m')
+        print 'Async request not finish after deadline'
+        print('\033[0m')
+    p_asyncrequest(_client, request_id=request_id, details=False)
+
+
+def main():
+    FUNCS = ['list', 'show', 'create', 'delete', 'send']
+
+    try:
+        func = sys.argv.pop(1)
+        if func not in FUNCS:
+            raise ValueError
+    except (IndexError, ValueError):
+        print 'action is: %s' % '  '.join(FUNCS)
+        print 'use -h for help'
+        sys.exit(1)
+    func = eval(func)
+    logging.basicConfig(level=logging.WARN)
+    CONF.register_cli_opts(client_opts)
+    func()
+
+
+if __name__ == '__main__':
+    main()

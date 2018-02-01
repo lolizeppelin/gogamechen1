@@ -45,7 +45,9 @@ install -d %{buildroot}%{_sysconfdir}/goperation/endpoints
 install -p -D -m 0644 etc/endpoints/*.conf.sample %{buildroot}%{_sysconfdir}/goperation/endpoints
 
 install -d %{buildroot}%{_sbindir}
-install -p -D -m 0754 bin/* %{buildroot}%{_sbindir}
+install -d %{buildroot}%{_bindir}
+install -p -D -m 0754 sbin/* %{buildroot}%{_sbindir}
+install -p -D -m 0754 bin/* %{buildroot}%{_bindir}
 
 
 %clean
@@ -63,7 +65,11 @@ install -p -D -m 0754 bin/* %{buildroot}%{_sbindir}
 %{python_sitelib}/%{proj_name}/api/client
 %{python_sitelib}/%{proj_name}/cmd
 %{python_sitelib}/%{proj_name}-%{version}-py?.?.egg-info
-%{_sbindir}/%{proj_name}-db-init
+%{_sbindir}/%{proj_name}-init
+%{_bindir}/%{proj_name}-appentity
+%{_bindir}/%{proj_name}-group
+%{_bindir}/%{proj_name}-objfile
+%{_bindir}/%{proj_name}-package
 %doc README.md
 %doc doc/*
 

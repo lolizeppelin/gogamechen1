@@ -298,7 +298,8 @@ class PackageReuest(BaseContorller):
                 'magic': {'type': 'object'},
                 'extension': {'type': 'extension'},
                 'desc': {'type': 'string'},
-                'status': {'type': 'integer', 'enum': [common.ENABLE, common.DISENABLE]}
+                'version': {'type': 'string'},
+                'status': {'type': 'integer', 'enum': [common.ENABLE, common.DISABLE]}
             }
     }
 
@@ -357,6 +358,7 @@ class PackageReuest(BaseContorller):
 
     def index(self, req, group_id, body=None):
         body = body or {}
+        group_id = int(group_id)
         order = body.pop('order', None)
         page_num = int(body.pop('page_num', 0))
         session = endpoint_session(readonly=True)
@@ -379,6 +381,7 @@ class PackageReuest(BaseContorller):
 
     def create(self, req, group_id, body=None):
         body = body or {}
+        group_id = int(group_id)
         jsonutils.schema_validate(body, self.CREATESCHEMA)
         resource_id = int(body.pop('resource_id'))
         package_name = body.pop('package_name')
@@ -395,7 +398,6 @@ class PackageReuest(BaseContorller):
             # 确认group
             group_controller.show(req, group_id)
             # 基本资源引用
-            # cdnresource_controller.quote(req, resource_id)
             package = Package(resource_id=resource_id,
                               package_name=package_name,
                               group_id=group_id,
@@ -419,10 +421,15 @@ class PackageReuest(BaseContorller):
                                               )])
 
     def show(self, req, group_id, package_id, body=None):
+        body = body or {}
+        group_id = int(group_id)
+        package_id = int(package_id)
         session = endpoint_session(readonly=True)
         query = model_query(session, Package, filter=Package.package_id == package_id)
         query = query.options(joinedload(Package.files, innerjoin=False))
         package = query.one()
+        if package.group_id != group_id:
+            raise InvalidArgument('Group id not the same')
         # 确认cdn资源
         resource = resource_cache_map(package.resource_id)
         group = group_controller.show(req, package.group_id)['data'][0]
@@ -430,6 +437,7 @@ class PackageReuest(BaseContorller):
                                    data=[dict(package_id=package.package_id,
                                               package_name=package.package_name,
                                               group=group,
+                                              resource_id=package.resource_id,
                                               rversion=package.rversion,
                                               rquote_id=package.rquote_id,
                                               etype=resource.get('etype'),
@@ -455,15 +463,19 @@ class PackageReuest(BaseContorller):
 
     def update(self, req, group_id, package_id, body=None):
         body = body or {}
+        group_id = int(group_id)
+        package_id = int(package_id)
         jsonutils.schema_validate(body, self.UPDATESCHEMA)
         magic = body.get('magic')
         extension = body.get('extension')
         status = body.get('status')
         desc = body.get('desc')
-        version = body.get('version')
+        rversion = body.get('rversion')
         session = endpoint_session()
         with session.begin():
             package = model_query(session, Package, filter=Package.package_id == package_id).one()
+            if package.group_id != group_id:
+                raise InvalidArgument('Group id not the same')
             if status:
                 package.status = status
             if desc:
@@ -476,30 +488,35 @@ class PackageReuest(BaseContorller):
                 default_extension = jsonutils.loads_as_bytes(package.extension) if package.extension else {}
                 default_extension.update(extension)
                 package.extension = jsonutils.dumps(default_extension)
-            if version:
+            if rversion:
                 # 没有引用过默认version,添加资源引用
                 if not package.rquote_id:
                     qresult = cdnresource_controller.vquote(req, resource_id=Package.resource_id,
-                                                            body=dict(version=version))
+                                                            body=dict(version=rversion))
                     if qresult.get('resultcode') != manager_common.RESULT_SUCCESS:
                         return qresult
                     quote = qresult['data'][0]
-                    package.rversion = version
+                    package.rversion = rversion
                     package.rquote_id = quote.get('quote_id')
                 # 修改资源引用
                 else:
-                    cdnquote_controller.update(req, quote_id=package.rquote_id, body={'version': version})
+                    cdnquote_controller.update(req, quote_id=package.rquote_id, body={'version': rversion})
             session.flush()
         notify.resource()
         return resultutils.results('Update package success')
 
     def delete(self, req, group_id, package_id, body=None):
+        body = body or {}
+        group_id = int(group_id)
+        package_id = int(package_id)
         session = endpoint_session()
         package_id = int(package_id)
         query = model_query(session, Package, filter=Package.package_id == package_id)
         query = query.options(joinedload(Package.files))
         with session.begin():
             package = query.one()
+            if package.group_id != group_id:
+                raise InvalidArgument('Group id not the same')
             if package.group_id != group_id:
                 raise InvalidArgument('Group id not match')
             if package.files:
@@ -527,22 +544,34 @@ class PackageReuest(BaseContorller):
     def upgrade(self, req, group_id, package_id, body=None):
         """更新资源版本"""
         body = body or {}
+        group_id = int(group_id)
+        package_id = int(package_id)
         session = endpoint_session(readonly=True)
         query = model_query(session, Package, filter=Package.package_id == package_id)
         package = query.one()
+        if package.group_id != group_id:
+            raise InvalidArgument('Group id not the same')
         result = cdnresource_controller.upgrade(req, resource_id=package.resource_id, body=body)
         asyncinfo = result['data'][0]
         eventlet.spawn_after(asyncinfo['deadline'], notify.resource)
         return result
 
-    def add_remark(self, req, package_id, body=None):
+    def add_remark(self, req, group_id, package_id, body=None):
         body = body or {}
+        group_id = int(group_id)
+        package_id = int(package_id)
         if 'username' not in body:
             raise InvalidArgument('username not found')
         if 'message' not in body:
             raise InvalidArgument('message not found')
-        package_id = int(package_id)
         session = endpoint_session()
+        query = model_query(session, Package, filter=Package.package_id == package_id)
+        package = query.one()
+        if package.group_id != group_id:
+            raise InvalidArgument('Group id not the same')
+        if package.group_id != group_id:
+            raise InvalidArgument('Group id not the same')
+
         remark = PackageRemark(package_id=package_id,
                                rtime=int(time.time()),
                                username=str(body.get('username')),
@@ -551,19 +580,31 @@ class PackageReuest(BaseContorller):
         session.flush()
         return resultutils.results(result='Add remark success')
 
-    def del_remark(self, req, package_id, body=None):
+    def del_remark(self, req, group_id, package_id, body=None):
         body = body or {}
+        group_id = int(group_id)
+        package_id = int(package_id)
         remark_id = int(body.pop('remark_id'))
         session = endpoint_session()
+        query = model_query(session, Package, filter=Package.package_id == package_id)
+        package = query.one_or_none()
+        if package and package.group_id != group_id:
+            raise InvalidArgument('Group id not the same')
         query = model_query(session, PackageRemark, filter=and_(PackageRemark.package_id == package_id,
                                                                 PackageRemark.remark_id == remark_id))
         query.delete()
         return resultutils.results(result='Delete remark success')
 
-    def list_remarks(self, req, package_id, body=None):
+    def list_remarks(self, req, group_id, package_id, body=None):
         body = body or {}
+        group_id = int(group_id)
+        package_id = int(package_id)
         page_num = int(body.pop('page_num', 0))
         session = endpoint_session(readonly=True)
+        query = model_query(session, Package, filter=Package.package_id == package_id)
+        package = query.one()
+        if package and package.group_id != group_id:
+            raise InvalidArgument('Group id not the same')
         results = resultutils.bulk_results(session,
                                            model=PackageRemark,
                                            columns=[PackageRemark.rtime,
@@ -667,6 +708,7 @@ class PackageFileReuest(BaseContorller):
             # 上传结束后通知
             with session.begin():
                 pfile = PackageFile(package_id=package_id, ftype=ftype,
+                                    resource_id=resource_id, filename=fileinfo.get('filename'),
                                     uptime=uptime, gversion=gversion,
                                     address=address, status=manager_common.DOWNFILE_UPLOADING,
                                     desc=desc)
@@ -713,6 +755,8 @@ class PackageFileReuest(BaseContorller):
         if pfile.status == manager_common.DOWNFILE_UPLOADING and status == manager_common.DOWNFILE_FILEOK:
             if pfile.resource_id:
                 cdnresource_controller.quote(req, pfile.resource_id)
+            else:
+                LOG.error('Not resource_id found for package file')
         with session.begin():
             data = {'status': status}
             query.update(data)
@@ -736,7 +780,12 @@ class PackageFileReuest(BaseContorller):
                     cdnresource_controller.unquote(req, pfile.resource_id, pfile.quote_id)
                 except Exception:
                     LOG.error('Revmove quote from %d fail' % pfile.resource_id)
-
+                if pfile.filename:
+                    try:
+                        cdnresource_controller.delete_file(req, pfile.resource_id,
+                                                           body=dict(filename=pfile.filename))
+                    except Exception:
+                        LOG.error('Remove file %s from %d fail' % (pfile.resource_id, pfile.filename))
             eventlet.spawn_n(wapper)
 
         session.delete(pfile)

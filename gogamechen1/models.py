@@ -113,7 +113,7 @@ class Group(TableBase):
 
 class PackageRemark(TableBase):
     remark_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True, autoincrement=True)
-    package_id = sa.Column(sa.ForeignKey('packages.package_id', ondelete="RESTRICT", onupdate='RESTRICT'),
+    package_id = sa.Column(sa.ForeignKey('packages.package_id', ondelete="CASCADE", onupdate='RESTRICT'),
                            nullable=False)
     rtime = sa.Column(INTEGER(unsigned=True), nullable=False)
     username = sa.Column(VARCHAR(64), nullable=False)
@@ -126,6 +126,8 @@ class PackageFile(TableBase):
                          primary_key=True, autoincrement=True)
     # 安装包引用的resource_id, 为0则为外部地址
     resource_id = sa.Column(INTEGER(unsigned=True), nullable=False, default=0)
+    # 安装包文件名
+    filename = sa.Column(VARCHAR(128), nullable=True)
     package_id = sa.Column(sa.ForeignKey('packages.package_id', ondelete="RESTRICT", onupdate='RESTRICT'),
                            nullable=False)
     # 包类型
@@ -152,7 +154,7 @@ class Package(TableBase):
     # 游戏资源默认版本
     rversion = sa.Column(VARCHAR(64), nullable=True)
     # 默认版本引用id
-    rquote_id = sa.Column(INTEGER(unsigned=True), nullable=False)
+    rquote_id = sa.Column(INTEGER(unsigned=True), nullable=True)
     # 包名,一般情况下唯一
     package_name = sa.Column(VARCHAR(64), nullable=False)
     # 游戏服务器组id

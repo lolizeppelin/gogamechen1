@@ -1,0 +1,332 @@
+#!/usr/bin/python
+import time
+import logging
+import sys
+
+from simpleutil.config import cfg
+from simpleutil.utils import table
+
+from goperation.api.client.config import client_opts
+from goperation.api.client.config import index_opts
+from goperation.api.client import ManagerClient
+
+from goperation.api.client.utils import prepare_results
+from goperation.api.client.utils import wait_finish
+from goperation.api.client.utils import p_asyncrequest
+
+from gogamechen1 import common
+from gogamechen1.api.client import GogameChen1DBClient
+
+CONF = cfg.CONF
+
+timeout_opts = [
+    cfg.IPOpt('timeout',
+              default=30,
+              help='Send file/Upgrade timeout'),
+]
+
+one_opts = [
+    cfg.IntOpt('group_id',
+               required=True,
+               help='Package for game group'),
+    cfg.IntOpt('package_id',
+               required=True,
+               help='Package id'),
+]
+
+game_type_opts = [
+    cfg.StrOpt('objtype',
+               short='o',
+               choices=['gamesvr', 'loginsvr', 'publicsvr'],
+               help='Game objtype objfile for')
+]
+
+sub_type_opts = [
+    cfg.StrOpt('subtype',
+               short='s',
+               choices=['datadb', 'logdb', 'appfile'],
+               help='Game subtype objfile for')
+]
+
+type_opts = game_type_opts + sub_type_opts
+
+create_opts = [
+    cfg.StrOpt('address',
+               help='File download address, if None, mean upload from local'),
+    cfg.StrOpt('file',
+               required=True,
+               help='File local path, will get file info from it'),
+    cfg.StrOpt('fversion',
+               required=True,
+               help='Uploade file version'),
+]
+
+version_opts = [
+    cfg.StrOpt('rversion',
+               required=True,
+               help='Cdn resource version'),
+]
+
+
+def client(session=None):
+    return GogameChen1DBClient(httpclient=ManagerClient(url=CONF.gcenter, port=CONF.gcenter_port,
+                                                        retries=CONF.retries, timeout=CONF.apitimeout,
+                                                        token=CONF.trusted, session=session))
+
+
+def all():
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.package_all)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    print('\033[1;32;40m')
+    print 'List all game packages success'
+    print('\033[0m')
+
+    file_heads = ['pfile_id', 'ftype', 'gversion', 'status', 'uptime', 'address']
+
+    for package in data:
+        resource = package.get('resource')
+        login = package.get('login')
+        files = package.get('files')
+        print('\033[1;32;40m')
+        print '---------Pakcage Info---------'
+        print('\033[0m')
+        print 'package id: %s' % package.get('package_id')
+        print 'package name: %s' % package.get('package_name')
+        print 'mark: %s' % package.get('mark')
+        print 'etype: %s' % package.get('etype')
+        print 'name: %s' % package.get('name')
+        print 'status: %s' % package.get('status')
+        print 'magic: %s' % package.get('magic')
+        print 'extension: %s' % package.get('extension')
+        print 'rversion: %s' % package.get('rversion')
+        print '---------Resource Info---------'
+        print 'resource_id: %d' % resource.get('resource_id')
+        print 'versions: %s' % resource.get('versions')
+        print 'urls: %s' % resource.get('urls')
+        print '----------Login Info----------'
+        print 'group id: %s' % package.get('group_id')
+        print 'local_ip: %s' % login.get('local_ip')
+        print 'ports: %s' % str(login.get('ports'))
+        print 'objtype: %s' % login.get('objtype')
+        print 'dnsnames: %s' % str(login.get('dnsnames'))
+        print 'external_ips: %s' % str(login.get('external_ips'))
+        print '---------Package file---------'
+        tb = table.PleasantTable(ident=8, columns=file_heads, counter=True)
+        if files:
+            for _file in files:
+                tb.add_row([_file.get('pfile_id'), _file.get('ftype'), _file.get('gversion'),
+                            _file.get('status'), _file.get('rversion'),
+                            _file.get('uptime'), _file.get('address')])
+        print tb.pformat()
+
+
+def list():
+    CONF.register_cli_opts(index_opts)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.package_index)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    package_heads = ['package_id', 'package_name', 'mark', 'group_id', 'rversion', 'resource_id',
+                     'status', 'magic', 'extension']
+    print('\033[1;32;40m')
+    print 'List game packages success'
+    print('\033[0m')
+    tb = table.PleasantTable(ident=0, columns=package_heads, counter=True)
+    for package in data:
+        tb.add_row([package.get('package_id'), package.get('package_name'), package.get('mark'),
+                    package.get('group_id'), package.get('rversion'), package.get('resource_id')])
+    print tb.pformat()
+
+
+def create():
+    pass
+
+
+def show():
+    CONF.register_cli_opts(one_opts)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.package_show, CONF.group_id, CONF.package_id)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    if not data:
+        print('\033[1;32;40m')
+        print 'Now package exist'
+        print('\033[0m')
+
+    pfile_heads = ['ftype', 'gversion', 'address', 'uptime', 'status', 'desc']
+    package = data[0]
+    group = package.get('group')
+    files = package.get('files')
+    print('\033[1;32;40m')
+    print 'Show package success'
+    print 'desc: %s' % package.get('desc')
+    print 'package id: %s' % package.get('package_id')
+    print 'package name: %s' % package.get('package_name')
+    print 'status: %s' % package.get('status')
+    print 'mark: %s' % package.get('mark')
+    print 'etype: %s' % package.get('etype')
+    print 'name: %s' % package.get('name')
+    print 'magic: %s' % package.get('magic')
+    print 'extension: %s' % package.get('extension')
+    print 'rversion: %s' % package.get('rversion')
+    print '---------Resource Info---------'
+    print 'rversion quote id: %d' % package.get('rquote_id')
+    print 'resource_id: %d' % package.get('resource_id')
+    print 'versions: %s' % package.get('versions')
+    print 'urls: %s' % package.get('urls')
+    print '----------Group Info----------'
+    print 'group id: %s' % group.get('group_id')
+    print 'group name: %s' % group.get('name')
+    print 'lastarea: %d' % group.get('lastarea')
+    print '---------Package file---------'
+    tb = table.PleasantTable(ident=0, columns=pfile_heads, counter=True)
+    for pfile in files:
+        tb.add_row([pfile.get('ftype'), pfile.get('gversion'), pfile.get('address'),
+                    pfile.get('uptime'), pfile.get('status'), pfile.get('desc')])
+    print tb.pformat()
+    print('\033[0m')
+
+
+def delete():
+    CONF.register_cli_opts(one_opts)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.package_delete, CONF.group_id, CONF.package_id)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    print('\033[1;32;40m')
+    print 'Delete package success'
+    print('\033[0m')
+
+
+def upgrade():
+    CONF.register_cli_opts(one_opts)
+    CONF.register_cli_opts(version_opts)
+    CONF.register_cli_opts(timeout_opts)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.package_resource_upgrade, CONF.group_id, CONF.package_id,
+                                         version=CONF.rversion, timeout=CONF.timeout)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    asyncrequest = data[0]
+    now = int(time.time())
+    request_id = asyncrequest.get('request_id')
+    sleep = asyncrequest.get('finishtime') - now
+    dead = asyncrequest.get('deadline') - now
+    print('\033[1;32;40m')
+    print 'Package resource upgrade async request %s has been sended' % request_id
+    print 'group id: %s' % CONF.group_id
+    print 'package id: %s' % CONF.package_id
+    print 'rversion: %s' % CONF.rversion
+    print('\033[0m')
+    print 'Result will respon after %d, dead after %d' % (sleep, dead)
+    if not wait_finish(_client, asyncrequest):
+        print('\033[1;31;40m')
+        print 'Async request not finish after deadline'
+        print('\033[0m')
+    p_asyncrequest(_client, request_id=request_id, details=False)
+
+
+def rversion():
+    CONF.register_cli_opts(one_opts)
+    CONF.register_cli_opts(version_opts)
+    _client = client()
+    body = dict(rversion=CONF.rversion)
+    code, result, data = prepare_results(_client.package_update, CONF.group_id, CONF.package_id, body=body)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    print('\033[1;32;40m')
+    print 'Change package default resource version success'
+    print('\033[0m')
+
+
+def enable():
+    CONF.register_cli_opts(one_opts)
+    _client = client()
+    code, result, data = prepare_results(_client.package_update, CONF.group_id, CONF.package_id,
+                                         body=dict(status=common.ENABLE))
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    print('\033[1;32;40m')
+    print 'Enable package success'
+    print('\033[0m')
+
+
+def disable():
+    CONF.register_cli_opts(one_opts)
+    _client = client()
+    code, result, data = prepare_results(_client.package_update, CONF.group_id, CONF.package_id,
+                                         body=dict(status=common.DISABLE))
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    print('\033[1;32;40m')
+    print 'Disenable package success'
+    print('\033[0m')
+
+
+def main():
+    FUNCS = ['all', 'list', 'show', 'create', 'delete', 'upgrade', 'rversion',
+             'enable', 'disable']
+
+    try:
+        func = sys.argv.pop(1)
+        if func not in FUNCS:
+            raise ValueError
+    except (IndexError, ValueError):
+        print 'action is: %s' % '  '.join(FUNCS)
+        print 'use -h for help'
+        sys.exit(1)
+    func = eval(func)
+    logging.basicConfig(level=logging.WARN)
+    CONF.register_cli_opts(client_opts)
+    func()
+
+
+if __name__ == '__main__':
+    main()

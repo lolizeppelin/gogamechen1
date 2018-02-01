@@ -356,8 +356,9 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
         return results
 
     def package_resource_upgrade(self, group_id, package_id, version, timeout=60):
+        timeout = timeout or 60
         body = dict(version=version, request_time=int(time.time()),
-                    finishtime=int(time.time() + 60))
+                    finishtime=int(time.time() + timeout))
         resp, results = self.put(action=self.package_path_ex % (str(group_id), package_id, 'upgrade'),
                                  body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:

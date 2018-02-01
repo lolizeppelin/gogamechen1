@@ -67,7 +67,7 @@ def game_stop(entitys):
 def game_flushconf(entitys):
     print client.game_flushconfig(group_id=1, entitys=entitys,
                                   body={'request_time': int(time.time()),
-                                        common.GAMESERVER: True})
+                                        common.GMSERVER: True})
 
 
 def game_create():
@@ -140,4 +140,4 @@ def game_start(entitys):
 # gm_flushconf(entity='all')
 
 
-print client.async_show(request_id='6fddaf0d-470d-4a70-9d64-f970fa87cde8', body={'details': True})
+# print client.async_show(request_id='70b979ef-e3be-4ed9-8e1c-16484019fe3c', body={'details': True})

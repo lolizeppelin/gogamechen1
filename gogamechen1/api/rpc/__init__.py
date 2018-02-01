@@ -723,7 +723,7 @@ class Application(AppEndpointBase):
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           ctxt=ctxt,
                                           resultcode=resultcode,
-                                          result='Flush entity config success', details=details)
+                                          result='Flush entitys config end', details=details)
 
     def rpc_upgrade_entitys(self, ctxt, entitys, **kwargs):
         entitys = argutils.map_to_int(entitys) & set(self.entitys)

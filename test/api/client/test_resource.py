@@ -134,6 +134,9 @@ def pacakge_index(group_id):
     print client.package_index(group_id)
 
 
+def resource_upgrade(group_id, package_id, version='HEAD', timeout=60):
+    print client.package_resource_upgrade(group_id, package_id, version=version, timeout=timeout)
+
 gamepath = r'C:\Users\loliz_000\Desktop\game.zip'
 gmpath = r'C:\Users\loliz_000\Desktop\gm.zip'
 crosspath = r'C:\Users\loliz_000\Desktop\cross.zip'
@@ -149,8 +152,10 @@ crosspath = r'C:\Users\loliz_000\Desktop\cross.zip'
 
 # group_index()
 # resource_index()
-resource_shows(resource_id=6)
-resource_show(resource_id=6)
+# resource_shows(resource_id=6)
+# resource_show(resource_id=6)
+
+
 
 # pacakge_create(resource_id=6, group_id=1, package_name='com.packmon.dyb', mark='dyb')
 # pacakge_index(group_id=1)
@@ -160,3 +165,6 @@ apkpath = r'C:\Users\loliz_000\Desktop\online.1.0.341.3046749070.apk'
 
 # pfile_create(package_id=1, apkpath=apkpath)
 package_all()
+
+# print resource_upgrade(group_id=1, package_id=1)
+# print client.async_show(request_id='d0479126-693e-49b4-b5a0-30b85b945c68', body={'details': True})
