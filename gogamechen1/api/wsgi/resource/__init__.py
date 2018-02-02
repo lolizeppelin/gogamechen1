@@ -785,17 +785,17 @@ class PackageFileReuest(BaseContorller):
         if pfile.resource_id:
 
             def wapper():
-                if pfile.status == manager_common.DOWNFILE_FILEOK:
+                if pfile.resource_id and pfile.status == manager_common.DOWNFILE_FILEOK:
                     try:
                         cdnresource_controller.unquote(req, pfile.resource_id)
                     except Exception:
                         LOG.error('Revmove quote from %d fail' % pfile.resource_id)
-                if pfile.filename:
-                    try:
-                        cdnresource_controller.delete_file(req, pfile.resource_id,
-                                                           body=dict(filename=pfile.filename))
-                    except Exception:
-                        LOG.error('Remove file %s from %d fail' % (pfile.resource_id, pfile.filename))
+                    if pfile.filename:
+                        try:
+                            cdnresource_controller.delete_file(req, pfile.resource_id,
+                                                               body=dict(filename=pfile.filename))
+                        except Exception:
+                            LOG.error('Remove file %s from %d fail' % (pfile.resource_id, pfile.filename))
             eventlet.spawn_n(wapper)
 
         session.delete(pfile)
