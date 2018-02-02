@@ -398,9 +398,7 @@ def upload():
 
     _client = client()
     fileinfo = build_fileinfo(CONF.file)
-    timeout = build_fileinfo(CONF.timeout)
-    if not timeout:
-        timeout = 60
+    timeout = CONF.timeout or 60
     body = dict(ftyp=CONF.ftype, gversion=CONF.gversion, desc=CONF.desc,
                 timeout=timeout)
     if CONF.address:

@@ -545,6 +545,7 @@ class PackageReuest(BaseContorller):
                 cdnquote_controller.delete(req, package.rquote_id)
             # 资源引用计数器减少
             cdnresource_controller.unquote(req, package.resource_id)
+            session.delete(package)
             session.flush()
         notify.resource()
         return resultutils.results('Delete package success')

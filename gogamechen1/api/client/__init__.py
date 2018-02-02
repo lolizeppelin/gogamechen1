@@ -408,7 +408,7 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
-    def package_delete(self, group_id, package_id, body):
+    def package_delete(self, group_id, package_id, body=None):
         resp, results = self.delete(action=self.package_path % (str(group_id), package_id), body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='delete %d package fail:%d' %

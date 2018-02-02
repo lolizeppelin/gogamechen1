@@ -117,9 +117,7 @@ def create():
 
     _client = client()
     fileinfo = build_fileinfo(CONF.file)
-    timeout = build_fileinfo(CONF.timeout)
-    if not timeout:
-        timeout = 30
+    timeout = CONF.timeout or 30
     body = {'timeout': timeout}
     if CONF.address:
         body.setdefault('address', CONF.address)
