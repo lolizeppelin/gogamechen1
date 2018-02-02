@@ -126,7 +126,7 @@ def all():
     print 'List all game packages success'
     print '\033[0m'
 
-    file_heads = ['pfile_id', 'ftype', 'gversion', 'status', 'uptime', 'address']
+    file_heads = ['id', 'ftype', 'gversion', 'status', 'uptime', 'address']
 
     for package in data:
         resource = package.get('resource')
@@ -156,7 +156,7 @@ def all():
         print 'dnsnames: %s' % str(login.get('dnsnames'))
         print 'external_ips: %s' % str(login.get('external_ips'))
         print '---------Package file---------'
-        tb = table.PleasantTable(ident=8, columns=file_heads, counter=True)
+        tb = table.PleasantTable(ident=0, columns=file_heads, counter=True)
         if files:
             for _file in files:
                 tb.add_row([_file.get('pfile_id'), _file.get('ftype'), _file.get('gversion'),
