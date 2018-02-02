@@ -36,7 +36,7 @@ group_opt = cfg.IntOpt('group_id',
 package_opt = cfg.IntOpt('package_id',
                          short='p',
                          required=True,
-                         help='Package id'),
+                         help='Package id')
 
 
 one_opts = [
