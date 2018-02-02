@@ -411,11 +411,12 @@ class PackageReuest(BaseContorller):
                                    data=[dict(package_id=package.package_id,
                                               group_id=package.group_id,
                                               package_name=package.package_name,
+                                              status=package.status,
+                                              mark=package.mark,
                                               name=resource.get('name'),
                                               etype=resource.get('etype'),
-                                              resource=dict(versions=resource.get('versions'),
-                                                            resource_id=package.resource_id,
-                                                            quote_id=package.quote_id,
+                                              resource=dict(resource_id=package.resource_id,
+                                                            versions=resource.get('versions'),
                                                             urls=resource_url(package.resource_id),
                                                             )
                                               )])

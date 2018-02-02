@@ -15,6 +15,8 @@ from goperation.api.client.utils import prepare_results
 from goperation.api.client.utils import wait_finish
 from goperation.api.client.utils import p_asyncrequest
 
+from gopcdn.utils import build_fileinfo
+
 from gogamechen1 import common
 from gogamechen1.api.client import GogameChen1DBClient
 
@@ -23,7 +25,7 @@ CONF = cfg.CONF
 timeout_opts = [
     cfg.IntOpt('timeout',
                default=30,
-               help='Send file/Upgrade timeout'),
+               help='Send file/Upgrade/Uploade timeout'),
 ]
 
 group_opt = cfg.IntOpt('group_id',
@@ -31,13 +33,16 @@ group_opt = cfg.IntOpt('group_id',
                        short='g',
                        help='Package for game group')
 
+package_opt = cfg.IntOpt('package_id',
+                         short='p',
+                         required=True,
+                         help='Package id'),
+
 
 one_opts = [
     group_opt,
-    cfg.IntOpt('package_id',
-               short='p',
-               required=True,
-               help='Package id'),
+    package_opt,
+
 ]
 
 game_type_opts = [
@@ -57,18 +62,40 @@ sub_type_opts = [
 type_opts = game_type_opts + sub_type_opts
 
 create_package_opts = [
+    group_opt,
+    cfg.StrOpt('name',
+               required=True,
+               short='n',
+               help='Package name'),
+    cfg.StrOpt('mark',
+               required=True,
+               short='m',
+               help='Package mark name'),
+    cfg.IntOpt('resource_id',
+               short='r',
+               required=True,
+               help='Which game resource package bond with'),
+    cfg.StrOpt('desc',
+               help='Package desc'),
+
 
 ]
 
-create_file_opts = [
+create_pfile_opts = [
     cfg.StrOpt('address',
                help='File download address, if None, mean upload from local'),
     cfg.StrOpt('file',
                required=True,
                help='File local path, will get file info from it'),
-    cfg.StrOpt('fversion',
+    cfg.StrOpt('gversion',
                required=True,
-               help='Uploade file version'),
+               help='Package file version'),
+    cfg.StrOpt('ftype',
+               required=True,
+               choices=common.PackageTypeMap.values(),
+               help='Package file type, small, update, full'),
+    cfg.StrOpt('desc',
+               help='Package file desc'),
 ]
 
 version_opts = [
@@ -165,7 +192,38 @@ def list():
 
 
 def create():
-    pass
+    CONF.register_cli_opts(create_package_opts)
+    CONF(project='cmd')
+    _client = client()
+    if CONF.desc:
+        body = dict(dict=CONF.desc)
+    else:
+        body = None
+    code, result, data = prepare_results(_client.package_create, CONF.group_id,
+                                         CONF.resource_id, CONF.name, CONF.mark, body=body)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    print '\033[1;32;40m\r',
+    print 'Create game packages success'
+    print '\033[0m'
+    package = data[0]
+    resource = package.get('resource')
+    print 'group id: %s' % package.get('group_id')
+    print 'package id: %s' % package.get('package_id')
+    print 'package name: %s' % package.get('package_name')
+    print 'status: %s' % package.get('status')
+    print 'mark: %s' % package.get('mark')
+    print 'etype: %s' % package.get('etype')
+    print 'name: %s' % package.get('name')
+    print '---------Resource Info---------'
+    print 'resource_id: %d' % resource.get('resource_id')
+    print 'versions: %s' % resource.get('versions')
+    print 'urls: %s' % resource.get('urls')
 
 
 def show():
@@ -323,9 +381,73 @@ def disable():
     print('\033[0m')
 
 
+def upload():
+    CONF.register_cli_opt(package_opt)
+    CONF.register_cli_opts(timeout_opts)
+    CONF.register_cli_opts(create_pfile_opts)
+    CONF(project='cmd')
+
+    if not CONF.address:
+        try:
+            import websocket
+        except ImportError:
+            print('\033[1;31;40m')
+            print 'python-websocket-client not install'
+            print('\033[0m')
+            sys.exit(1)
+
+    _client = client()
+    fileinfo = build_fileinfo(CONF.file)
+    timeout = build_fileinfo(CONF.timeout)
+    if not timeout:
+        timeout = 60
+    body = dict(ftyp=CONF.ftype, gversion=CONF.gversion, desc=CONF.desc,
+                timeout=timeout)
+    if CONF.address:
+        body.setdefault('address', CONF.address)
+    else:
+        body.setdefault('fileinfo', fileinfo)
+    code, result, data = prepare_results(_client.packagefile_create,
+                                         CONF.package_id, body=body)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    info = data[0]
+    if not CONF.address:
+        print '\033[1;32;40m\r',
+        print 'Create package file success'
+        print 'Pfile id  is %s' % info.get('pfile_id')
+        print('\033[0m')
+    else:
+        uri = info.get('uri')
+        print '\033[1;32;40m\r',
+        print 'Get upload file websocket uri success'
+        print 'uri is %s:%d' % (uri.get('ipaddr'), uri.get('port'))
+        print 'try connect websocket after 0.1 seconds'
+        print('\033[0m')
+        time.sleep(0.1)
+        ws = websocket.create_connection("ws://%s:%d" % (uri.get('ipaddr'), uri.get('port')),
+                                         subprotocols=["binary"])
+        print "connect websocket success, send file now"
+        _start = time.time()
+        with open(CONF.file, 'rb') as f:
+            while True:
+                buffer = f.read(4096)
+                if buffer:
+                    ws.send(buffer)
+                else:
+                    print 'file send finish, size %d, time use %d' % (fileinfo.get('size'),
+                                                                      int(time.time()) - _start)
+                    break
+
+
 def main():
     FUNCS = ['all', 'list', 'show', 'create', 'delete', 'upgrade', 'rversion',
-             'enable', 'disable']
+             'enable', 'disable', 'upload']
 
     try:
         func = sys.argv.pop(1)
