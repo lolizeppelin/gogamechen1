@@ -390,7 +390,7 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
-    def package_show(self, group_id, package_id, body):
+    def package_show(self, group_id, package_id, body=None):
         resp, results = self.get(action=self.package_path % (str(group_id), package_id), body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='show %d package fail:%d' %

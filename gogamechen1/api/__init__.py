@@ -4,10 +4,8 @@ from simpleutil.config import cfg
 from simpleservice.ormdb.api import MysqlDriver
 
 from goperation import lock
-from goperation.manager.api import get_global
 
 from gogamechen1 import common
-from gogamechen1.api import gamelock
 
 CONF = cfg.CONF
 
@@ -45,6 +43,8 @@ def init_gamelock():
         with lock.get('gamelock-gogamechen1'):
             if GameLock is None:
                 LOG.info("Try init gamelock for gogamechen1")
+                from goperation.manager.api import get_global
+                from gogamechen1.api import gamelock
                 gogamechen1_lock = gamelock.GoGameLock(gdata=get_global())
                 GameLock = gogamechen1_lock
     else:

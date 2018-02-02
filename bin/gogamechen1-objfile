@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# -*- encoding: utf-8 -*-
 import time
 import logging
 import sys
@@ -20,9 +21,9 @@ from gogamechen1.api.client import GogameChen1DBClient
 CONF = cfg.CONF
 
 timeout_opts = [
-    cfg.IPOpt('timeout',
-              default=30,
-              help='Send file timeout'),
+    cfg.IntOpt('timeout',
+               default=30,
+               help='Send file timeout'),
 ]
 
 one_opts = [
@@ -223,8 +224,14 @@ def delete():
 
 def send():
     CONF.register_cli_opts(one_opts)
+    CONF.register_cli_opts(timeout_opts)
     CONF.register_cli_opts(game_type_opts)
     CONF(project='cmd')
+    if not CONF.objtype:
+        print('\033[1;31;40m')
+        print 'Ojbtype is None, need objtype'
+        print('\033[0m')
+        sys.exit(1)
     timeout = CONF.timeout
     if not timeout:
         timeout = 30

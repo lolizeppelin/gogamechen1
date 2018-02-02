@@ -496,11 +496,11 @@ class PackageReuest(BaseContorller):
                     if qresult.get('resultcode') != manager_common.RESULT_SUCCESS:
                         return qresult
                     quote = qresult['data'][0]
-                    package.rversion = rversion
                     package.rquote_id = quote.get('quote_id')
                 # 修改资源引用
                 else:
                     cdnquote_controller.update(req, quote_id=package.rquote_id, body={'version': rversion})
+                package.rversion = rversion
             session.flush()
         notify.resource()
         return resultutils.results('Update package success')
@@ -720,7 +720,7 @@ class PackageFileReuest(BaseContorller):
                            'fail': dict(action=url, method='DELETE')}
                 uri = gopcdn_upload(req, resource_id, body,
                                     fileinfo=fileinfo, notify=_notify)
-        return resultutils.results('add package file  for %d success' % package_id,
+        return resultutils.results('add package file for %d success' % package_id,
                                    data=[dict(pfile_id=pfile.pfile_id, uri=uri)])
 
     def show(self, req, package_id, pfile_id, body=None):

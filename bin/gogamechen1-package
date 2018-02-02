@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# -*- encoding: utf-8 -*-
 import time
 import logging
 import sys
@@ -20,16 +21,21 @@ from gogamechen1.api.client import GogameChen1DBClient
 CONF = cfg.CONF
 
 timeout_opts = [
-    cfg.IPOpt('timeout',
-              default=30,
-              help='Send file/Upgrade timeout'),
+    cfg.IntOpt('timeout',
+               default=30,
+               help='Send file/Upgrade timeout'),
 ]
 
+group_opt = cfg.IntOpt('group_id',
+                       required=True,
+                       short='g',
+                       help='Package for game group')
+
+
 one_opts = [
-    cfg.IntOpt('group_id',
-               required=True,
-               help='Package for game group'),
+    group_opt,
     cfg.IntOpt('package_id',
+               short='p',
                required=True,
                help='Package id'),
 ]
@@ -50,7 +56,11 @@ sub_type_opts = [
 
 type_opts = game_type_opts + sub_type_opts
 
-create_opts = [
+create_package_opts = [
+
+]
+
+create_file_opts = [
     cfg.StrOpt('address',
                help='File download address, if None, mean upload from local'),
     cfg.StrOpt('file',
@@ -85,9 +95,9 @@ def all():
             print data
         print('\033[0m')
         sys.exit(1)
-    print('\033[1;32;40m')
+    print '\033[1;32;40m\r',
     print 'List all game packages success'
-    print('\033[0m')
+    print '\033[0m'
 
     file_heads = ['pfile_id', 'ftype', 'gversion', 'status', 'uptime', 'address']
 
@@ -95,9 +105,9 @@ def all():
         resource = package.get('resource')
         login = package.get('login')
         files = package.get('files')
-        print('\033[1;32;40m')
-        print '---------Pakcage Info---------'
-        print('\033[0m')
+        print '\033[1;32;40m\r',
+        print '---------Pakcage Info---------',
+        print '\033[0m'
         print 'package id: %s' % package.get('package_id')
         print 'package name: %s' % package.get('package_name')
         print 'mark: %s' % package.get('mark')
@@ -123,16 +133,16 @@ def all():
         if files:
             for _file in files:
                 tb.add_row([_file.get('pfile_id'), _file.get('ftype'), _file.get('gversion'),
-                            _file.get('status'), _file.get('rversion'),
-                            _file.get('uptime'), _file.get('address')])
+                            _file.get('status'), _file.get('uptime'), _file.get('address')])
         print tb.pformat()
 
 
 def list():
     CONF.register_cli_opts(index_opts)
+    CONF.register_cli_opt(group_opt)
     CONF(project='cmd')
     _client = client()
-    code, result, data = prepare_results(_client.package_index)
+    code, result, data = prepare_results(_client.package_index, CONF.group_id)
     if code:
         print('\033[1;31;40m')
         print 'Fail, code %d, result %s' % (code, result)
@@ -142,13 +152,15 @@ def list():
         sys.exit(1)
     package_heads = ['package_id', 'package_name', 'mark', 'group_id', 'rversion', 'resource_id',
                      'status', 'magic', 'extension']
-    print('\033[1;32;40m')
+    print '\033[1;32;40m\r',
     print 'List game packages success'
-    print('\033[0m')
+    print '\033[0m'
     tb = table.PleasantTable(ident=0, columns=package_heads, counter=True)
     for package in data:
         tb.add_row([package.get('package_id'), package.get('package_name'), package.get('mark'),
-                    package.get('group_id'), package.get('rversion'), package.get('resource_id')])
+                    package.get('group_id'), package.get('rversion'), package.get('resource_id'),
+                    package.get('status'), package.get('magic'), package.get('extension'),
+                    ])
     print tb.pformat()
 
 
@@ -177,8 +189,9 @@ def show():
     package = data[0]
     group = package.get('group')
     files = package.get('files')
-    print('\033[1;32;40m')
+    print '\033[1;32;40m\r',
     print 'Show package success'
+    print '\033[0m'
     print 'desc: %s' % package.get('desc')
     print 'package id: %s' % package.get('package_id')
     print 'package name: %s' % package.get('package_name')
@@ -204,7 +217,6 @@ def show():
         tb.add_row([pfile.get('ftype'), pfile.get('gversion'), pfile.get('address'),
                     pfile.get('uptime'), pfile.get('status'), pfile.get('desc')])
     print tb.pformat()
-    print('\033[0m')
 
 
 def delete():
@@ -261,6 +273,7 @@ def upgrade():
 def rversion():
     CONF.register_cli_opts(one_opts)
     CONF.register_cli_opts(version_opts)
+    CONF(project='cmd')
     _client = client()
     body = dict(rversion=CONF.rversion)
     code, result, data = prepare_results(_client.package_update, CONF.group_id, CONF.package_id, body=body)
