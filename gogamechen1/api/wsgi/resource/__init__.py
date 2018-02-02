@@ -391,13 +391,18 @@ class PackageReuest(BaseContorller):
         desc = body.get('desc')
         session = endpoint_session()
         with session.begin():
+            # 确认package_name没有相同
+            if model_count_with_key(session, Package.package_id,
+                                    filter=Package.package_name == package_name):
+                raise InvalidArgument('Package name Duplicate')
+            # 确认group
+            group_controller.show(req, group_id)
             # 确认cdn资源
             resource = resource_cache_map(resource_id)
             if resource.get('internal'):
                 raise InvalidArgument('Resource is internal resrouce')
-            # 确认group
-            group_controller.show(req, group_id)
-            # 基本资源引用
+            # 资源引用数量增加
+            cdnresource_controller.quote(req, resource_id)
             package = Package(resource_id=resource_id,
                               package_name=package_name,
                               group_id=group_id,
