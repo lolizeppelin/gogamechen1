@@ -1,17 +1,252 @@
 #!/usr/bin/python
 # -*- encoding: utf-8 -*-
 import logging
+import sys
+
 from simpleutil.config import cfg
+from simpleutil.utils import table
 
 from goperation.api.client.config import client_opts
+from goperation.api.client.config import index_opts
+from goperation.api.client import ManagerClient
 
-from gogamechen1.api import client
+from goperation.api.client.utils import prepare_results
+from goperation.api.client.utils import wait_finish
+from goperation.api.client.utils import p_asyncrequest
+
+from gopcdn.utils import build_fileinfo
+
+from gogamechen1 import common
+from gogamechen1.api.client import GogameChen1DBClient
+
+CONF = cfg.CONF
+
+timeout_opts = [
+    cfg.IntOpt('timeout',
+               default=30,
+               help='Send file/Upgrade/Uploade timeout'),
+]
+
+one_opts = [
+    cfg.IntOpt('group_id',
+               required=True,
+               short='g',
+               help='Package for game group')
+]
+
+game_type_opts = [
+    cfg.StrOpt('objtype',
+               short='o',
+               choices=['gamesvr', 'loginsvr', 'publicsvr'],
+               help='Game objtype objfile for')
+]
+
+sub_type_opts = [
+    cfg.StrOpt('subtype',
+               short='s',
+               choices=['datadb', 'logdb', 'appfile'],
+               help='Game subtype objfile for')
+]
+
+type_opts = game_type_opts + sub_type_opts
+
+create_opts = [
+    cfg.StrOpt('name',
+               short='n',
+               required=True,
+               help='Game group name'),
+    cfg.StrOpt('desc',
+               help='Game group description')
+]
+
+version_opts = [
+    cfg.IntOpt('package_id',
+               short='p',
+               required=True,
+               help='Package id'),
+    cfg.StrOpt('rversion',
+               required=True,
+               help='Cdn resource version'),
+]
+
+
+def client(session=None):
+    return GogameChen1DBClient(httpclient=ManagerClient(url=CONF.gcenter, port=CONF.gcenter_port,
+                                                        retries=CONF.retries, timeout=CONF.apitimeout,
+                                                        token=CONF.trusted, session=session))
+
+
+def list():
+    CONF.register_cli_opts(index_opts)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.groups_index)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    group_heads = ['id', 'name', 'lastarea', 'desc']
+    print '\033[1;32;40m\r',
+    print 'List game group success'
+    print '\033[0m'
+    tb = table.PleasantTable(ident=0, columns=group_heads, counter=True)
+    for package in data:
+        tb.add_row([package.get('group_id'), package.get('name'),
+                    package.get('lastarea'), package.get('desc')])
+    print tb.pformat()
+
+
+def create():
+    CONF.register_cli_opts(create_opts)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.groups_create, CONF.name, CONF.desc)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    print '\033[1;32;40m\r',
+    print 'Create game group success'
+    print '\033[0m'
+    group = data[0]
+    print 'group id: %s' % group.get('group_id')
+    print 'group name: %s' % group.get('name')
+    print 'lastarea: %s' % group.get('lastarea')
+
+
+def areas():
+    CONF.register_cli_opts(one_opts)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.group_areas, CONF.group_id)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    print '\033[1;32;40m\r',
+    print 'List all areas of group: %d success' % CONF.group_id
+    print '\033[0m'
+    area_heads = ['area_id', 'name', 'entity', 'port', 'dnsnames', 'external_ips', 'versions']
+    tb = table.PleasantTable(ident=8, columns=area_heads, counter=True)
+    for area in data:
+        tb.add_row([area.get('area_id'), area.get('name'), area.get('entity'), area.get('port'),
+                    ','.join(area.get('dnsnames')),
+                    ','.join(area.get('external_ips')), area.get('versions')])
+    print tb.pformat()
+
+
+def show():
+    CONF.register_cli_opts(one_opts)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.group_show, CONF.group_id, detail=True)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    group = data[0]
+    entitys = group.get('entitys')
+    print '\033[1;32;40m\r',
+    print 'Show package success'
+    print '\033[0m'
+    print 'group id: %s' % group.get('group_id')
+    print 'group name: %s' % group.get('name')
+    print 'lastarea: %s' % group.get('lastarea')
+    gm = entitys.get(common.GMSERVER)
+    if gm:
+        gm = gm[0]
+        print '{0:{fill}{align}{size}}'.format(common.GMSERVER,
+                                               fill='-', align="^", size=25)
+        print '%s entity: %d' % (common.GMSERVER, gm.get('entity'))
+    cross_s = entitys.get(common.CROSSSERVER)
+    if cross_s:
+        print '{0:{fill}{align}{size}}'.format(common.CROSSSERVER,
+                                               fill='-', align="^", size=25)
+        print '%s entitys: %s' % (common.CROSSSERVER, ','.join(map(str, cross_s)))
+    games = entitys.get(common.GMSERVER)
+    if games:
+        game_heads = ['entity', 'areas']
+        print '{0:{fill}{align}{size}}'.format(common.GMSERVER,
+                                               fill='-', align="^", size=25)
+        tb = table.PleasantTable(ident=0, columns=game_heads, counter=True)
+        print '%s entitys: %s' % (common.CROSSSERVER, ','.join(map(str, cross_s)))
+        for game in games:
+            tb.add_row([game.get('entity'), ','.join(map(str, game.get('areas')))])
+        print tb.pformat()
+
+
+def delete():
+    CONF.register_cli_opts(one_opts)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.group_delete, CONF.group_id)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    group = data[0]
+    print('\033[1;32;40m')
+    print 'Delete group success'
+    print 'group id: %s' % group.get('group_id')
+    print 'group name: %s' % group.get('name')
+    print 'lastarea: %s' % group.get('lastarea')
+    print('\033[0m')
+
+
+def chiefs():
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.group_chiefs, 'all', body=dict(cross=True))
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    chief_heads = ['group_id', 'entity', 'objtype', 'local_ip', 'ports', 'external_ips', 'dnsnames']
+    tb = table.PleasantTable(ident=0, columns=chief_heads, counter=True)
+    for chief in data:
+        tb.add_row([chief.get('group_id'), chief.get('entity'), chief.get('objtype'),
+                    chief.get('local_ip'),
+                    ','.join(map(str, chief.get('ports'))),
+                    ','.join(map(str, chief.get('external_ips'))),
+                    ','.join(map(str, chief.get('dnsnames'))),
+                    ])
+    print tb.pformat()
+
 
 
 def main():
+    FUNCS = ['list', 'create', 'areas', 'show', 'delete', 'chiefs']
+
+    try:
+        func = sys.argv.pop(1)
+        if func not in FUNCS:
+            raise ValueError
+    except (IndexError, ValueError):
+        print 'action is: %s' % '  '.join(FUNCS)
+        print 'use -h for help'
+        sys.exit(1)
+    func = eval(func)
     logging.basicConfig(level=logging.WARN)
-    conf = cfg.ConfigOpts()
-    conf()
+    CONF.register_cli_opts(client_opts)
+    func()
 
 
 if __name__ == '__main__':

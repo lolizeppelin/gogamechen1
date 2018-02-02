@@ -388,6 +388,10 @@ def upload():
     CONF(project='cmd')
 
     if not CONF.address:
+        if not CONF.file:
+            print('\033[1;31;40m')
+            print 'upload file path is None'
+            print('\033[0m')
         try:
             import websocket
         except ImportError:
@@ -397,13 +401,13 @@ def upload():
             sys.exit(1)
 
     _client = client()
-    fileinfo = build_fileinfo(CONF.file)
     timeout = CONF.timeout or 60
     body = dict(ftype=CONF.ftype, gversion=CONF.gversion, desc=CONF.desc,
                 timeout=timeout)
     if CONF.address:
         body.setdefault('address', CONF.address)
     else:
+        fileinfo = build_fileinfo(CONF.file)
         body.setdefault('fileinfo', fileinfo)
     code, result, data = prepare_results(_client.packagefile_create,
                                          CONF.package_id, body=body)

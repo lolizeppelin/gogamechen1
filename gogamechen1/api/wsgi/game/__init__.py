@@ -184,12 +184,14 @@ class GroupReuest(BaseContorller):
         query = model_query(session, Group, filter=Group.group_id == group_id)
         query = query.options(joinedload(Group.entitys, innerjoin=False))
         _group = query.one()
+        deleted = dict(group_id=_group.group_id, name=_group.name, lastarea=_group.lastarea)
         if _group.entitys:
             raise InvalidArgument('Group has entitys, can not be delete')
-        query.delete()
+        session.delete(_group)
+        session.flush()
         notify.areas(group_id)
         return resultutils.results(result='delete group success',
-                                   data=[dict(group_id=_group.group_id, name=_group.name)])
+                                   data=[deleted])
 
     def maps(self, req, group_id, body=None):
         body = body or {}
