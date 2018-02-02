@@ -399,7 +399,7 @@ def upload():
     _client = client()
     fileinfo = build_fileinfo(CONF.file)
     timeout = CONF.timeout or 60
-    body = dict(ftyp=CONF.ftype, gversion=CONF.gversion, desc=CONF.desc,
+    body = dict(ftype=CONF.ftype, gversion=CONF.gversion, desc=CONF.desc,
                 timeout=timeout)
     if CONF.address:
         body.setdefault('address', CONF.address)
@@ -415,7 +415,7 @@ def upload():
         print('\033[0m')
         sys.exit(1)
     info = data[0]
-    if not CONF.address:
+    if CONF.address:
         print '\033[1;32;40m\r',
         print 'Create package file success'
         print 'Pfile id  is %s' % info.get('pfile_id')
