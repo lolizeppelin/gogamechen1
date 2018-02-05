@@ -17,6 +17,9 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
     group_path = '/gogamechen1/groups/%s'
     group_path_ex = '/gogamechen1/groups/%s/%s'
 
+    agents_chioces_path = '/gogamechen1/agents'
+    databases_chioces_path = '/gogamechen1/databases'
+
     games_path = '/gogamechen1/group/%s/gamesvr/entitys'
     game_path = '/gogamechen1/group/%s/gamesvr/entitys/%s'
     game_path_ex = '/gogamechen1/group/%s/gamesvr/entitys/%s/%s'
@@ -174,6 +177,29 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='reset gogamechen1 %s.%d fail:%d' % (results['resultcode'],
                                                                                          objtype, entity),
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    # -----------chioces api-----------------
+    def agents_chioces(self, objtype, zone=None):
+        body = dict(objtype=objtype)
+        if zone:
+            body.setdefault('zone', zone)
+        resp, results = self.get(action=self.agents_chioces_path, body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='list agents chioces fail:%d' % results['resultcode'],
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def databases_chioces(self, objtype, zone=None):
+        body = dict(objtype=objtype)
+        if zone:
+            body.setdefault('zone', zone)
+        resp, results = self.get(action=self.databases_chioces_path, body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='list databases chioces fail:%d' % results['resultcode'],
                                             code=resp.status_code,
                                             resone=results['result'])
         return results

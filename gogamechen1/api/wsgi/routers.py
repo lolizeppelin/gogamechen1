@@ -99,6 +99,14 @@ class Routers(router.RoutersBase):
                    path='/%s/entitys' % common.NAME,
                    get_action='entitys')
 
+        self._add_resource(mapper, game_controller,
+                           path='/%s/databases' % common.NAME,
+                           get_action='databases')
+
+        self._add_resource(mapper, game_controller,
+                           path='/%s/agents' % common.NAME,
+                           get_action='agents')
+
         collection = mapper.collection(collection_name=collection_name,
                                        resource_name=resource_name,
                                        controller=game_controller,

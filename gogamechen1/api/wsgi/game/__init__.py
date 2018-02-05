@@ -335,6 +335,15 @@ class AppEntityReuest(BaseContorller):
                    'request_time': {'type': 'integer', 'description': '异步请求时间'}}
                }
 
+    @staticmethod
+    def _validate_databases(objtype, databases):
+        NEEDED = common.DBAFFINITYS[objtype].keys()
+        if set(NEEDED) != set(databases.keys()):
+            for subtype in NEEDED:
+                if subtype not in databases:
+                    raise InvalidArgument('database %s.%s not set')
+            raise ValueError('Databases not match database needed info')
+
     def _entityinfo(self, req, entity):
         entityinfo = entity_controller.show(req=req, entity=entity,
                                             endpoint=common.NAME, body={'ports': True})['data'][0]
@@ -366,8 +375,6 @@ class AppEntityReuest(BaseContorller):
 
     def _db_chioces(self, req, objtype, **kwargs):
         """返回排序好的可选数据库"""
-        if kwargs.get('databases'):
-            return kwargs.get('databases')
         zone = kwargs.get('zone', 'all')
         # 指定亲和性
         body = dict(affinitys=common.DBAFFINITYS[objtype].values(),
@@ -380,7 +387,9 @@ class AppEntityReuest(BaseContorller):
 
     def _dbselect(self, req, objtype, **kwargs):
         """数据库自动选择"""
-        _databases = dict()
+        _databases = kwargs.pop('databases', {})
+        if _databases:
+            return _databases
         chioces = self._db_chioces(req, objtype, **kwargs)
         if not chioces:
             raise InvalidArgument('Auto selete database fail')
@@ -401,13 +410,15 @@ class AppEntityReuest(BaseContorller):
         LOG.debug('Auto select agent %d' % chioces[0])
         return chioces[0]
 
-    def _validate_databases(self, objtype, databases):
-        NEEDED = common.DBAFFINITYS[objtype].keys()
-        if set(NEEDED) != set(databases.keys()):
-            for subtype in NEEDED:
-                if subtype not in databases:
-                    raise InvalidArgument('database %s.%s not set')
-            raise ValueError('Databases not match database needed info')
+    def databases(self, req, objtype, **kwargs):
+        chioces = self._db_chioces(req, objtype, **kwargs)
+        return resultutils.results(result='get databases  chioces success',
+                                   data=chioces)
+
+    def agents(self, req, objtype, **kwargs):
+        chioces = self._agent_chioces(req, objtype, **kwargs)
+        return resultutils.results(result='get agents chioces success',
+                                   data=chioces)
 
     def index(self, req, group_id, objtype, body=None):
         body = body or {}
@@ -536,6 +547,12 @@ class AppEntityReuest(BaseContorller):
                     return resultutils.results('Create entity fail, can not find GMSERVER: %s' % e.message,
                                                resultcode=manager_common.RESULT_ERROR)
                 if objtype == common.GAMESERVER:
+
+                    if model_count_with_key(session, GameArea,
+                                            filter=and_(GameArea.group_id == group_id,
+                                                        GameArea.area_id == next_area)):
+                        return resultutils.results('Create entity fail, next area id exist',
+                                                   resultcode=manager_common.RESULT_ERROR)
                     cross = None
                     # 游戏服务器需要在同组中找到cross实例
                     try:
@@ -580,7 +597,7 @@ class AppEntityReuest(BaseContorller):
                     maps = entity_controller.shows(endpoint=common.NAME, entitys=[gm.entity, cross.entity])
                     for v in six.itervalues(maps):
                         if v is None:
-                            raise InvalidArgument('Get chiefs info error, not online?')
+                            raise InvalidArgument('Get chiefs info error, agent not online?')
                     chiefs = dict()
                     chiefs.setdefault(common.CROSSSERVER,
                                       dict(entity=cross.entity,
