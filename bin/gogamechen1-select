@@ -1,0 +1,107 @@
+#!/usr/bin/python
+# -*- encoding: utf-8 -*-
+import logging
+import sys
+
+from simpleutil.config import cfg
+from simpleutil.utils import table
+
+from goperation.api.client.config import client_opts
+from goperation.api.client import ManagerClient
+
+from goperation.api.client.utils import prepare_results
+from gogamechen1.api.client import GogameChen1DBClient
+
+CONF = cfg.CONF
+
+objtype_opt = cfg.StrOpt('objtype',
+                         short='o',
+                         default='gamesvr',
+                         required=True,
+                         choices=['gamesvr', 'loginsvr', 'publicsvr'],
+                         help='Game objtype objfile for')
+
+subtype_opt = cfg.StrOpt('subtype',
+                         short='s',
+                         choices=['datadb', 'logdb', 'appfile'],
+                         help='Game subtype objfile for')
+
+zone_opt = cfg.StrOpt('zone',
+                      regex='^[a-z][a-z0-9]+$',
+                      help='Agent zone mark')
+
+
+def client(session=None):
+    return GogameChen1DBClient(httpclient=ManagerClient(url=CONF.gcenter, port=CONF.gcenter_port,
+                                                        retries=CONF.retries, timeout=CONF.apitimeout,
+                                                        token=CONF.trusted, session=session))
+
+
+def agents():
+    CONF.register_cli_opt(zone_opt)
+    CONF.register_cli_opt(objtype_opt)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.agents_chioces, CONF.objtype, CONF.zone)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    agents_head = ['index', 'agent id']
+    print '\033[1;32;40m\r',
+    print 'List %s agents chioces success' % CONF.objtype
+    print '\033[0m'
+    tb = table.PleasantTable(ident=0, columns=agents_head, counter=True)
+    for index, agent_id in enumerate(data):
+        tb.add_row([index + 1, agent_id])
+    print tb.pformat()
+
+
+def databases():
+    CONF.register_cli_opt(zone_opt)
+    CONF.register_cli_opt(objtype_opt)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.databases_chioces, CONF.objtype, CONF.zone)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    database_heads = ['affinity', 'database_id']
+    print '\033[1;32;40m\r',
+    print 'List %s databases chioces success' % CONF.objtype
+    for chioce in data:
+        print '\033[1;32;40m\raffinity: %d\033[0m' % chioce['affinity']
+        _databases = chioce.get('databases')
+        if _databases:
+            tb = table.PleasantTable(ident=8, columns=database_heads, counter=True)
+            for index, database_id in enumerate(_databases):
+                tb.add_row([index + 1, database_id])
+            print tb.pformat()
+
+
+def main():
+    FUNCS = ['agents', 'databases']
+
+    try:
+        func = sys.argv.pop(1)
+        if func not in FUNCS:
+            raise ValueError
+    except (IndexError, ValueError):
+        print 'action is: %s' % '  '.join(FUNCS)
+        print 'use -h for help'
+        sys.exit(1)
+    func = eval(func)
+    logging.basicConfig(level=logging.WARN)
+    CONF.register_cli_opts(client_opts)
+    func()
+
+
+if __name__ == '__main__':
+    main()
