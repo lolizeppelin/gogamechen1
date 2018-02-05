@@ -204,6 +204,17 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
+    # -----------appentity api-----------------
+    def appentity_index(self, group_id, body=None):
+        resp, results = self.get(action=self.games_path % str(group_id), body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='list gogamechen1 gameserver fail:%d' % results['resultcode'],
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+
+
     # -----------game server api-----------------
     def games_index(self, group_id, body=None):
         resp, results = self.get(action=self.games_path % str(group_id), body=body)

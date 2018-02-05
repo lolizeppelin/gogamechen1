@@ -11,10 +11,6 @@ from goperation.api.client.config import index_opts
 from goperation.api.client import ManagerClient
 
 from goperation.api.client.utils import prepare_results
-from goperation.api.client.utils import wait_finish
-from goperation.api.client.utils import p_asyncrequest
-
-from gopcdn.utils import build_fileinfo
 
 from gogamechen1 import common
 from gogamechen1.api.client import GogameChen1DBClient
@@ -68,6 +64,12 @@ version_opts = [
                required=True,
                help='Cdn resource version'),
 ]
+
+group_opts = cfg.StrOpt('group_id',
+                        default='all',
+                        short='g',
+                        help='Package for game group, 1,2,3 or 1-5, or all')
+
 
 
 def client(session=None):
@@ -217,9 +219,11 @@ def delete():
 
 
 def chiefs():
+    CONF.register_cli_opt(group_opts)
     CONF(project='cmd')
     _client = client()
-    code, result, data = prepare_results(_client.group_chiefs, 'all', body=dict(cross=True))
+    code, result, data = prepare_results(_client.group_chiefs,
+                                         CONF.group_id, body=dict(cross=True))
     if code:
         print('\033[1;31;40m')
         print 'Fail, code %d, result %s' % (code, result)

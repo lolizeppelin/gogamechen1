@@ -73,7 +73,7 @@ def databases():
             print data
         print('\033[0m')
         sys.exit(1)
-    database_heads = ['affinity', 'database_id']
+    database_heads = ['index', 'database_id']
     print '\033[1;32;40m\r',
     print 'List %s databases chioces success' % CONF.objtype
     print('\033[0m')
