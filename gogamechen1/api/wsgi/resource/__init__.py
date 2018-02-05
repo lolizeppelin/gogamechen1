@@ -358,17 +358,24 @@ class PackageReuest(BaseContorller):
 
     def resources(self, req, body=None):
         session = endpoint_session(readonly=True)
-        query = model_query(session, Package, filter=Package.status)
+        query = model_query(session, Package)
         packages = query.all()
         _resources = set()
+        maps = {}
         for package in packages:
+            try:
+                maps[package.resource_id].append(package)
+            except KeyError:
+                maps = [package, ]
             _resources.add(package.resource_id)
         map_resources(_resources)
 
         data = []
         for resource_id in _resources:
             resource = resource_cache_map(resource_id=resource_id)
-            data.append(dict(resource_id=resource.get('resource_id'),
+            data.append(dict(resource_id=resource_id,
+                             packages=[p.package_id for p in maps[resource_id]],
+                             groups=[p.group_id for p in maps[resource_id]],
                              etype=resource.get('etype'),
                              name=resource.get('name'),
                              versions=resource.get('versions')))
