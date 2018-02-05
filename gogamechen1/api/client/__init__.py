@@ -6,6 +6,8 @@ from gopcdn.api.client import GopCdnClient
 
 from goperation.manager import common
 
+from gogamechen1.common import GAMESERVER
+
 
 class GogameChen1DBClient(GopDBClient, GopCdnClient):
 
@@ -20,20 +22,12 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
     agents_chioces_path = '/gogamechen1/%s/agents'
     databases_chioces_path = '/gogamechen1/%s/databases'
 
-    games_path = '/gogamechen1/group/%s/gamesvr/entitys'
-    game_path = '/gogamechen1/group/%s/gamesvr/entitys/%s'
-    game_path_ex = '/gogamechen1/group/%s/gamesvr/entitys/%s/%s'
-
-    gms_path = '/gogamechen1/group/%s/loginsvr/entitys'
-    gm_path = '/gogamechen1/group/%s/loginsvr/entitys/%s'
-    gm_path_ex = '/gogamechen1/group/%s/loginsvr/entitys/%s/%s'
-
-    crosss_path = '/gogamechen1/group/%s/publicsvr/entitys'
-    cross_path = '/gogamechen1/group/%s/publicsvr/entitys/%s'
-    cross_path_ex = '/gogamechen1/group/%s/publicsvr/entitys/%s/%s'
+    appentitys_path = '/gogamechen1/group/%s/%s/entitys'
+    appentity_path = '/gogamechen1/group/%s/%s/entitys/%s'
+    appentity_path_ex = '/gogamechen1/group/%s/%s/entitys/%s/%s'
 
     bond_path = '/gogamechen1/entity/%s'
-    appentitys_path = '/gogamechen1/entitys'
+    appentitys_all_path = '/gogamechen1/entitys'
     reset_path = '/gogamechen1/group/%s/%s/entitys/%s/reset'
 
     all_packages_path = '/gogamechen1/packages'
@@ -164,7 +158,7 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
         return results
 
     def appentitys(self, entitys):
-        resp, results = self.get(action=self.appentitys_path, body=dict(entitys=entitys),
+        resp, results = self.get(action=self.appentitys_all_path, body=dict(entitys=entitys),
                                  timeout=15)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='get gogamechen1 entitys fail:%d' % results['resultcode'],
@@ -205,180 +199,132 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
         return results
 
     # -----------appentity api-----------------
-    def appentity_index(self, group_id, body=None):
-        resp, results = self.get(action=self.games_path % str(group_id), body=body)
+    def appentitys_index(self, group_id, objtype, body=None):
+        resp, results = self.get(action=self.appentitys_path % (str(group_id), objtype), body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='list gogamechen1 gameserver fail:%d' % results['resultcode'],
+            raise ServerExecuteRequestError(message='list %s fail:%d' % (objtype, results['resultcode']),
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
 
-
-
-    # -----------game server api-----------------
-    def games_index(self, group_id, body=None):
-        resp, results = self.get(action=self.games_path % str(group_id), body=body)
+    def appentitys_create(self, group_id, objtype, body=None):
+        resp, results = self.post(action=self.appentitys_path % (str(group_id), objtype), body=body,
+                                  timeout=30)
         if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='list gogamechen1 gameserver fail:%d' % results['resultcode'],
+            raise ServerExecuteRequestError(message='create %s fail:%d' % (objtype, results['resultcode']),
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
 
-    def games_create(self, group_id, body=None):
-        resp, results = self.post(action=self.games_path % str(group_id), body=body, timeout=15)
-        if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='create gogamechen1 gameserver fail:%d' % results['resultcode'],
-                                            code=resp.status_code,
-                                            resone=results['result'])
-        return results
-
-    def game_show(self, group_id, entity, detail=False):
-        resp, results = self.get(action=self.game_path % (str(group_id), str(entity)),
+    def appentity_show(self, group_id, objtype, entity, detail=False):
+        resp, results = self.get(action=self.appentity_path % (str(group_id), objtype, str(entity)),
                                  body=dict(detail=detail))
         if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='show gogamechen1 gameserver fail:%d' % results['resultcode'],
+            raise ServerExecuteRequestError(message='show %s fail:%d' % (objtype, results['resultcode']),
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
 
-    def game_update(self, group_id, entity, detail=False):
-        raise NotImplementedError
-
-    def game_delete(self, group_id, entity, clean='unquote'):
-        resp, results = self.delete(action=self.game_path % (str(group_id), str(entity)),
-                                    body=dict(clean=clean))
-        if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='delete gogamechen1 gameserver fail:%d' % results['resultcode'],
-                                            code=resp.status_code,
-                                            resone=results['result'])
-        return results
-
-    def game_start(self, group_id, entitys, body=None):
-        resp, results = self.post(action=self.game_path_ex % (str(group_id), str(entitys), 'start'), body=body)
-        if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='start gogamechen1 gameserver fail:%d' % results['resultcode'],
-                                            code=resp.status_code,
-                                            resone=results['result'])
-        return results
-
-    def game_stop(self, group_id, entitys, body=None):
-        resp, results = self.post(action=self.game_path_ex % (str(group_id), str(entitys), 'stop'), body=body)
-        if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='start gogamechen1 gameserver fail:%d' % results['resultcode'],
-                                            code=resp.status_code,
-                                            resone=results['result'])
-        return results
-
-    def game_status(self, group_id, entitys, body=None):
-        resp, results = self.get(action=self.game_path_ex % (str(group_id), str(entitys), 'status'), body=body)
-        if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='start gogamechen1 gameserver fail:%d' % results['resultcode'],
-                                            code=resp.status_code,
-                                            resone=results['result'])
-        return results
-
-    def game_upgrade(self, group_id, entitys, body=None):
-        resp, results = self.post(action=self.game_path_ex % (str(group_id), str(entitys), 'upgrade'), body=body)
-        if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='upgrade gogamechen1 gameserver fail:%d' % results['resultcode'],
-                                            code=resp.status_code,
-                                            resone=results['result'])
-        return results
-
-    def game_flushconfig(self, group_id, entitys, body=None):
-        resp, results = self.put(action=self.game_path_ex % (str(group_id), str(entitys), 'flushconfig'),
+    def appentity_update(self, group_id, objtype, entity, body):
+        resp, results = self.put(action=self.appentity_path % (str(group_id), objtype, str(entity)),
                                  body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(
-                message='flushconfig gogamechen1 gameserver fail:%d' % results['resultcode'],
-                code=resp.status_code,
-                resone=results['result'])
-        return results
-
-
-    # -----------gm server api-----------------
-    def gms_index(self, group_id, body=None):
-        resp, results = self.get(action=self.gms_path % str(group_id), body=body)
-        if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='list gogamechen1 gmserver fail:%d' % results['resultcode'],
+            raise ServerExecuteRequestError(message='update %s fail:%d' % (objtype, results['resultcode']),
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
 
-    def gms_create(self, group_id, body=None):
-        resp, results = self.post(action=self.gms_path % str(group_id), body=body, timeout=15)
+    def appentity_delete(self, group_id, objtype, entity, body=None):
+        resp, results = self.delete(action=self.appentity_path % (str(group_id), objtype, str(entity)),
+                                    body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='create gogamechen1 gmserver fail:%d' % results['resultcode'],
+            raise ServerExecuteRequestError(message='delete %s fail:%d' % (objtype, results['resultcode']),
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
 
-    def gm_show(self, group_id, entity, detail=False):
-        resp, results = self.get(action=self.gm_path % (str(group_id), str(entity)),
-                                 body=dict(detail=detail))
+    def appentity_clean(self, group_id, objtype, entity, body=None):
+        resp, results = self.delete(action=self.appentity_path_ex % (str(group_id), objtype,
+                                                                     str(entity), 'clean'),
+                                    body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='show gogamechen1 gmserver fail:%d' % results['resultcode'],
+            raise ServerExecuteRequestError(message='clean %s fail:%d' % (objtype, results['resultcode']),
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
 
-    def gm_update(self, group_id, entity, detail=False):
-        raise NotImplementedError
-
-    def gm_delete(self, group_id, entity, clean='unquote'):
-        resp, results = self.delete(action=self.gm_path % (str(group_id), str(entity)),
-                                    body=dict(clean=clean))
+    def appentity_start(self, group_id, objtype, entity, body=None):
+        resp, results = self.post(action=self.appentity_path_ex % (str(group_id), objtype, str(entity), 'start'),
+                                  body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='delete gogamechen1 gmserver fail:%d' % results['resultcode'],
+            raise ServerExecuteRequestError(message='start %s fail:%d' % (objtype, results['resultcode']),
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
 
-    def gm_flushconfig(self, group_id, entity, body=None):
-        resp, results = self.put(action=self.gm_path_ex % (str(group_id), str(entity), 'flushconfig'),
-                                 body=body)
+    def appentity_stop(self, group_id, objtype, entity, body=None):
+        resp, results = self.post(action=self.appentity_path_ex % (str(group_id), objtype, str(entity), 'start'),
+                                  body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(
-                message='flushconfig gogamechen1 gameserver fail:%d' % results['resultcode'],
-                code=resp.status_code,
-                resone=results['result'])
-        return results
-
-
-    # -----------cross server api-----------------
-    def crosss_index(self, group_id, body=None):
-        resp, results = self.get(action=self.crosss_path % str(group_id), body=body)
-        if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='list gogamechen1 gmserver fail:%d' % results['resultcode'],
+            raise ServerExecuteRequestError(message='stop %s fail:%d' % (objtype, results['resultcode']),
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
 
-    def crosss_create(self, group_id, body=None):
-        resp, results = self.post(action=self.crosss_path % str(group_id), body=body, timeout=15)
+    def appentity_status(self, group_id, objtype, entity, body=None):
+        resp, results = self.post(action=self.appentity_path_ex % (str(group_id), objtype, str(entity), 'status'),
+                                  body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='create gogamechen1 gmserver fail:%d' % results['resultcode'],
+            raise ServerExecuteRequestError(message='status %s fail:%d' % (objtype, results['resultcode']),
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
 
-    def cross_show(self, group_id, entity, detail=False):
-        resp, results = self.get(action=self.cross_path % (str(group_id), str(entity)),
-                                 body=dict(detail=detail))
+    def appentity_upgrade(self, group_id, objtype, entity, body=None):
+        resp, results = self.post(action=self.appentity_path_ex % (str(group_id), objtype, str(entity), 'upgrade'),
+                                  body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='show gogamechen1 gmserver fail:%d' % results['resultcode'],
+            raise ServerExecuteRequestError(message='upgrade %s fail:%d' % (objtype, results['resultcode']),
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
 
-    def cross_update(self, group_id, entity, detail=False):
-        raise NotImplementedError
-
-    def cross_delete(self, group_id, entity, clean='unquote'):
-        resp, results = self.delete(action=self.cross_path % (str(group_id), str(entity)),
-                                    body=dict(clean=clean))
+    def appentity_flushconfig(self, group_id, objtype, entity, body=None):
+        resp, results = self.post(action=self.appentity_path_ex % (str(group_id), objtype,
+                                                                   str(entity), 'flushconfig'),
+                                  body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='delete gogamechen1 gmserver fail:%d' % results['resultcode'],
+            raise ServerExecuteRequestError(message='flushconfig %s fail:%d' % (objtype, results['resultcode']),
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def appentity_reset(self, group_id, objtype, entity, body=None):
+        resp, results = self.post(action=self.appentity_path_ex % (str(group_id), objtype,
+                                                                   str(entity), 'reset'),
+                                  body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='reset %s fail:%d' % (objtype, results['resultcode']),
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def appentity_hotfix(self, group_id, objtype, entity, body=None):
+        resp, results = self.post(action=self.appentity_path_ex % (str(group_id), objtype,
+                                                                   str(entity), 'hotfix'),
+                                  body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='hotfix %s fail:%d' % (objtype, results['resultcode']),
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def game_opentime(self, group_id, entity, opentime):
+        resp, results = self.put(action=self.appentity_path_ex % (str(group_id), GAMESERVER,
+                                                                  str(entity), 'opentime'),
+                                 body=dict(opentime=opentime))
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='reset %s fail:%d' % (GAMESERVER, results['resultcode']),
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
