@@ -410,13 +410,15 @@ class AppEntityReuest(BaseContorller):
         LOG.debug('Auto select agent %d' % chioces[0])
         return chioces[0]
 
-    def databases(self, req, objtype, **kwargs):
-        chioces = self._db_chioces(req, objtype, **kwargs)
+    def databases(self, req, objtype, body=None):
+        body = body or {}
+        chioces = self._db_chioces(req, objtype, **body)
         return resultutils.results(result='get databases  chioces success',
                                    data=chioces)
 
-    def agents(self, req, objtype, **kwargs):
-        chioces = self._agent_chioces(req, objtype, **kwargs)
+    def agents(self, req, objtype, body=None):
+        body = body or {}
+        chioces = self._agent_chioces(req, objtype, **body)
         return resultutils.results(result='get agents chioces success',
                                    data=chioces)
 

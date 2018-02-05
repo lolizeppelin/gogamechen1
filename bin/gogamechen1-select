@@ -76,6 +76,7 @@ def databases():
     database_heads = ['affinity', 'database_id']
     print '\033[1;32;40m\r',
     print 'List %s databases chioces success' % CONF.objtype
+    print('\033[0m')
     for chioce in data:
         print '\033[1;32;40m\raffinity: %d\033[0m' % chioce['affinity']
         _databases = chioce.get('databases')

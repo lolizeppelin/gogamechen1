@@ -100,11 +100,11 @@ class Routers(router.RoutersBase):
                    get_action='entitys')
 
         self._add_resource(mapper, game_controller,
-                           path='/%s/databases' % common.NAME,
+                           path='/%s/{objtype}/databases' % common.NAME,
                            get_action='databases')
 
         self._add_resource(mapper, game_controller,
-                           path='/%s/agents' % common.NAME,
+                           path='/%s/{objtype}/agents' % common.NAME,
                            get_action='agents')
 
         collection = mapper.collection(collection_name=collection_name,

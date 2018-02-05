@@ -17,8 +17,8 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
     group_path = '/gogamechen1/groups/%s'
     group_path_ex = '/gogamechen1/groups/%s/%s'
 
-    agents_chioces_path = '/gogamechen1/agents'
-    databases_chioces_path = '/gogamechen1/databases'
+    agents_chioces_path = '/gogamechen1/%s/agents'
+    databases_chioces_path = '/gogamechen1/%s/databases'
 
     games_path = '/gogamechen1/group/%s/gamesvr/entitys'
     game_path = '/gogamechen1/group/%s/gamesvr/entitys/%s'
@@ -183,10 +183,10 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
 
     # -----------chioces api-----------------
     def agents_chioces(self, objtype, zone=None):
-        body = dict(objtype=objtype)
+        body = None
         if zone:
-            body.setdefault('zone', zone)
-        resp, results = self.get(action=self.agents_chioces_path, body=body)
+            body = dict(zone=zone)
+        resp, results = self.get(action=self.agents_chioces_path % objtype, body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='list agents chioces fail:%d' % results['resultcode'],
                                             code=resp.status_code,
@@ -194,10 +194,10 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
         return results
 
     def databases_chioces(self, objtype, zone=None):
-        body = dict(objtype=objtype)
+        body = None
         if zone:
-            body.setdefault('zone', zone)
-        resp, results = self.get(action=self.databases_chioces_path, body=body)
+            body = dict(zone=zone)
+        resp, results = self.get(action=self.databases_chioces_path % objtype, body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='list databases chioces fail:%d' % results['resultcode'],
                                             code=resp.status_code,
