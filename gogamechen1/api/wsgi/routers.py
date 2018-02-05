@@ -36,6 +36,9 @@ class Routers(router.RoutersBase):
         self._add_resource(mapper, package_controller,
                            path='/%s/packages' % common.NAME,
                            get_action='packages')
+        self._add_resource(mapper, package_controller,
+                           path='/%s/resources' % common.NAME,
+                           get_action='resources')
         collection = mapper.collection(collection_name=collection_name,
                                        resource_name=resource_name,
                                        controller=package_controller,
@@ -114,6 +117,7 @@ class Routers(router.RoutersBase):
                                        member_prefix='/{entity}',
                                        collection_actions=COLLECTION_ACTIONS,
                                        member_actions=MEMBER_ACTIONS)
+        collection.member.link('clean', method='DELETE')
         collection.member.link('reset', method='POST')
         collection.member.link('start', method='POST')
         collection.member.link('stop', method='POST')

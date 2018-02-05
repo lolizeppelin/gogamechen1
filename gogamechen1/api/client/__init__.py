@@ -31,6 +31,7 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
     reset_path = '/gogamechen1/group/%s/%s/entitys/%s/reset'
 
     all_packages_path = '/gogamechen1/packages'
+    all_resources_path = '/gogamechen1/resources'
     packages_path = '/gogamechen1/group/%s/packages'
     package_path = '/gogamechen1/group/%s/packages/%s'
     package_path_ex = '/gogamechen1/group/%s/packages/%s/%s'
@@ -243,10 +244,11 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
-    def appentity_clean(self, group_id, objtype, entity, body=None):
+    def appentity_clean(self, group_id, objtype, entity, delete=False):
+        action = 'delete' if delete else 'unquote'
         resp, results = self.delete(action=self.appentity_path_ex % (str(group_id), objtype,
                                                                      str(entity), 'clean'),
-                                    body=body)
+                                    body=dict(clean=action))
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='clean %s fail:%d' % (objtype, results['resultcode']),
                                             code=resp.status_code,
@@ -334,6 +336,14 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
         resp, results = self.get(action=self.all_packages_path)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='list all package fail',
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def package_resource_all(self):
+        resp, results = self.get(action=self.all_resources_path)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='list all package resource fail',
                                             code=resp.status_code,
                                             resone=results['result'])
         return results

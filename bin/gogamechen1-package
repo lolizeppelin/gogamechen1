@@ -6,6 +6,7 @@ import sys
 
 from simpleutil.config import cfg
 from simpleutil.utils import table
+from simpleutil.utils import timeutils
 
 from goperation.api.client.config import client_opts
 from goperation.api.client.config import index_opts
@@ -162,6 +163,36 @@ def all():
                 tb.add_row([_file.get('pfile_id'), _file.get('ftype'), _file.get('gversion'),
                             _file.get('status'), _file.get('uptime'), _file.get('address')])
         print tb.pformat()
+
+
+def resources():
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.package_resource_all)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    print '\033[1;32;40m\r',
+    print 'List all game packages resource success'
+    print '\033[0m'
+
+    resource_heads = ['resource_id', 'etype', 'name']
+    version_heads = ['version_id', 'version', 'time']
+    for resource in data:
+        versions = resource.get('versions')
+        tb = table.PleasantTable(ident=0, columns=resource_heads, counter=True)
+        tb.add_row([resource.get('resource_id'), resource.get('etype'), resource.get('name')])
+        print tb.pformat()
+        if versions:
+            tb = table.PleasantTable(ident=0, columns=version_heads, counter=True)
+            for version in versions:
+                tb.add_row([version.get('version_id'), version.get('version'),
+                            timeutils.unix_to_iso(version.get('vtime'))])
+            print tb.pformat()
 
 
 def list():

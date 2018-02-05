@@ -120,11 +120,13 @@ class Application(AppEndpointBase):
                 objtype = entityinfo.get('objtype')
                 group_id = entityinfo.get('group_id')
                 areas = entityinfo.get('areas')
+                status = entityinfo.get('status')
                 opentime= entityinfo.get('opentime')
                 if _entity in self.konwn_appentitys:
                     raise RuntimeError('App Entity %d Duplicate' % _entity)
                 LOG.info('Entity %d type %s, group %d' % (_entity, objtype, group_id))
                 self.konwn_appentitys.setdefault(_entity, dict(objtype=objtype, group_id=group_id,
+                                                               status=status,
                                                                areas=areas, opentime=opentime,
                                                                pid=None))
         # find entity pid
@@ -359,6 +361,22 @@ class Application(AppEndpointBase):
             os.kill(p.pid, sig)
             eventlet.sleep(1)
 
+    def rpc_stoped(self, ctxt, entity, **kwargs):
+        timeout = count_timeout(ctxt, kwargs)
+        with self.lock(entity, timeout):
+            if entity not in set(self.entitys):
+                return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                                  resultcode=manager_common.RESULT_ERROR,
+                                                  ctxt=ctxt, result='entity not exist')
+            if self._entity_process(entity):
+                return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                                  ctxt=ctxt,
+                                                  resultcode=manager_common.RESULT_ERROR,
+                                                  result='running')
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              ctxt=ctxt,
+                                              resultcode=manager_common.RESULT_SUCCESS)
+
     def rpc_create_entity(self, ctxt, entity, **kwargs):
         timeout = count_timeout(ctxt, kwargs)
         chiefs = kwargs.pop('chiefs', None)
@@ -413,11 +431,15 @@ class Application(AppEndpointBase):
 
     def rpc_post_create_entity(self, ctxt, entity, **kwargs):
         LOG.info('Get post create command with %s' % str(kwargs))
-        self.konwn_appentitys.setdefault(entity, dict(objtype=kwargs.pop('objtype'),
-                                                      group_id=kwargs.pop('group_id'),
-                                                      areas=kwargs.pop('areas'),
-                                                      opentime=kwargs.pop('opentime'),
-                                                      pid=None))
+        try:
+            self.konwn_appentitys.setdefault(entity, dict(objtype=kwargs.pop('objtype'),
+                                                          group_id=kwargs.pop('group_id'),
+                                                          status=kwargs.pop('status'),
+                                                          areas=kwargs.pop('areas'),
+                                                          opentime=kwargs.pop('opentime'),
+                                                          pid=None))
+        except KeyError:
+            LOG.error('Fail setdefault for entity by KeyError')
 
     def rpc_reset_entity(self, ctxt, entity, appfile,
                          databases, chiefs, **kwargs):
@@ -551,8 +573,13 @@ class Application(AppEndpointBase):
                 LOG.exception('Start entity %d fail' % target_id)
 
         for entity in entitys:
-            eventlet.spawn_n(safe_wapper, entity)
-
+            status = self.konwn_appentitys[entity].get('status')
+            if status == common.OK:
+                eventlet.spawn_n(safe_wapper, entity)
+            else:
+                details.append(dict(detail_id=entity,
+                                    resultcode=manager_common.RESULT_ERROR,
+                                    result='start entity %d fail, status %s' % str(status)))
         while len(details) < len(entitys):
             eventlet.sleep(0.5)
             if int(time.time()) > overtime:

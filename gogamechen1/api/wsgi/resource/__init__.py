@@ -356,6 +356,25 @@ class PackageReuest(BaseContorller):
             data.append(info)
         return resultutils.results(result='list packages success', data=data)
 
+    def resources(self, req, body=None):
+        session = endpoint_session(readonly=True)
+        query = model_query(session, Package, filter=Package.status)
+        packages = query.all()
+        _resources = set()
+        for package in packages:
+            _resources.add(package.resource_id)
+        map_resources(_resources)
+
+        data = []
+        for resource_id in _resources:
+            resource = resource_cache_map(resource_id=resource_id)
+            data.append(dict(resource_id=resource.get('resource_id'),
+                             etype=resource.get('etype'),
+                             name=resource.get('name'),
+                             versions=resource.get('versions')))
+
+        return resultutils.results(result='list packages success', data=data)
+
     def index(self, req, group_id, body=None):
         body = body or {}
         group_id = int(group_id)

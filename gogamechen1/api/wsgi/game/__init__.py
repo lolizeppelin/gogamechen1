@@ -416,6 +416,44 @@ class AppEntityReuest(BaseContorller):
         return resultutils.results(result='get databases  chioces success',
                                    data=chioces)
 
+    def bondto(self, req, entity, body=None):
+        """本地记录数据库绑定信息"""
+        body = body or {}
+        entity = int(entity)
+        databases = body.pop('databases')
+        session = endpoint_session()
+        with session.begin():
+            for subtype, database in six.iteritems(databases):
+                LOG.info('Bond entity %d to database %d' % (entity, database.get('database_id')))
+                session.add(AreaDatabase(quote_id=database.get('quote_id'),
+                                         database_id=database.get('database_id'),
+                                         entity=entity, subtype=subtype,
+                                         host=database.get('host'), port=database.get('port'),
+                                         user=database.get('user'), passwd=database.get('passwd'),
+                                         ro_user=database.get('ro_user'), ro_passwd=database.get('ro_passwd'),
+                                         character_set=database.get('character_set')
+                                         )
+                            )
+                session.flush()
+        return resultutils.results(result='bond entity %d database success' % entity)
+
+    def entitys(self, req, body=None):
+        """批量查询entitys信息接口,内部接口agent启动的时调用"""
+        entitys = body.get('entitys')
+        if not entitys:
+            return resultutils.results(result='not any app entitys found')
+        entitys = argutils.map_to_int(entitys)
+        session = endpoint_session(readonly=True)
+        query = model_query(session, AppEntity, filter=AppEntity.entity.in_(entitys))
+        query = query.options(joinedload(AppEntity.areas, innerjoin=False))
+        return resultutils.results(result='get app entitys success',
+                                   data=[dict(entity=_entity.entity,
+                                              group_id=_entity.group_id,
+                                              status=_entity.status,
+                                              opentime=_entity.opentime,
+                                              areas=[area.area_id for area in _entity.areas],
+                                              objtype=_entity.objtype) for _entity in query])
+
     def agents(self, req, objtype, body=None):
         body = body or {}
         chioces = self._agent_chioces(req, objtype, **body)
@@ -654,6 +692,7 @@ class AppEntityReuest(BaseContorller):
 
             threadpool.add_thread(entity_controller.post_create_entity,
                                   _entity.get('entity'), common.NAME, objtype=objtype,
+                                  status=common.UNACTIVE,
                                   opentime=opentime,
                                   group_id=group_id, areas=[next_area, ])
             notify.areas(group_id)
@@ -810,6 +849,116 @@ class AppEntityReuest(BaseContorller):
                                    data=[dict(entity=entity, objtype=objtype,
                                               ports=ports, metadata=metadata)])
 
+    def clean(self, req, group_id, objtype, entity, body=None):
+        body = body or {}
+        action = body.pop('clean', 'unquote')
+        if action not in ('delete', 'unquote'):
+            raise InvalidArgument('clean option value error')
+        group_id = int(group_id)
+        entity = int(entity)
+        session = endpoint_session()
+        glock = get_gamelock()
+        metadata, ports = self._entityinfo(req=req, entity=entity)
+        if not metadata:
+            raise InvalidArgument('Agent offline, can not delete entity')
+        query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
+        query = query.options(joinedload(AppEntity.databases, innerjoin=False))
+        _entity = query.one()
+        with glock.grouplock(group=group_id):
+            target = targetutils.target_agent_by_string(metadata.get('agent_type'),
+                                                        metadata.get('host'))
+            target.namespace = common.NAME
+            rpc = get_client()
+            finishtime, timeout = rpcfinishtime()
+            with session.begin():
+                rpc_ret = rpc.call(target, ctxt={'finishtime': finishtime},
+                                   msg={'method': 'stoped', 'args': dict(entity=entity)})
+            if not rpc_ret:
+                raise RpcResultError('check entity is stoped result is None')
+            if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
+                raise RpcResultError('check entity is stoped fail, running')
+
+            with session.begin():
+                if _entity.status == common.DELETED:
+                    raise InvalidArgument('Entity status is not DELETED, '
+                                          'mark status to DELETED before delete it')
+                if _entity.objtype != objtype:
+                    raise InvalidArgument('Objtype not match')
+                if _entity.group_id != group_id:
+                    raise InvalidArgument('Group id not match')
+                if objtype == common.GMSERVER:
+                    if model_count_with_key(session, AppEntity, filter=AppEntity.group_id == group_id) > 1:
+                        raise InvalidArgument('You must delete other objtype entity before delete gm')
+                elif objtype == common.CROSSSERVER:
+                    if model_count_with_key(session, AppEntity, filter=AppEntity.cross_id == _entity.entity):
+                        raise InvalidArgument('Cross server are reflected')
+
+                # esure database delete
+                if action == 'delete':
+                    LOG.warning('Clean option is delete, can not rollback when fail')
+                    for _database in _entity.databases:
+                        schema = '%s_%s_%s_%d' % (common.NAME, objtype, _database.subtype, entity)
+                        quotes = schema_controller.show(req=req, database_id=_database.database_id,
+                                                        schema=schema,
+                                                        body={'quotes': True})['data'][0]['quotes']
+                        if set(quotes) != set([_database.quote_id]):
+                            result = 'delete %s:%d fail' % (objtype, entity)
+                            reason = ': database [%d].%s quote: %s' % (_database.database_id, schema, str(quotes))
+                            return resultutils.results(result=(result + reason))
+                        LOG.info('Delete quotes check success for %s' % schema)
+                # clean database
+                rollbacks = []
+                for _database in _entity.databases:
+                    schema = '%s_%s_%s_%d' % (common.NAME, objtype, _database.subtype, entity)
+                    if action == 'delete':
+                        LOG.warning('Delete schema %s from %d' % (schema, _database.database_id))
+                        try:
+                            schema_controller.delete(req=req, database_id=_database.database_id,
+                                                     schema=schema, body={'unquotes': [_database.quote_id]})
+                        except Exception:
+                            LOG.error('Delete %s from %d fail' % (schema, _database.database_id))
+                            if LOG.isEnabledFor(logging.DEBUG):
+                                LOG.exception('Delete schema fail')
+                    elif action == 'unquote':
+                        LOG.info('Try unquote %d' % _database.quote_id)
+                        try:
+                            quote = schema_controller.unquote(req=req, quote_id=_database.quote_id)['data'][0]
+                            if quote.get('database_id') != _database.database_id:
+                                LOG.critical('quote %d with database %d, not %d' % (_database.quote_id,
+                                                                                    quote.get('database_id'),
+                                                                                    _database.database_id))
+                                raise RuntimeError('Data error, quote database not the same')
+                            rollbacks.append(dict(database_id=_database.database_id,
+                                                  quote_id=_database.quote_id, schema=schema))
+                        except Exception:
+                            LOG.error('Unquote %d fail, try rollback' % _database.quote_id)
+                token = uuidutils.generate_uuid()
+                LOG.info('Send delete command with token %s' % token)
+                try:
+                    entity_controller.delete(req, common.NAME, entity=entity, body=dict(token=token))
+                except Exception as e:
+                    # roll back unquote
+                    def _rollback():
+                        for back in rollbacks:
+                            __database_id = back.get('database_id')
+                            __schema = back.get('schema')
+                            __quote_id = back.get('quote_id')
+                            rbody = dict(quote_id=__quote_id, entity=entity)
+                            rbody.setdefault(dbcommon.ENDPOINTKEY, common.NAME)
+                            try:
+                                schema_controller.bond(req, database_id=__database_id, schema=__schema, body=rbody)
+                            except Exception:
+                                LOG.error('rollback entity %d quote %d.%s.%d fail' %
+                                          (entity, __database_id, schema, __quote_id))
+
+                    threadpool.add_thread(_rollback)
+                    raise e
+                query.delete()
+        notify.areas(group_id)
+        return resultutils.results(result='delete %s:%d success' % (objtype, entity),
+                                   data=[dict(entity=entity, objtype=objtype,
+                                              ports=ports, metadata=metadata)])
+
     def opentime(self, req, group_id, objtype, entity, body=None):
         """修改开服时间接口"""
         body = body or {}
@@ -828,17 +977,14 @@ class AppEntityReuest(BaseContorller):
                 raise InvalidArgument('Entity is not %s' % objtype)
             if _entity.group_id != group_id:
                 raise InvalidArgument('Entity group %d not match  %d' % (_entity.group_id, group_id))
-            entityinfo = entity_controller.show(req=req, entity=entity,
-                                                endpoint=common.NAME, body={'ports': False})['data'][0]
-            agent_id = entityinfo['agent_id']
-            metadata = entityinfo['metadata']
+            metadata, ports = self._entityinfo(req=req, entity=entity)
             target = targetutils.target_agent_by_string(metadata.get('agent_type'),
                                                         metadata.get('host'))
             target.namespace = common.NAME
             rpc = get_client()
             finishtime, timeout = rpcfinishtime()
             with session.begin():
-                rpc_ret = rpc.call(target, ctxt={'finishtime': finishtime, 'agents': [agent_id, ]},
+                rpc_ret = rpc.call(target, ctxt={'finishtime': finishtime},
                                    msg={'method': 'opentime_entity',
                                         'args': dict(entity=entity, opentime=opentime)},
                                    timeout=timeout)
@@ -848,43 +994,6 @@ class AppEntityReuest(BaseContorller):
             if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
                 raise RpcResultError('change entity opentime fail %s' % rpc_ret.get('result'))
         return resultutils.results(result='change entity opentime' % entity)
-
-    def bondto(self, req, entity, body=None):
-        """本地记录数据库绑定信息"""
-        body = body or {}
-        entity = int(entity)
-        databases = body.pop('databases')
-        session = endpoint_session()
-        with session.begin():
-            for subtype, database in six.iteritems(databases):
-                LOG.info('Bond entity %d to database %d' % (entity, database.get('database_id')))
-                session.add(AreaDatabase(quote_id=database.get('quote_id'),
-                                         database_id=database.get('database_id'),
-                                         entity=entity, subtype=subtype,
-                                         host=database.get('host'), port=database.get('port'),
-                                         user=database.get('user'), passwd=database.get('passwd'),
-                                         ro_user=database.get('ro_user'), ro_passwd=database.get('ro_passwd'),
-                                         character_set=database.get('character_set')
-                                         )
-                            )
-                session.flush()
-        return resultutils.results(result='bond entity %d database success' % entity)
-
-    def entitys(self, req, body=None):
-        """批量查询entitys信息接口,内部接口agent启动的时调用"""
-        entitys = body.get('entitys')
-        if not entitys:
-            return resultutils.results(result='not any app entitys found')
-        entitys = argutils.map_to_int(entitys)
-        session = endpoint_session(readonly=True)
-        query = model_query(session, AppEntity, filter=AppEntity.entity.in_(entitys))
-        query = query.options(joinedload(AppEntity.areas, innerjoin=False))
-        return resultutils.results(result='get app entitys success',
-                                   data=[dict(entity=_entity.entity,
-                                              group_id=_entity.group_id,
-                                              opentime=_entity.opentime,
-                                              areas=[area.area_id for area in _entity.areas],
-                                              objtype=_entity.objtype) for _entity in query])
 
     def _async_bluck_rpc(self, action, group_id, objtype, entity, body):
         caller = inspect.stack()[0][3]
