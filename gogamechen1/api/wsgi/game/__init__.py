@@ -342,8 +342,8 @@ class AppEntityReuest(BaseContorller):
         metadata = entityinfo['metadata']
         return metadata, ports
 
-    def _agentselect(self, req, objtype, **kwargs):
-        """服务器自动选择"""
+    def _agent_chioces(self, req, objtype, **kwargs):
+        """返回排序好的可选服务器列表"""
         if kwargs.get('agent_id'):
             return kwargs.get('agent_id')
         zone = kwargs.get('zone', 'all')
@@ -361,14 +361,11 @@ class AppEntityReuest(BaseContorller):
             {'free': 200},
             {'left': 500},
             {'process': None}]
-        agents = self.chioces(common.NAME, includes=includes, weighters=weighters)
-        if not agents:
-            raise InvalidArgument('Auto select agent fail')
-        LOG.debug('Auto select agent %d' % agents[0])
-        return agents[0]
+        chioces = self.chioces(common.NAME, includes=includes, weighters=weighters)
+        return chioces
 
-    def _dbselect(self, req, objtype, **kwargs):
-        """数据库自动选择"""
+    def _db_chioces(self, req, objtype, **kwargs):
+        """返回排序好的可选数据库"""
         if kwargs.get('databases'):
             return kwargs.get('databases')
         zone = kwargs.get('zone', 'all')
@@ -377,9 +374,14 @@ class AppEntityReuest(BaseContorller):
                     dbtype='mysql', zone=zone)
         # 默认使用本地数据库
         impl = kwargs.pop('impl', 'local')
-        _databases = dict()
         # 返回排序好的可选数据库
         chioces = database_controller.select(req, impl, body)['data']
+        return chioces
+
+    def _dbselect(self, req, objtype, **kwargs):
+        """数据库自动选择"""
+        _databases = dict()
+        chioces = self._db_chioces(req, objtype, **kwargs)
         if not chioces:
             raise InvalidArgument('Auto selete database fail')
         for subtype in common.DBAFFINITYS[objtype].keys():
@@ -391,6 +393,13 @@ class AppEntityReuest(BaseContorller):
                     LOG.debug('Auto select %s.%s database %d' % (objtype, subtype, databases[0]))
                     break
         return _databases
+
+    def _agentselect(self, req, objtype, **kwargs):
+        chioces = self._agent_chioces(req, objtype, **kwargs)
+        if not chioces:
+            raise InvalidArgument('Auto select agent fail')
+        LOG.debug('Auto select agent %d' % chioces[0])
+        return chioces[0]
 
     def _validate_databases(self, objtype, databases):
         NEEDED = common.DBAFFINITYS[objtype].keys()
@@ -499,27 +508,32 @@ class AppEntityReuest(BaseContorller):
         with glock.arealock(group_id, next_area):
             typemap = {}
             for _entity in _group.entitys:
+                # 跳过未激活的实体
+                if _entity.status != common.OK:
+                    continue
                 try:
                     typemap[_entity.objtype].append(_entity)
                 except KeyError:
                     typemap[_entity.objtype] = [_entity, ]
             # 前置实体
             chiefs = None
-            # 来源文件
-            # base = None
             # 相同类型的实例列表
             same_type_entitys = typemap.get(objtype, [])
             if objtype == common.GMSERVER:
                 # GM服务不允许相同实例
-                if same_type_entitys:
-                    return resultutils.results('create entity fail, %s duplicate in group' % objtype,
-                                               resultcode=manager_common.RESULT_ERROR)
+                # if same_type_entitys:
+                #     return resultutils.results('create entity fail, %s duplicate in group' % objtype,
+                #                                resultcode=manager_common.RESULT_ERROR)
+                for _entity in _group.entitys:
+                    if _entity.objtype == common.GMSERVER:
+                        return resultutils.results('create entity fail, %s duplicate in group' % objtype,
+                                                   resultcode=manager_common.RESULT_ERROR)
             else:
                 # 非gm实体添加需要先找到同组的gm
                 try:
                     gm = typemap[common.GMSERVER][0]
                 except KeyError as e:
-                    return resultutils.results('create entity fail, can not find my chief: %s' % e.message,
+                    return resultutils.results('Create entity fail, can not find GMSERVER: %s' % e.message,
                                                resultcode=manager_common.RESULT_ERROR)
                 if objtype == common.GAMESERVER:
                     cross = None
@@ -695,20 +709,11 @@ class AppEntityReuest(BaseContorller):
         query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
         query = query.options(joinedload(AppEntity.databases, innerjoin=False))
         _entity = query.one()
-
-        # 移除资源绑定,这里后续出错也不需要回滚
-        # if _entity.rquote_id:
-        #     version_id = cdnquote_controller.delete(req,
-        #                                             quote_id=_entity.rquote_id)['data'][0].get('version_id')
-        #     LOG.info('Remove cdnresource quote of version id %d' % version_id)
-        #     _entity.rversion = None
-        #     _entity.rquote_id = 0
-        #     session.flush()
-
         with glock.grouplock(group=group_id):
             with session.begin():
-                if _entity.status == common.OK:
-                    raise InvalidArgument('Entity is active, unactive before delete it')
+                if _entity.status == common.DELETED:
+                    raise InvalidArgument('Entity status is not DELETED, '
+                                          'mark status to DELETED before delete it')
                 if _entity.objtype != objtype:
                     raise InvalidArgument('Objtype not match')
                 if _entity.group_id != group_id:

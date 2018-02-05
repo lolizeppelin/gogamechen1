@@ -14,6 +14,7 @@ APPFILE = 'appfile'
 
 UNACTIVE = -1
 OK = 0
+DELETED = -2
 
 APPAFFINITYS = {GAMESERVER: 1, CROSSSERVER: 2, GMSERVER: 4}
 #    map app affinitys by bitwise operation
