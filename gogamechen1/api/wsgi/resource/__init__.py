@@ -296,7 +296,7 @@ class PackageReuest(BaseContorller):
         'properties':
             {
                 'magic': {'type': 'object'},
-                'extension': {'type': 'extension'},
+                'extension': {'type': 'object'},
                 'desc': {'type': 'string'},
                 'version': {'type': 'string'},
                 'status': {'type': 'integer', 'enum': [common.ENABLE, common.DISABLE]}
@@ -497,7 +497,7 @@ class PackageReuest(BaseContorller):
             if rversion:
                 # 没有引用过默认version,添加资源引用
                 if not package.rquote_id:
-                    qresult = cdnresource_controller.vquote(req, resource_id=Package.resource_id,
+                    qresult = cdnresource_controller.vquote(req, resource_id=package.resource_id,
                                                             body=dict(version=rversion))
                     if qresult.get('resultcode') != manager_common.RESULT_SUCCESS:
                         return qresult
