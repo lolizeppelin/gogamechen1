@@ -692,15 +692,19 @@ class Application(AppEndpointBase):
         details = []
         for entity in entitys:
             objtype = self._objtype(entity)
+            if objtype == common.GAMESERVER:
+                prefix = ','.join(map(str, self.konwn_appentitys[entity].get('areas')))
+            else:
+                prefix = '%s entity %d' % (objtype, entity)
             p = self._entity_process(entity, proc_snapshot)
             if p:
                 details.append(dict(detail_id=entity,
                                     resultcode=manager_common.RESULT_SUCCESS,
-                                    result='%s entity %d is running' % (objtype, entity)))
+                                    result='%s running' % prefix))
             else:
                 details.append(dict(detail_id=entity,
                                     resultcode=manager_common.RESULT_SUCCESS,
-                                    result='%s entity %d not running' % (objtype, entity)))
+                                    result='%s not running' % prefix))
 
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           ctxt=ctxt,

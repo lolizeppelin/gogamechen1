@@ -7,6 +7,7 @@ import sys
 from simpleutil.config import cfg
 from simpleutil.config import types
 from simpleutil.utils import table
+from simpleutil.utils import timeutils
 
 from goperation.manager import common as manager_common
 from goperation.api.client.config import client_opts
@@ -102,6 +103,10 @@ areas_opt = cfg.ListOpt('areas',
                         item_type=types.String(regex=manager_common.ENABLEIDS),
                         help='Target areas id list, value like 1-2,3,4,5, all means all')
 
+stop_opt = cfg.BoolOpt('kill',
+                       default=False,
+                       help='Stop process with kill options when call stop')
+
 
 def _objtype():
     _opt = objtype_opt
@@ -130,11 +135,11 @@ def client(session=None):
 
 def list():
     CONF.register_cli_opts(index_opts)
-    CONF.register_cli_opts(group_opt)
-    CONF.register_cli_opts(objtype_opt)
+    CONF.register_cli_opt(group_opt)
+    CONF.register_cli_opt(objtype_opt)
     CONF(project='cmd')
     _client = client()
-    code, result, data = prepare_results(_client.games_index)
+    code, result, data = prepare_results(_client.appentitys_index, CONF.group_id, CONF.objtype)
     if code:
         print('\033[1;31;40m')
         print 'Fail, code %d, result %s' % (code, result)
@@ -142,14 +147,21 @@ def list():
             print data
         print('\033[0m')
         sys.exit(1)
-    group_heads = ['id', 'name', 'lastarea', 'desc']
+    entity_heads = ['group_id', 'entity', 'agent_id', 'status', 'objtype']
+    if CONF.objtype == common.GAMESERVER:
+        entity_heads.append('opentime')
     print '\033[1;32;40m\r',
-    print 'List game group success'
+    print 'List %s entitys success' % CONF.objtype
+    print 'status DELETED:-2  UNACTIVE:-1  ACTIVE:0',
     print '\033[0m'
-    tb = table.PleasantTable(ident=0, columns=group_heads, counter=True)
-    for package in data:
-        tb.add_row([package.get('group_id'), package.get('name'),
-                    package.get('lastarea'), package.get('desc')])
+    tb = table.PleasantTable(ident=0, columns=entity_heads, counter=True)
+    for appentity in data:
+        row = [appentity.get('group_id'), appentity.get('entity'), appentity.get('agent_id'),
+               appentity.get('status'), appentity.get('objtype')
+               ]
+        if CONF.objtype == common.GAMESERVER:
+            row.append(timeutils.unix_to_iso(appentity.get('opentime')))
+        tb.add_row(row)
     print tb.pformat()
 
 
@@ -228,8 +240,10 @@ def show():
     print 'local_ip: %s' % metadata.get('local_ip')
     print 'external_ips: %s' % str(metadata.get('external_ips'))
     if appentity.get('objtype') == common.GAMESERVER:
-        print 'areas: %s' % ','.join(map(str, appentity.get('areas')))
         print 'versions: %s' % str(appentity.get('versions'))
+        print '--------------areas  info--------------'
+        for area in appentity.get('areas'):
+            print 'area id: %d | areaname: %s' % (area['area_id'], area['areaname'])
     print '-------------database info-------------'
     for database in appentity.get('databases'):
         print 'subtype: %s' % database.get('subtype')
@@ -240,6 +254,7 @@ def show():
         print 'ro_passwd: %s' % database.get('ro_passwd')
         print 'database id: %d' % database.get('database_id')
         print 'quote id: %d' % database.get('quote_id')
+        print '---------------------------------------'
 
 
 def delete():
@@ -267,9 +282,13 @@ def async(action):
         CONF.register_cli_opt(group_opt)
         CONF.register_cli_opt(objtype_opt)
         CONF.register_cli_opt(areas_opt)
-        target = CONF.areas
     else:
         CONF.register_cli_opts(one_opts)
+    if action == 'stop':
+        CONF.register_cli_opt(stop_opt)
+    if objtype == common.GAMESERVER:
+        target = ','.join(CONF.areas)
+    else:
         target = CONF.entity
     CONF(project='cmd')
     _client = client()
@@ -282,7 +301,10 @@ def async(action):
     now = int(time.time())
     body = dict(request_time=now,
                 finishtime=now + timeout)
-    code, result, data = prepare_results(_client.appentity_delete,
+    if action == 'stop':
+        if CONF.kill:
+            body.setdefault('kill', CONF.kill)
+    code, result, data = prepare_results(_func,
                                          CONF.group_id, CONF.objtype, target, body=body)
     asyncrequest = data[0]
     request_id = asyncrequest.get('request_id')
@@ -297,6 +319,21 @@ def async(action):
         sys.exit(1)
     p_asyncrequest(_client, request_id=request_id, details=True)
 
+
+def start():
+    async('start')
+
+
+def stop():
+    async('stop')
+
+
+def status():
+    async('status')
+
+
+def flushconfig():
+    async('flushconfig')
 
 
 def main():

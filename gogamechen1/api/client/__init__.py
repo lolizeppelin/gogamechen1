@@ -274,8 +274,8 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
         return results
 
     def appentity_status(self, group_id, objtype, entity, body=None):
-        resp, results = self.post(action=self.appentity_path_ex % (str(group_id), objtype, str(entity), 'status'),
-                                  body=body)
+        resp, results = self.get(action=self.appentity_path_ex % (str(group_id), objtype, str(entity), 'status'),
+                                 body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='status %s fail:%d' % (objtype, results['resultcode']),
                                             code=resp.status_code,
