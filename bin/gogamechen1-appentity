@@ -1,11 +1,14 @@
 #!/usr/bin/python
 # -*- encoding: utf-8 -*-
 import logging
+import time
 import sys
 
 from simpleutil.config import cfg
+from simpleutil.config import types
 from simpleutil.utils import table
 
+from goperation.manager import common as manager_common
 from goperation.api.client.config import client_opts
 from goperation.api.client.config import index_opts
 from goperation.api.client import ManagerClient
@@ -13,8 +16,6 @@ from goperation.api.client import ManagerClient
 from goperation.api.client.utils import prepare_results
 from goperation.api.client.utils import wait_finish
 from goperation.api.client.utils import p_asyncrequest
-
-from gopcdn.utils import build_fileinfo
 
 from gogamechen1 import common
 from gogamechen1.api.client import GogameChen1DBClient
@@ -45,7 +46,80 @@ subtype_opt = cfg.StrOpt('subtype',
                          choices=['datadb', 'logdb', 'appfile'],
                          help='Game subtype objfile for')
 
+agent_opt = cfg.IntOpt('agent',
+                       short='a',
+                       min=1,
+                       help='Game install agent, if not set, auto select'
+                       )
+
+zone_opt = cfg.StrOpt('zone',
+                      default='all',
+                      regex='^[a-z][a-z0-9]+$',
+                      help='Agent zone mark defalut all')
+
+appfile_opt = cfg.StrOpt('appfile',
+                         required=True,
+                         short='f',
+                         help='Game appfile file uuid')
+
+datadb_opt = cfg.IntOpt('datadb',
+                        short='d',
+                        min=1,
+                        help='Game data database id')
+
+opentime_opt = cfg.IntOpt('opentime',
+                          required=True,
+                          default=int(time.time()),
+                          short='t',
+                          help='Game server opentime time')
+
+area_name_opt = cfg.StrOpt('name',
+                           required=True,
+                           short='n',
+                           help='Game server area name')
+
+logdb_opt = cfg.IntOpt('logdb',
+                       short='l',
+                       min=1,
+                       help='Game log database id')
+
+cross_opt = cfg.IntOpt('cross',
+                       short='c',
+                       help='Game server cross id, if not set auto select')
+
+
 one_opts = [group_opt, objtype_opt, entity_opt]
+
+create_opts = [group_opt, objtype_opt,
+               agent_opt, zone_opt,
+               appfile_opt,
+               datadb_opt]
+
+gamesvr_create_opt = [area_name_opt, logdb_opt, area_name_opt, opentime_opt]
+
+areas_opt = cfg.ListOpt('areas',
+                        required=True,
+                        item_type=types.String(regex=manager_common.ENABLEIDS),
+                        help='Target areas id list, value like 1-2,3,4,5, all means all')
+
+
+def _objtype():
+    _opt = objtype_opt
+    prefixs = ['--%s' % _opt.name]
+    if _opt.short:
+        prefixs.append('-%s' % _opt.short)
+    choices = _opt.type.choices
+    index = 0
+    for i, arg in enumerate(sys.argv):
+        if arg in prefixs:
+            index = i + 1
+    if not index:
+        objtype = _opt.default
+    else:
+        objtype = sys.argv[index]
+    if choices and objtype not in choices:
+        raise ValueError('objtype value not in %s' % str(choices))
+    return objtype
 
 
 def client(session=None):
@@ -80,10 +154,38 @@ def list():
 
 
 def create():
+    objtype = _objtype()
     CONF.register_cli_opts(create_opts)
+    if objtype == common.GAMESERVER:
+        CONF.register_cli_opts(gamesvr_create_opt)
+
     CONF(project='cmd')
     _client = client()
-    code, result, data = prepare_results(_client.groups_create, CONF.name, CONF.desc)
+
+    databases = dict()
+    body = dict(appfile=CONF.appfile)
+
+    if CONF.agent_id:
+        body.setdefault('agent_id', CONF.agent)
+
+    if CONF.zone:
+        body.setdefault('zone', CONF.zone)
+
+    if CONF.datadb:
+        databases.setdefault('datadb', CONF.datadb)
+
+    if objtype == common.GAMESERVER:
+        body.setdefault('areaname', CONF.name)
+        body.setdefault('opentime', CONF.opentime)
+        if CONF.cross:
+            body.setdefault('cross_id', CONF.cross)
+        if CONF.logdb:
+            databases.setdefault('logdb', CONF.logdb)
+
+    if databases:
+        body.setdefault('database', databases)
+
+    code, result, data = prepare_results(_client.appentitys_create, CONF.group_id, CONF.objtype, body)
     if code:
         print('\033[1;31;40m')
         print 'Fail, code %d, result %s' % (code, result)
@@ -92,7 +194,7 @@ def create():
         print('\033[0m')
         sys.exit(1)
     print '\033[1;32;40m\r',
-    print 'Create game group success'
+    print 'Create %s entity success' % objtype
     print '\033[0m'
     group = data[0]
     print 'group id: %s' % group.get('group_id')
@@ -104,7 +206,7 @@ def show():
     CONF.register_cli_opts(one_opts)
     CONF(project='cmd')
     _client = client()
-    code, result, data = prepare_results(_client.group_show, CONF.group_id, detail=True)
+    code, result, data = prepare_results(_client.appentity_show, CONF.group_id, CONF.objtype, CONF.entity)
     if code:
         print('\033[1;31;40m')
         print 'Fail, code %d, result %s' % (code, result)
@@ -112,50 +214,39 @@ def show():
             print data
         print('\033[0m')
         sys.exit(1)
-    group = data[0]
-    entitys = group.get('entitys')
+    appentity = data[0]
+    metadata = appentity.get('metadata')
     print '\033[1;32;40m\r',
     print 'Show package success'
+    print 'status DELETED:-2  UNACTIVE:-1  ACTIVE:0',
     print '\033[0m'
-    print 'group id: %s' % group.get('group_id')
-    print 'group name: %s' % group.get('name')
-    print 'lastarea: %s' % group.get('lastarea')
-    gm = entitys.get(common.GMSERVER)
-    if gm:
-        gm = gm[0]
-        print '\033[1;32;40m\r',
-        print '{0:{fill}{align}{size}}'.format(common.GMSERVER,
-                                               fill='-', align="^", size=25)
-        print '\033[0m'
-        print '%s entity: %d' % (common.GMSERVER, gm.get('entity'))
-    cross_s = entitys.get(common.CROSSSERVER)
-    if cross_s:
-        print '\033[1;32;40m\r',
-        print '{0:{fill}{align}{size}}'.format(common.CROSSSERVER,
-                                               fill='-', align="^", size=25)
-        print '\033[0m'
-        _entitys = []
-        for c in cross_s:
-            _entitys.append(c.get('entity'))
-        print '%s entitys: %s' % (common.CROSSSERVER, ','.join(map(str, cross_s)))
-    games = entitys.get(common.GAMESERVER)
-    if games:
-        game_heads = ['entity', 'areas']
-        print '\033[1;32;40m\r',
-        print '{0:{fill}{align}{size}}'.format(common.GAMESERVER,
-                                               fill='-', align="^", size=25)
-        print '\033[0m'
-        tb = table.PleasantTable(ident=0, columns=game_heads, counter=True)
-        for game in games:
-            tb.add_row([game.get('entity'), ','.join(map(str, game.get('areas')))])
-        print tb.pformat()
+    print 'status: %d' % appentity.get('status')
+    print 'group id: %s' % appentity.get('group_id')
+    print 'objtype: %s' % appentity.get('objtype')
+    print 'entity: %d' % appentity.get('entity')
+    print 'ports: %s' % ','.join(map(str, appentity.get('ports')))
+    print 'local_ip: %s' % metadata.get('local_ip')
+    print 'external_ips: %s' % str(metadata.get('external_ips'))
+    if appentity.get('objtype') == common.GAMESERVER:
+        print 'areas: %s' % ','.join(map(str, appentity.get('areas')))
+        print 'versions: %s' % str(appentity.get('versions'))
+    print '-------------database info-------------'
+    for database in appentity.get('databases'):
+        print 'subtype: %s' % database.get('subtype')
+        print 'schema: %s' % database.get('schema')
+        print 'host: %s' % database.get('host')
+        print 'port: %d' % database.get('port')
+        print 'ro_user: %s' % database.get('ro_user')
+        print 'ro_passwd: %s' % database.get('ro_passwd')
+        print 'database id: %d' % database.get('database_id')
+        print 'quote id: %d' % database.get('quote_id')
 
 
 def delete():
     CONF.register_cli_opts(one_opts)
     CONF(project='cmd')
     _client = client()
-    code, result, data = prepare_results(_client.group_delete, CONF.group_id)
+    code, result, data = prepare_results(_client.appentity_delete, CONF.group_id, CONF.objtype, CONF.entity)
     if code:
         print('\033[1;31;40m')
         print 'Fail, code %d, result %s' % (code, result)
@@ -163,42 +254,54 @@ def delete():
             print data
         print('\033[0m')
         sys.exit(1)
-    group = data[0]
+    appentity = data[0]
     print('\033[1;32;40m')
-    print 'Delete group success'
-    print 'group id: %s' % group.get('group_id')
-    print 'group name: %s' % group.get('name')
-    print 'lastarea: %s' % group.get('lastarea')
+    print 'Delete entity success'
     print('\033[0m')
 
 
-def chiefs():
+def async(action):
+    objtype = _objtype()
+    CONF.register_cli_opt(timeout_opt)
+    if objtype == common.GAMESERVER:
+        CONF.register_cli_opt(group_opt)
+        CONF.register_cli_opt(objtype_opt)
+        CONF.register_cli_opt(areas_opt)
+        target = CONF.areas
+    else:
+        CONF.register_cli_opts(one_opts)
+        target = CONF.entity
     CONF(project='cmd')
     _client = client()
-    code, result, data = prepare_results(_client.group_chiefs, 'all', body=dict(cross=True))
-    if code:
+    _func = getattr(_client, 'appentity_%s' % action)
+    if not _func:
+        raise AttributeError
+    timeout = CONF.timeout
+    if not timeout:
+        timeout = 30
+    now = int(time.time())
+    body = dict(request_time=now,
+                finishtime=now + timeout)
+    code, result, data = prepare_results(_client.appentity_delete,
+                                         CONF.group_id, CONF.objtype, target, body=body)
+    asyncrequest = data[0]
+    request_id = asyncrequest.get('request_id')
+    sleep = asyncrequest.get('finishtime') - now
+    dead = asyncrequest.get('deadline') - now
+    print '%s % request %s has been sended' % (objtype, action, request_id)
+    print 'Result will respon after %d, dead after %d' % (sleep, dead)
+    if not wait_finish(_client, asyncrequest):
         print('\033[1;31;40m')
-        print 'Fail, code %d, result %s' % (code, result)
-        if data:
-            print data
+        print 'Async request not finish after deadline'
         print('\033[0m')
         sys.exit(1)
-    chief_heads = ['group_id', 'entity', 'objtype', 'local_ip', 'ports', 'external_ips', 'dnsnames']
-    tb = table.PleasantTable(ident=0, columns=chief_heads, counter=True)
-    for chief in data:
-        tb.add_row([chief.get('group_id'), chief.get('entity'), chief.get('objtype'),
-                    chief.get('local_ip'),
-                    ','.join(map(str, chief.get('ports'))),
-                    ','.join(map(str, chief.get('external_ips'))),
-                    ','.join(map(str, chief.get('dnsnames'))),
-                    ])
-    print tb.pformat()
+    p_asyncrequest(_client, request_id=request_id, details=True)
 
 
 
 def main():
-    FUNCS = ['list', 'create', 'areas', 'show', 'delete', 'chiefs']
-
+    FUNCS = ['list', 'create', 'show', 'delete',
+             'start', 'stop', 'status', 'flushconfig']
     try:
         func = sys.argv.pop(1)
         if func not in FUNCS:

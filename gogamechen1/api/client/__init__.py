@@ -217,9 +217,9 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
-    def appentity_show(self, group_id, objtype, entity, detail=False):
+    def appentity_show(self, group_id, objtype, entity, body=None):
         resp, results = self.get(action=self.appentity_path % (str(group_id), objtype, str(entity)),
-                                 body=dict(detail=detail))
+                                 body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='show %s fail:%d' % (objtype, results['resultcode']),
                                             code=resp.status_code,

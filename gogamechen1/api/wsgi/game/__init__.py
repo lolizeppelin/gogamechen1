@@ -388,8 +388,11 @@ class AppEntityReuest(BaseContorller):
     def _dbselect(self, req, objtype, **kwargs):
         """数据库自动选择"""
         _databases = kwargs.pop('databases', {})
-        if _databases:
+        try:
+            self._validate_databases(objtype, _databases)
             return _databases
+        except ValueError:
+            pass
         chioces = self._db_chioces(req, objtype, **kwargs)
         if not chioces:
             raise InvalidArgument('Auto selete database fail')
@@ -534,6 +537,7 @@ class AppEntityReuest(BaseContorller):
         cross_id = body.pop('cross_id', None)
         # 开服时间, gameserver专用
         opentime = body.pop('opentime', None)
+        # 区服显示民称, gameserver专用
         areaname = body.pop('areaname', None)
         if objtype == common.GAMESERVER:
             if not areaname or not opentime:
@@ -753,101 +757,7 @@ class AppEntityReuest(BaseContorller):
         pass
 
     def delete(self, req, group_id, objtype, entity, body=None):
-        body = body or {}
-        clean = body.pop('clean', 'unquote')
-        if clean not in ('delete', 'unquote'):
-            raise InvalidArgument('clean option value error')
-        group_id = int(group_id)
-        entity = int(entity)
-        session = endpoint_session()
-        glock = get_gamelock()
-        metadata, ports = self._entityinfo(req=req, entity=entity)
-        if not metadata:
-            raise InvalidArgument('Agent offline, can not delete entity')
-        query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
-        query = query.options(joinedload(AppEntity.databases, innerjoin=False))
-        _entity = query.one()
-        with glock.grouplock(group=group_id):
-            with session.begin():
-                if _entity.status == common.DELETED:
-                    raise InvalidArgument('Entity status is not DELETED, '
-                                          'mark status to DELETED before delete it')
-                if _entity.objtype != objtype:
-                    raise InvalidArgument('Objtype not match')
-                if _entity.group_id != group_id:
-                    raise InvalidArgument('Group id not match')
-                if objtype == common.GMSERVER:
-                    if model_count_with_key(session, AppEntity, filter=AppEntity.group_id == group_id) > 1:
-                        raise InvalidArgument('You must delete other objtype entity before delete gm')
-                elif objtype == common.CROSSSERVER:
-                    if model_count_with_key(session, AppEntity, filter=AppEntity.cross_id == _entity.entity):
-                        raise InvalidArgument('Cross server are reflected')
-
-                # esure database delete
-                if clean == 'delete':
-                    LOG.warning('Clean option is delete, can not rollback when fail')
-                    for _database in _entity.databases:
-                        schema = '%s_%s_%s_%d' % (common.NAME, objtype, _database.subtype, entity)
-                        quotes = schema_controller.show(req=req, database_id=_database.database_id,
-                                                        schema=schema,
-                                                        body={'quotes': True})['data'][0]['quotes']
-                        if set(quotes) != set([_database.quote_id]):
-                            result = 'delete %s:%d fail' % (objtype, entity)
-                            reason = ': database [%d].%s quote: %s' % (_database.database_id, schema, str(quotes))
-                            return resultutils.results(result=(result + reason))
-                        LOG.info('Delete quotes check success for %s' % schema)
-                # clean database
-                rollbacks = []
-                for _database in _entity.databases:
-                    schema = '%s_%s_%s_%d' % (common.NAME, objtype, _database.subtype, entity)
-                    if clean == 'delete':
-                        LOG.warning('Delete schema %s from %d' % (schema, _database.database_id))
-                        try:
-                            schema_controller.delete(req=req, database_id=_database.database_id,
-                                                     schema=schema, body={'unquotes': [_database.quote_id]})
-                        except Exception:
-                            LOG.error('Delete %s from %d fail' % (schema, _database.database_id))
-                            if LOG.isEnabledFor(logging.DEBUG):
-                                LOG.exception('Delete schema fail')
-                    elif clean == 'unquote':
-                        LOG.info('Try unquote %d' % _database.quote_id)
-                        try:
-                            quote = schema_controller.unquote(req=req, quote_id=_database.quote_id)['data'][0]
-                            if quote.get('database_id') != _database.database_id:
-                                LOG.critical('quote %d with database %d, not %d' % (_database.quote_id,
-                                                                                    quote.get('database_id'),
-                                                                                    _database.database_id))
-                                raise RuntimeError('Data error, quote database not the same')
-                            rollbacks.append(dict(database_id=_database.database_id,
-                                                  quote_id=_database.quote_id, schema=schema))
-                        except Exception:
-                            LOG.error('Unquote %d fail, try rollback' % _database.quote_id)
-                token = uuidutils.generate_uuid()
-                LOG.info('Send delete command with token %s' % token)
-                try:
-                    entity_controller.delete(req, common.NAME, entity=entity, body=dict(token=token))
-                except Exception as e:
-                    # roll back unquote
-                    def _rollback():
-                        for back in rollbacks:
-                            __database_id = back.get('database_id')
-                            __schema = back.get('schema')
-                            __quote_id = back.get('quote_id')
-                            rbody = dict(quote_id=__quote_id, entity=entity)
-                            rbody.setdefault(dbcommon.ENDPOINTKEY, common.NAME)
-                            try:
-                                schema_controller.bond(req, database_id=__database_id, schema=__schema, body=rbody)
-                            except Exception:
-                                LOG.error('rollback entity %d quote %d.%s.%d fail' %
-                                          (entity, __database_id, schema, __quote_id))
-
-                    threadpool.add_thread(_rollback)
-                    raise e
-                query.delete()
-        notify.areas(group_id)
-        return resultutils.results(result='delete %s:%d success' % (objtype, entity),
-                                   data=[dict(entity=entity, objtype=objtype,
-                                              ports=ports, metadata=metadata)])
+        raise NotImplementedError
 
     def clean(self, req, group_id, objtype, entity, body=None):
         body = body or {}
@@ -1102,7 +1012,8 @@ class AppEntityReuest(BaseContorller):
                                                 AppEntity.objtype == common.GMSERVER))
                 gm = query.one()
                 # query = model_query(session, (AppEntity.cross_id, func.count(AppEntity.cross_id)),
-                #                     filter=and_(AppEntity.group_id == group_id, AppEntity.objtype == common.GMSERVER))
+                #                     filter=and_(AppEntity.group_id == group_id,
+                #                                 AppEntity.objtype == common.GMSERVER))
                 # query.group_by(AppEntity.cross_id).order_by(func.count(AppEntity.cross_id))
                 # 获取实体相关服务器信息(端口/ip)
                 maps = entity_controller.shows(endpoint=common.NAME, entitys=[gm.entity])
