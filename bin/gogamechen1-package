@@ -479,7 +479,8 @@ def upload():
 
 
 def main():
-    FUNCS = ['all', 'list', 'show', 'create', 'delete', 'upgrade', 'rversion',
+    FUNCS = ['all', 'list', 'show', 'create', 'delete',
+             'upgrade', 'rversion', 'resources',
              'enable', 'disable', 'upload']
 
     try:

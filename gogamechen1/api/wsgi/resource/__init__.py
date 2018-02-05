@@ -366,7 +366,7 @@ class PackageReuest(BaseContorller):
             try:
                 maps[package.resource_id].append(package)
             except KeyError:
-                maps = [package, ]
+                maps[package.resource_id] = [package, ]
             _resources.add(package.resource_id)
         map_resources(_resources)
 
