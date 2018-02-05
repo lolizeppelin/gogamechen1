@@ -70,6 +70,7 @@ install -p -D -m 0754 bin/* %{buildroot}%{_bindir}
 %{_bindir}/%{proj_name}-group
 %{_bindir}/%{proj_name}-objfile
 %{_bindir}/%{proj_name}-package
+%{_bindir}/%{proj_name}-select
 %doc README.md
 %doc doc/*
 
