@@ -535,8 +535,6 @@ class PackageReuest(BaseContorller):
                 if not package.rquote_id:
                     qresult = cdnresource_controller.vquote(req, resource_id=package.resource_id,
                                                             body=dict(version=rversion))
-                    if qresult.get('resultcode') != manager_common.RESULT_SUCCESS:
-                        return qresult
                     quote = qresult['data'][0]
                     package.rquote_id = quote.get('quote_id')
                 # 修改资源引用

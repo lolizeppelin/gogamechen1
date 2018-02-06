@@ -787,16 +787,15 @@ class AppEntityReuest(BaseContorller):
                 quote.update(body)
                 cdnquote_controller.update(req, quote.get('quote_id'), body=body)
             else:
-                result = cdnresource_controller.vquote(req, resource_id, body={'version': rversion,
-                                                                               'desc': '%s.%d' % (common.NAME, entity)})
-                if result.get('resultcode') != manager_common.RESULT_SUCCESS:
-                    raise InvalidArgument('%s' % result.get('result'))
-                info = result['data'][0]
-                quote = dict(version=rversion, quote_id=info.get('quote_id'))
+                qresult = cdnresource_controller.vquote(req, resource_id,
+                                                        body={'version': rversion,
+                                                              'desc': '%s.%d' % (common.NAME, entity)})
+                quote = qresult['data'][0]
+                quote = dict(version=rversion, quote_id=quote.get('quote_id'))
                 versions.setdefault(str_key, quote)
             _entity.versions = jsonutils.dumps(versions)
             session.flush()
-        return resultutils.results(result='set entity version quote success' % objtype,
+        return resultutils.results(result='set entity version quote success',
                                    data=[dict(resource_id=resource_id,
                                               version=rversion, quote_id=quote.get('quote_id'))])
 
