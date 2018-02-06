@@ -375,7 +375,8 @@ class Application(AppEndpointBase):
                                                   result='running')
             return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                               ctxt=ctxt,
-                                              resultcode=manager_common.RESULT_SUCCESS)
+                                              resultcode=manager_common.RESULT_SUCCESS,
+                                              result='not running')
 
     def rpc_create_entity(self, ctxt, entity, **kwargs):
         timeout = count_timeout(ctxt, kwargs)
@@ -781,3 +782,8 @@ class Application(AppEndpointBase):
             middlewares = taskupgrade.upgrade_entitys(self, entitys, kwargs.get('objfiles'),
                                                       kwargs.get('objtype'))
         print middlewares
+
+    def rpc_change_status(self, ctxt, entity, status, **kwargs):
+        if entity not in set(self.entitys):
+            LOG.error('entity not found, can not change status')
+        self.konwn_appentitys[entity].update({'status': status})

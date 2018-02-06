@@ -49,6 +49,7 @@ from gopdb.api.wsgi.controller import SchemaReuest
 from gopdb.api.wsgi.controller import DatabaseReuest
 
 from gopcdn.api.wsgi.resource import CdnQuoteRequest
+from gopcdn.api.wsgi.resource import CdnResourceReuest
 
 from gogamechen1 import common
 from gogamechen1 import utils
@@ -59,6 +60,7 @@ from gogamechen1.models import Group
 from gogamechen1.models import AppEntity
 from gogamechen1.models import GameArea
 from gogamechen1.models import AreaDatabase
+from gogamechen1.models import Package
 
 from gogamechen1.api.wsgi.notify import notify
 
@@ -80,6 +82,7 @@ entity_controller = EntityReuest()
 schema_controller = SchemaReuest()
 database_controller = DatabaseReuest()
 cdnquote_controller = CdnQuoteRequest()
+cdnresource_controller = CdnResourceReuest()
 
 CONF = cfg.CONF
 
@@ -587,6 +590,9 @@ class AppEntityReuest(BaseContorller):
                 # 非gm实体添加需要先找到同组的gm
                 try:
                     gm = typemap[common.GMSERVER][0]
+                    if gm.status <= common.DELETED:
+                        return resultutils.results(result='Create entity fail, gm mark deleted',
+                                                   resultcode=manager_common.RESULT_ERROR)
                 except KeyError as e:
                     return resultutils.results(result='Create entity fail, can not find GMSERVER: %s' % e.message,
                                                resultcode=manager_common.RESULT_ERROR)
@@ -636,8 +642,7 @@ class AppEntityReuest(BaseContorller):
                                     cross = _cross
                                     break
                     if not cross:
-                        raise InvalidArgument('cross server can not be found for %s' % objtype)
-
+                        raise InvalidArgument('cross server can not be found or not active')
                     # 获取实体相关服务器信息(端口/ip)
                     maps = entity_controller.shows(endpoint=common.NAME, entitys=[gm.entity, cross.entity])
                     for v in six.itervalues(maps):
@@ -749,19 +754,151 @@ class AppEntityReuest(BaseContorller):
         pass
 
     def quote_version(self, req, group_id, objtype, entity, body=None):
-        pass
-        # glock = get_gamelock()
-        # with glock.arealock(group_id, areas):
-        #     pass
-        # notify.areas(group_id)
+        """区服包引用指定资源版本"""
+        body = body or {}
+        if objtype != common.GAMESERVER:
+            raise InvalidArgument('Version quote just for %s' % common.GAMESERVER)
+        package_id = int(body.get('package_id'))
+        version = body.get('version')
+        group_id = int(group_id)
+        entity = int(entity)
+        session = endpoint_session()
+        query = model_query(session, Group, filter=Group.group_id == group_id)
+        query = query.options(joinedload(Group.packages, innerjoin=False))
+        group = query.one()
+        resource_id = None
+        for package in group.packages:
+            if package.package_id == package_id:
+                resource_id = package.resource_id
+        if not resource_id:
+            raise InvalidArgument('Entity can not find package or package resource is None')
+        query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
+        with session.begin():
+            _entity = query.one()
+            if _entity.objtype != objtype:
+                raise InvalidArgument('Objtype not match')
+            if _entity.group_id != group_id:
+                raise InvalidArgument('Group id not match')
+            versions = jsonutils.loads_as_bytes(_entity.versions) if _entity.versions else {}
+            str_key = str(package_id)
+            if str_key in versions:
+                quote = versions.get(str_key)
+                body = {'version': version}
+                quote.update(body)
+                cdnquote_controller.update(req, quote.get('quote_id'), body=body)
+            else:
+                result = cdnresource_controller.vquote(req, resource_id, body={'version': version,
+                                                                               'desc': '%s.%d' % (common.NAME, entity)})
+                if result.get('resultcode') != manager_common.RESULT_SUCCESS:
+                    raise InvalidArgument('%s' % result.get('result'))
+                info = result['data'][0]
+                quote = dict(version=version, quote_id=info.get('quote_id'))
+                versions.setdefault(str_key, quote)
+            _entity.versions = jsonutils.dumps(versions)
+            session.flush()
+        return resultutils.results(result='set entity version quote success' % objtype,
+                                   data=[dict(version=version, quote_id=quote.get('quote_id'))])
 
     def unquote_version(self, req, group_id, objtype, entity, body=None):
-        pass
+        """区服包引用指定资源引用删除"""
+        body = body or {}
+        if objtype != common.GAMESERVER:
+            raise InvalidArgument('Version unquote just for %s' % common.GAMESERVER)
+        package_id = int(body.get('package_id'))
+        version = body.get('version')
+        group_id = int(group_id)
+        entity = int(entity)
+        session = endpoint_session()
+        query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
+        with session.begin():
+            _entity = query.one()
+            if _entity.objtype != objtype:
+                raise InvalidArgument('Objtype not match')
+            if _entity.group_id != group_id:
+                raise InvalidArgument('Group id not match')
+            versions = jsonutils.loads_as_bytes(_entity.versions) if _entity.versions else {}
+            str_key = str(package_id)
+            quote = None
+            with session.begin():
+                if str_key in versions:
+                    quote = versions.pop(str_key)
+                    cdnquote_controller.delete(req, quote.get('quote_id'))
+                    _entity.versions = jsonutils.dumps(versions)
+                    session.flush()
+        return resultutils.results(result='entity version unquote success' % objtype,
+                                   data=[dict(version=version,
+                                              quote_id=quote.get('quote_id') if quote else None)])
 
     def delete(self, req, group_id, objtype, entity, body=None):
-        raise NotImplementedError
+        """标记删除entity"""
+        body = body or {}
+        group_id = int(group_id)
+        entity = int(entity)
+        session = endpoint_session()
+        glock = get_gamelock()
+        metadata, ports = self._entityinfo(req=req, entity=entity)
+        if not metadata:
+            raise InvalidArgument('Agent offline, can not delete entity')
+        query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
+        if objtype == common.GAMESERVER:
+            query = query.options(joinedload(AppEntity.areas, innerjoin=False))
+        _entity = query.one()
+        if _entity.status == common.DELETED:
+            return resultutils.results(result='mark %s entity delete success' % objtype,
+                                       data=[dict(entity=entity, objtype=objtype,
+                                                  ports=ports, metadata=metadata)])
+        if _entity.objtype != objtype:
+            raise InvalidArgument('Objtype not match')
+        if _entity.group_id != group_id:
+            raise InvalidArgument('Group id not match')
+        target = targetutils.target_agent_by_string(metadata.get('agent_type'), metadata.get('host'))
+        target.namespace = common.NAME
+        rpc = get_client()
+        with glock.grouplock(group=group_id):
+            if objtype == common.GMSERVER:
+                if model_count_with_key(session, AppEntity, filter=AppEntity.group_id == group_id) > 1:
+                    raise InvalidArgument('You must delete other objtype entity before delete gm')
+            elif objtype == common.CROSSSERVER:
+                if model_count_with_key(session, AppEntity, filter=AppEntity.cross_id == _entity.entity):
+                    raise InvalidArgument('Cross server are reflected')
+            with session.begin():
+                # 确认实体没有运行
+                rpc_ret = rpc.call(target, ctxt={'agents': [_entity.agent_id, ]},
+                                   msg={'method': 'stoped',
+                                        'args': dict(entity=entity)})
+                if not rpc_ret:
+                    raise RpcResultError('reset entity result is None')
+                if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
+                    raise RpcResultError('reset entity fail %s' % rpc_ret.get('result'))
+                _entity.status = common.DELETED
+                session.flush()
+                if objtype == common.GAMESERVER:
+                    # 删除所有资源版本引用
+                    if _entity.versions:
+                        for quote in six.itervalues(_entity.versions):
+                            threadpool.add_thread(cdnquote_controller.delete, req, quote.get('quote_id'))
+                    _entity.versions = None
+                    session.flush()
+                    if _entity.areas:
+                        if len(_entity.areas) > 1:
+                            raise InvalidArgument('%s areas more then one' % objtype)
+                        area = _entity.areas[0]
+                        group = _entity.group
+                        if area.area_id != group.lastarea:
+                            raise InvalidArgument('%s entity not the last area entity')
+                        group.lastarea = group.lastarea - 1
+                        session.flush()
+                        session.delete(area)
+                        session.flush()
+                rpc.cast(target, ctxt={'agents': [_entity.agent_id, ]},
+                         msg={'method': 'change_status',
+                              'args': dict(entity=entity, status=common.DELETED)})
+        return resultutils.results(result='mark %s entity delete success' % objtype,
+                                   data=[dict(entity=entity, objtype=objtype,
+                                              ports=ports, metadata=metadata)])
 
     def clean(self, req, group_id, objtype, entity, body=None):
+        """彻底删除entity"""
         body = body or {}
         action = body.pop('clean', 'unquote')
         if action not in ('delete', 'unquote'):
@@ -791,20 +928,13 @@ class AppEntityReuest(BaseContorller):
                 raise RpcResultError('check entity is stoped fail, running')
 
             with session.begin():
-                if _entity.status == common.DELETED:
+                if _entity.status != common.DELETED:
                     raise InvalidArgument('Entity status is not DELETED, '
                                           'mark status to DELETED before delete it')
                 if _entity.objtype != objtype:
                     raise InvalidArgument('Objtype not match')
                 if _entity.group_id != group_id:
                     raise InvalidArgument('Group id not match')
-                if objtype == common.GMSERVER:
-                    if model_count_with_key(session, AppEntity, filter=AppEntity.group_id == group_id) > 1:
-                        raise InvalidArgument('You must delete other objtype entity before delete gm')
-                elif objtype == common.CROSSSERVER:
-                    if model_count_with_key(session, AppEntity, filter=AppEntity.cross_id == _entity.entity):
-                        raise InvalidArgument('Cross server are reflected')
-
                 # esure database delete
                 if action == 'delete':
                     LOG.warning('Clean option is delete, can not rollback when fail')

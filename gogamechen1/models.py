@@ -104,7 +104,8 @@ class Group(TableBase):
                              cascade='delete,delete-orphan')
     entitys = orm.relationship(AppEntity, backref='group', lazy='select',
                                cascade='delete,delete-orphan')
-
+    packages = orm.relationship(Package, backref='group', lazy='select',
+                                cascade='delete,delete-orphan')
     __table_args__ = (
         sa.UniqueConstraint('name', name='group_unique'),
         InnoDBTableBase.__table_args__

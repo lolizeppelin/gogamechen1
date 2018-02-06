@@ -117,6 +117,8 @@ class Routers(router.RoutersBase):
                                        member_prefix='/{entity}',
                                        collection_actions=COLLECTION_ACTIONS,
                                        member_actions=MEMBER_ACTIONS)
+        collection.member.link('quote', name='quote_version', method='PUT', action='quote_version')
+        collection.member.link('quote', name='unquote_version', method='DELETE', action='unquote_version')
         collection.member.link('clean', method='DELETE')
         collection.member.link('reset', method='POST')
         collection.member.link('start', method='POST')
