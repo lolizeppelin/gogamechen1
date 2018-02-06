@@ -313,6 +313,26 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
+    def appentity_vquote(self, group_id, objtype, entity, package_id, version):
+        resp, results = self.put(action=self.appentity_path_ex % (str(group_id), objtype,
+                                                                  str(entity), 'quote'),
+                                 body=dict(package_id=package_id, version=version))
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='version quote %s fail:%d' % (objtype, results['resultcode']),
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def appentity_vunquote(self, group_id, objtype, entity, body=None):
+        resp, results = self.delete(action=self.appentity_path_ex % (str(group_id), objtype,
+                                                                     str(entity), 'quote'),
+                                    body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='version unquote %s fail:%d' % (objtype, results['resultcode']),
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
     def appentity_hotfix(self, group_id, objtype, entity, body=None):
         resp, results = self.post(action=self.appentity_path_ex % (str(group_id), objtype,
                                                                    str(entity), 'hotfix'),

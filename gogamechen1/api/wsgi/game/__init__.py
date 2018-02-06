@@ -805,11 +805,11 @@ class AppEntityReuest(BaseContorller):
         if objtype != common.GAMESERVER:
             raise InvalidArgument('Version unquote just for %s' % common.GAMESERVER)
         package_id = int(body.get('package_id'))
-        version = body.get('version')
         group_id = int(group_id)
         entity = int(entity)
         session = endpoint_session()
         query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
+        quote = None
         with session.begin():
             _entity = query.one()
             if _entity.objtype != objtype:
@@ -818,7 +818,6 @@ class AppEntityReuest(BaseContorller):
                 raise InvalidArgument('Group id not match')
             versions = jsonutils.loads_as_bytes(_entity.versions) if _entity.versions else {}
             str_key = str(package_id)
-            quote = None
             with session.begin():
                 if str_key in versions:
                     quote = versions.pop(str_key)
@@ -826,7 +825,7 @@ class AppEntityReuest(BaseContorller):
                     _entity.versions = jsonutils.dumps(versions)
                     session.flush()
         return resultutils.results(result='entity version unquote success' % objtype,
-                                   data=[dict(version=version,
+                                   data=[dict(version=quote.get('version') if quote else None,
                                               quote_id=quote.get('quote_id') if quote else None)])
 
     def delete(self, req, group_id, objtype, entity, body=None):
