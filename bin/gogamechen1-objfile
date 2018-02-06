@@ -9,6 +9,7 @@ from simpleutil.utils import table
 
 from goperation.api.client.config import client_opts
 from goperation.api.client.config import index_opts
+from goperation.api.client.config import zone_opt
 from goperation.api.client import ManagerClient
 
 from goperation.api.client.utils import prepare_results
@@ -59,7 +60,8 @@ create_opts = [
                required=True,
                help='Uploade file version'),
 ]
-
+send_to_all_opt = cfg.BoolOpt('all',
+                              help='Send file to all agents match objtype in zone')
 
 def client(session=None):
     return GogameChen1DBClient(httpclient=ManagerClient(url=CONF.gcenter, port=CONF.gcenter_port,
@@ -224,6 +226,8 @@ def send():
     CONF.register_cli_opts(one_opts)
     CONF.register_cli_opts(timeout_opts)
     CONF.register_cli_opts(game_type_opts)
+    CONF.register_cli_opts(zone_opt)
+    CONF.register_cli_opts(send_to_all_opt)
     CONF(project='cmd')
     if not CONF.objtype:
         print('\033[1;31;40m')
@@ -237,6 +241,10 @@ def send():
     body = {}
     body.setdefault('request_time', now)
     body.setdefault('finishtime', now + timeout)
+    if CONF.zone:
+        body.setdefault('zone', CONF.zone)
+    if CONF.all is not None:
+        body.setdefault('all', CONF.all)
     _client = client()
     code, result, data = prepare_results(_client.objfile_send, CONF.uuid, CONF.objtype, body=body)
     if code:

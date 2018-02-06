@@ -246,16 +246,24 @@ class ObjtypeFileReuest(BaseContorller):
         """call by client, and asyncrequest
         send file to agents
         """
-        # TODO 修复发送目的地错误
         body = body or {}
         objtype = body.pop('objtype')
-        session = endpoint_session(readonly=True)
-        query = model_query(session, AppEntity.agent_id)
-        if objtype:
-            query = query.filter(AppEntity.objtype == objtype)
-        agents = []
-        for r in query:
-            agents.append(r[0])
+        zone = body.pop('zone', None)
+        if body.pop('all', True):
+            # 发文件到所以匹配的agent
+            includes = ['metadata.gogamechen1-aff&%d' % common.APPAFFINITYS[objtype],
+                        'metadata.agent_type=application', ]
+            includes.insert(0, 'metadata.zone=%s' % zone)
+            agents = self.chioces(endpoint=common.NAME, includes=includes)
+        else:
+            # 只发文件到已经有实体的agent
+            session = endpoint_session(readonly=True)
+            query = model_query(session, AppEntity.agent_id)
+            if objtype:
+                query = query.filter(AppEntity.objtype == objtype)
+            agents = []
+            for r in query:
+                agents.append(r[0])
         agents = list(set(agents))
         asyncrequest = self.create_asyncrequest(body)
         target = targetutils.target_endpoint(common.NAME)

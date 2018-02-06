@@ -7,6 +7,7 @@ from simpleutil.config import cfg
 from simpleutil.utils import table
 
 from goperation.api.client.config import client_opts
+from goperation.api.client.config import zone_opt
 from goperation.api.client import ManagerClient
 
 from goperation.api.client.utils import prepare_results
@@ -25,10 +26,6 @@ subtype_opt = cfg.StrOpt('subtype',
                          short='s',
                          choices=['datadb', 'logdb', 'appfile'],
                          help='Game subtype objfile for')
-
-zone_opt = cfg.StrOpt('zone',
-                      regex='^[a-z][a-z0-9]+$',
-                      help='Agent zone mark')
 
 
 def client(session=None):

@@ -12,6 +12,7 @@ from simpleutil.utils import timeutils
 from goperation.manager import common as manager_common
 from goperation.api.client.config import client_opts
 from goperation.api.client.config import index_opts
+from goperation.api.client.config import zone_opt
 from goperation.api.client import ManagerClient
 
 from goperation.api.client.utils import prepare_results
@@ -53,10 +54,6 @@ agent_opt = cfg.IntOpt('agent',
                        help='Game install agent, if not set, auto select'
                        )
 
-zone_opt = cfg.StrOpt('zone',
-                      default='all',
-                      regex='^[a-z][a-z0-9]+$',
-                      help='Agent zone mark defalut all')
 
 appfile_opt = cfg.StrOpt('appfile',
                          required=True,
