@@ -316,7 +316,7 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
     def appentity_vquote(self, group_id, objtype, entity, package_id, version):
         resp, results = self.put(action=self.appentity_path_ex % (str(group_id), objtype,
                                                                   str(entity), 'quote'),
-                                 body=dict(package_id=package_id, version=version))
+                                 body=dict(package_id=package_id, rversion=version))
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='version quote %s fail:%d' % (objtype, results['resultcode']),
                                             code=resp.status_code,

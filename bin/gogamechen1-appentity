@@ -104,11 +104,9 @@ stop_opt = cfg.BoolOpt('kill',
                        default=False,
                        help='Stop process with kill options when call stop')
 
-version_opts = [
-    cfg.StrOpt('rversion',
-               required=True,
-               help='Cdn resource version'),
-]
+version_opts = cfg.StrOpt('rversion',
+                          required=True,
+                          help='Cdn resource version')
 
 package_opt = cfg.IntOpt('package_id',
                          short='p',
