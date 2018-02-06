@@ -286,11 +286,12 @@ def async(action):
         CONF.register_cli_opts(one_opts)
     if action == 'stop':
         CONF.register_cli_opt(stop_opt)
+
+    CONF(project='cmd')
     if objtype == common.GAMESERVER:
         target = ','.join(CONF.areas)
     else:
         target = CONF.entity
-    CONF(project='cmd')
     _client = client()
     _func = getattr(_client, 'appentity_%s' % action)
     if not _func:

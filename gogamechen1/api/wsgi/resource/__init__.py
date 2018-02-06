@@ -437,7 +437,7 @@ class PackageReuest(BaseContorller):
                               desc=desc)
             session.add(package)
             session.flush()
-
+        eventlet.spawn_n(notify.resource)
         return resultutils.results(result='Add a new package success',
                                    data=[dict(package_id=package.package_id,
                                               group_id=package.group_id,
@@ -534,7 +534,7 @@ class PackageReuest(BaseContorller):
                     cdnquote_controller.update(req, quote_id=package.rquote_id, body={'version': rversion})
                 package.rversion = rversion
             session.flush()
-        notify.resource()
+        eventlet.spawn_n(notify.resource)
         return resultutils.results('Update package success')
 
     def delete(self, req, group_id, package_id, body=None):
@@ -573,7 +573,7 @@ class PackageReuest(BaseContorller):
             cdnresource_controller.unquote(req, package.resource_id)
             session.delete(package)
             session.flush()
-        notify.resource()
+        eventlet.spawn_n(notify.resource)
         return resultutils.results('Delete package success')
 
     def upgrade(self, req, group_id, package_id, body=None):
@@ -728,7 +728,7 @@ class PackageFileReuest(BaseContorller):
                                     address=address, desc=desc)
                 session.add(pfile)
                 session.flush()
-            notify.resource()
+            eventlet.spawn_n(notify.resource)
         else:
             resource_id = body.get('resource_id') or CONF[common.NAME].package_resource
             if not resource_id:
@@ -795,7 +795,7 @@ class PackageFileReuest(BaseContorller):
         with session.begin():
             data = {'status': status}
             query.update(data)
-        notify.resource()
+        eventlet.spawn_n(notify.resource)
         return resultutils.results('update package file  for %d success' % package_id,
                                    data=[dict(pfile_id=pfile_id)])
 
@@ -826,6 +826,6 @@ class PackageFileReuest(BaseContorller):
 
         session.delete(pfile)
         session.flush()
-        notify.resource()
+        eventlet.spawn_n(notify.resource)
         return resultutils.results('delete package file  for %d success' % package_id,
                                    data=[dict(pfile_id=pfile_id)])

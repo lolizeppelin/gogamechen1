@@ -140,7 +140,7 @@ class GroupReuest(BaseContorller):
             session.flush()
         except DBDuplicateEntry:
             raise InvalidArgument('Group name duplicate')
-        notify.areas(_group.group_id)
+        eventlet.spawn_n(notify.areas, _group.group_id)
         return resultutils.results(result='create group success',
                                    data=[dict(group_id=_group.group_id,
                                               name=_group.name,
@@ -189,7 +189,7 @@ class GroupReuest(BaseContorller):
             raise InvalidArgument('Group has entitys, can not be delete')
         session.delete(_group)
         session.flush()
-        notify.areas(group_id)
+        eventlet.spawn_n(notify.areas, group_id)
         return resultutils.results(result='delete group success',
                                    data=[deleted])
 
@@ -699,8 +699,8 @@ class AppEntityReuest(BaseContorller):
                                   status=common.UNACTIVE,
                                   opentime=opentime,
                                   group_id=group_id, areas=[next_area, ])
-            notify.areas(group_id)
-            notify.entity(group_id, objtype, entity)
+            eventlet.spawn_n(notify.areas, group_id)
+            eventlet.spawn_n(notify.entity, group_id, objtype, entity)
             return resultutils.results(result='create %s entity success' % objtype,
                                        data=[_result, ])
 
@@ -864,7 +864,7 @@ class AppEntityReuest(BaseContorller):
                     threadpool.add_thread(_rollback)
                     raise e
                 query.delete()
-        notify.areas(group_id)
+        eventlet.spawn_n(notify.areas, group_id)
         return resultutils.results(result='delete %s:%d success' % (objtype, entity),
                                    data=[dict(entity=entity, objtype=objtype,
                                               ports=ports, metadata=metadata)])
