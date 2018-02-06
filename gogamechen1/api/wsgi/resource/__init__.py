@@ -246,6 +246,7 @@ class ObjtypeFileReuest(BaseContorller):
         """call by client, and asyncrequest
         send file to agents
         """
+        # TODO 修复发送目的地错误
         body = body or {}
         objtype = body.pop('objtype')
         session = endpoint_session(readonly=True)
@@ -258,7 +259,7 @@ class ObjtypeFileReuest(BaseContorller):
         agents = list(set(agents))
         asyncrequest = self.create_asyncrequest(body)
         target = targetutils.target_endpoint(common.NAME)
-        target.namespace = None
+        target.namespace = manager_common.NAME
         rpc_method = 'getfile'
         rpc_args = {'mark': uuid, 'timeout': asyncrequest.deadline - 1}
         rpc_ctxt = {}
