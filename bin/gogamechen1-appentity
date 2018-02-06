@@ -208,11 +208,28 @@ def create():
     print '\033[1;32;40m\r',
     print 'Create %s entity success' % objtype
     print '\033[0m'
-    group = data[0]
-    print 'group id: %s' % group.get('group_id')
-    print 'group name: %s' % group.get('name')
-    print 'lastarea: %s' % group.get('lastarea')
-
+    appentity = data[0]
+    databases = appentity.get('databases')
+    print 'group id: %d' % CONF.group_id,
+    print 'agent id: %d' % appentity.get('agent_id'),
+    print 'objtype: %s' % appentity.get('objtype')
+    if objtype == common.GAMESERVER:
+        print 'opentime: %d' % timeutils.unix_to_iso(CONF.opentime)
+        print 'area id: %d' % appentity.get('area_id')
+        print 'area name: %s' % CONF.name
+    print '-------------database info-------------'
+    for subtype in databases:
+        database = databases[subtype]
+        print 'host: %s' % database.get('host')
+        print 'port: %d' % database.get('port')
+        print 'schema: %s' % database.get('schema')
+        print 'user: %s' % database.get('user')
+        print 'passwd: %s' % database.get('passwd')
+        print 'ro_user: %s' % database.get('ro_user')
+        print 'ro_passwd: %s' % database.get('ro_passwd')
+        print 'character_set: %s' % database.get('character_set')
+        print 'database_id: %d' % database.get('database_id')
+        print 'quote_id: %d' % database.get('quote_id')
 
 def show():
     CONF.register_cli_opts(one_opts)
