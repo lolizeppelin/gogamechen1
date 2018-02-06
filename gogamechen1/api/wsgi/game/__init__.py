@@ -665,8 +665,8 @@ class AppEntityReuest(BaseContorller):
                 _entity = entity_controller.create(req=req, agent_id=agent_id,
                                                    endpoint=common.NAME, body=body)['data'][0]
                 entity = _entity.get('entity')
-                notify = _entity.get('notify')
-                LOG.info('Entity controller create rpc result %s' % str(notify))
+                rpc_result = _entity.get('notify')
+                LOG.info('Entity controller create rpc result %s' % str(rpc_result))
                 # 插入实体信息
                 appentity = AppEntity(entity=entity,
                                       agent_id=agent_id,
@@ -690,7 +690,7 @@ class AppEntityReuest(BaseContorller):
                     query.update({'lastarea': next_area})
 
             _result = dict(entity=entity, objtype=objtype, agent_id=agent_id,
-                           databases=notify.get('databases'))
+                           databases=rpc_result.get('databases'))
             if objtype == common.GAMESERVER:
                 _result.setdefault('area_id', next_area)
 
