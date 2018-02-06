@@ -23,6 +23,73 @@ from gogamechen1 import common
 TableBase = declarative.declarative_base(cls=TableBase)
 
 
+class PackageRemark(TableBase):
+    remark_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True, autoincrement=True)
+    package_id = sa.Column(sa.ForeignKey('packages.package_id', ondelete="CASCADE", onupdate='RESTRICT'),
+                           nullable=False)
+    rtime = sa.Column(INTEGER(unsigned=True), nullable=False)
+    username = sa.Column(VARCHAR(64), nullable=False)
+    message = sa.Column(VARCHAR(512), nullable=False)
+
+
+class PackageFile(TableBase):
+    # 包文件id
+    pfile_id = sa.Column(INTEGER(unsigned=True), nullable=False,
+                         primary_key=True, autoincrement=True)
+    # 安装包引用的resource_id, None则为外部地址
+    resource_id = sa.Column(INTEGER(unsigned=True), nullable=True)
+    # 安装包文件名
+    filename = sa.Column(VARCHAR(128), nullable=True)
+    package_id = sa.Column(sa.ForeignKey('packages.package_id', ondelete="RESTRICT", onupdate='RESTRICT'),
+                           nullable=False)
+    # 包类型
+    ftype = sa.Column(VARCHAR(32), nullable=False)
+    # 安装包版本号
+    gversion = sa.Column(VARCHAR(64), nullable=False)
+    address = sa.Column(VARCHAR(200), nullable=True)
+    uptime = sa.Column(INTEGER(unsigned=True), nullable=False)
+    status = sa.Column(VARCHAR(16), ENUM(*manager_common.DOWNFILESTATUS),
+                       default=manager_common.DOWNFILE_FILEOK, nullable=False)
+    desc = sa.Column(VARCHAR(256), nullable=True)
+    __table_args__ = (
+        sa.UniqueConstraint('address', name='address_unique'),
+        sa.Index('ftype_index', 'ftype'),
+        InnoDBTableBase.__table_args__
+    )
+
+
+class Package(TableBase):
+    package_id = sa.Column(INTEGER(unsigned=True), nullable=False,
+                           primary_key=True, autoincrement=True)
+    # 游戏资源引用id, 游戏下载资源引用的resource id
+    resource_id = sa.Column(INTEGER(unsigned=True), nullable=False)
+    # 游戏资源默认版本
+    rversion = sa.Column(VARCHAR(64), nullable=True)
+    # 默认版本引用id
+    rquote_id = sa.Column(INTEGER(unsigned=True), nullable=True)
+    # 包名,一般情况下唯一
+    package_name = sa.Column(VARCHAR(64), nullable=False)
+    # 游戏服务器组id
+    group_id = sa.Column(sa.ForeignKey('groups.group_id', ondelete="RESTRICT", onupdate='RESTRICT'),
+                         nullable=False)
+    # 标记
+    mark = sa.Column(VARCHAR(32), nullable=False)
+    # 状态
+    status = sa.Column(SMALLINT, nullable=False, default=common.ENABLE)
+    # 说明
+    desc = sa.Column(VARCHAR(256), nullable=True)
+    # 特殊标记
+    magic = sa.Column(BLOB, nullable=True)
+    # 扩展字段
+    extension = sa.Column(BLOB, nullable=True)
+    files = orm.relationship(PackageFile, backref='package', lazy='select',
+                             cascade='delete,delete-orphan,save-update')
+    __table_args__ = (
+        sa.UniqueConstraint('package_name', name='package_unique'),
+        InnoDBTableBase.__table_args__
+    )
+
+
 class ObjtypeFile(TableBase):
     uuid = sa.Column(CHAR(36), default=uuidutils.generate_uuid,
                      nullable=False, primary_key=True)
@@ -108,72 +175,5 @@ class Group(TableBase):
                                 cascade='delete,delete-orphan')
     __table_args__ = (
         sa.UniqueConstraint('name', name='group_unique'),
-        InnoDBTableBase.__table_args__
-    )
-
-
-class PackageRemark(TableBase):
-    remark_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True, autoincrement=True)
-    package_id = sa.Column(sa.ForeignKey('packages.package_id', ondelete="CASCADE", onupdate='RESTRICT'),
-                           nullable=False)
-    rtime = sa.Column(INTEGER(unsigned=True), nullable=False)
-    username = sa.Column(VARCHAR(64), nullable=False)
-    message = sa.Column(VARCHAR(512), nullable=False)
-
-
-class PackageFile(TableBase):
-    # 包文件id
-    pfile_id = sa.Column(INTEGER(unsigned=True), nullable=False,
-                         primary_key=True, autoincrement=True)
-    # 安装包引用的resource_id, None则为外部地址
-    resource_id = sa.Column(INTEGER(unsigned=True), nullable=True)
-    # 安装包文件名
-    filename = sa.Column(VARCHAR(128), nullable=True)
-    package_id = sa.Column(sa.ForeignKey('packages.package_id', ondelete="RESTRICT", onupdate='RESTRICT'),
-                           nullable=False)
-    # 包类型
-    ftype = sa.Column(VARCHAR(32), nullable=False)
-    # 安装包版本号
-    gversion = sa.Column(VARCHAR(64), nullable=False)
-    address = sa.Column(VARCHAR(200), nullable=True)
-    uptime = sa.Column(INTEGER(unsigned=True), nullable=False)
-    status = sa.Column(VARCHAR(16), ENUM(*manager_common.DOWNFILESTATUS),
-                       default=manager_common.DOWNFILE_FILEOK, nullable=False)
-    desc = sa.Column(VARCHAR(256), nullable=True)
-    __table_args__ = (
-        sa.UniqueConstraint('address', name='address_unique'),
-        sa.Index('ftype_index', 'ftype'),
-        InnoDBTableBase.__table_args__
-    )
-
-
-class Package(TableBase):
-    package_id = sa.Column(INTEGER(unsigned=True), nullable=False,
-                           primary_key=True, autoincrement=True)
-    # 游戏资源引用id, 游戏下载资源引用的resource id
-    resource_id = sa.Column(INTEGER(unsigned=True), nullable=False)
-    # 游戏资源默认版本
-    rversion = sa.Column(VARCHAR(64), nullable=True)
-    # 默认版本引用id
-    rquote_id = sa.Column(INTEGER(unsigned=True), nullable=True)
-    # 包名,一般情况下唯一
-    package_name = sa.Column(VARCHAR(64), nullable=False)
-    # 游戏服务器组id
-    group_id = sa.Column(sa.ForeignKey('groups.group_id', ondelete="RESTRICT", onupdate='RESTRICT'),
-                         nullable=False)
-    # 标记
-    mark = sa.Column(VARCHAR(32), nullable=False)
-    # 状态
-    status = sa.Column(SMALLINT, nullable=False, default=common.ENABLE)
-    # 说明
-    desc = sa.Column(VARCHAR(256), nullable=True)
-    # 特殊标记
-    magic = sa.Column(BLOB, nullable=True)
-    # 扩展字段
-    extension = sa.Column(BLOB, nullable=True)
-    files = orm.relationship(PackageFile, backref='package', lazy='select',
-                             cascade='delete,delete-orphan,save-update')
-    __table_args__ = (
-        sa.UniqueConstraint('package_name', name='package_unique'),
         InnoDBTableBase.__table_args__
     )

@@ -323,7 +323,7 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
-    def appentity_vunquote(self, group_id, objtype, entity, package_id):
+    def appentity_unvquote(self, group_id, objtype, entity, package_id):
         resp, results = self.delete(action=self.appentity_path_ex % (str(group_id), objtype,
                                                                      str(entity), 'quote'),
                                     body=dict(package_id=package_id))

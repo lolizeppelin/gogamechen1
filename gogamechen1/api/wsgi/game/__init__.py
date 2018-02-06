@@ -759,7 +759,7 @@ class AppEntityReuest(BaseContorller):
         if objtype != common.GAMESERVER:
             raise InvalidArgument('Version quote just for %s' % common.GAMESERVER)
         package_id = int(body.get('package_id'))
-        version = body.get('version')
+        rversion = body.get('rversion')
         group_id = int(group_id)
         entity = int(entity)
         session = endpoint_session()
@@ -783,21 +783,22 @@ class AppEntityReuest(BaseContorller):
             str_key = str(package_id)
             if str_key in versions:
                 quote = versions.get(str_key)
-                body = {'version': version}
+                body = {'version': rversion}
                 quote.update(body)
                 cdnquote_controller.update(req, quote.get('quote_id'), body=body)
             else:
-                result = cdnresource_controller.vquote(req, resource_id, body={'version': version,
+                result = cdnresource_controller.vquote(req, resource_id, body={'version': rversion,
                                                                                'desc': '%s.%d' % (common.NAME, entity)})
                 if result.get('resultcode') != manager_common.RESULT_SUCCESS:
                     raise InvalidArgument('%s' % result.get('result'))
                 info = result['data'][0]
-                quote = dict(version=version, quote_id=info.get('quote_id'))
+                quote = dict(version=rversion, quote_id=info.get('quote_id'))
                 versions.setdefault(str_key, quote)
             _entity.versions = jsonutils.dumps(versions)
             session.flush()
         return resultutils.results(result='set entity version quote success' % objtype,
-                                   data=[dict(version=version, quote_id=quote.get('quote_id'))])
+                                   data=[dict(resource_id=resource_id,
+                                              version=rversion, quote_id=quote.get('quote_id'))])
 
     def unquote_version(self, req, group_id, objtype, entity, body=None):
         """区服包引用指定资源引用删除"""

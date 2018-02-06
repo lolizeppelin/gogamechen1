@@ -104,6 +104,18 @@ stop_opt = cfg.BoolOpt('kill',
                        default=False,
                        help='Stop process with kill options when call stop')
 
+version_opts = [
+    cfg.StrOpt('rversion',
+               required=True,
+               help='Cdn resource version'),
+]
+
+package_opt = cfg.IntOpt('package_id',
+                         short='p',
+                         required=True,
+                         help='Package id')
+
+
 
 def _objtype():
     _opt = objtype_opt
@@ -293,6 +305,54 @@ def delete():
     print('\033[0m')
 
 
+def vquote():
+    CONF.register_cli_opts(one_opts)
+    CONF.register_cli_opt(version_opts)
+    CONF.register_cli_opt(package_opt)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.appentity_vquote, CONF.group_id, CONF.objtype, CONF.entity,
+                                         CONF.package_id, CONF.rversion)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    quote = data[0]
+    print('\033[1;32;40m')
+    print 'Quote resource version success'
+    print 'entity: %s' % CONF.entity
+    print 'version: %s' % CONF.rversion
+    print 'resource_id: %d' % quote.get('resource_id')
+    print 'quote_id: %d' % quote.get('quote_id')
+    print('\033[0m')
+
+
+def unvquote():
+    CONF.register_cli_opts(one_opts)
+    CONF.register_cli_opt(package_opt)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.appentity_unvquote, CONF.group_id, CONF.objtype, CONF.entity,
+                                         CONF.package_id)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    quote = data[0]
+    print('\033[1;32;40m')
+    print 'Unquote resource version success'
+    print 'entity: %s' % CONF.entity
+    print 'version: %s' % quote.get('version')
+    print 'quote_id: %d' % quote.get('quote_id')
+    print('\033[0m')
+
+
 def async(action):
     objtype = _objtype()
     CONF.register_cli_opt(timeout_opt)
@@ -357,7 +417,8 @@ def flushconfig():
 
 def main():
     FUNCS = ['list', 'create', 'show', 'delete',
-             'start', 'stop', 'status', 'flushconfig']
+             'start', 'stop', 'status', 'flushconfig',
+             'vquote', 'unvquote', 'clean']
     try:
         func = sys.argv.pop(1)
         if func not in FUNCS:
