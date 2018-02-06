@@ -258,6 +258,7 @@ class ObjtypeFileReuest(BaseContorller):
         agents = list(set(agents))
         asyncrequest = self.create_asyncrequest(body)
         target = targetutils.target_endpoint(common.NAME)
+        target.namespace = None
         rpc_method = 'getfile'
         rpc_args = {'mark': uuid, 'timeout': asyncrequest.deadline - 1}
         rpc_ctxt = {}

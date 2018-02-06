@@ -96,7 +96,7 @@ create_opts = [group_opt, objtype_opt,
                appfile_opt,
                datadb_opt]
 
-gamesvr_create_opt = [area_name_opt, logdb_opt, area_name_opt, opentime_opt]
+gamesvr_create_opt = [area_name_opt, logdb_opt, area_name_opt, opentime_opt, cross_opt]
 
 areas_opt = cfg.ListOpt('areas',
                         required=True,
@@ -177,7 +177,7 @@ def create():
     databases = dict()
     body = dict(appfile=CONF.appfile)
 
-    if CONF.agent_id:
+    if CONF.agent:
         body.setdefault('agent_id', CONF.agent)
 
     if CONF.zone:

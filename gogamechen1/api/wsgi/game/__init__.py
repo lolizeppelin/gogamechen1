@@ -341,8 +341,10 @@ class AppEntityReuest(BaseContorller):
         if set(NEEDED) != set(databases.keys()):
             for subtype in NEEDED:
                 if subtype not in databases:
-                    raise InvalidArgument('database %s.%s not set')
-            raise ValueError('Databases not match database needed info')
+                    LOG.info('database %s.%s not set' % (objtype, subtype))
+                    return False
+            raise InvalidArgument('Databases not match database needed info')
+        return True
 
     def _entityinfo(self, req, entity):
         entityinfo = entity_controller.show(req=req, entity=entity,
@@ -388,11 +390,8 @@ class AppEntityReuest(BaseContorller):
     def _dbselect(self, req, objtype, **kwargs):
         """数据库自动选择"""
         _databases = kwargs.pop('databases', {})
-        try:
-            self._validate_databases(objtype, _databases)
+        if self._validate_databases(objtype, _databases):
             return _databases
-        except ValueError:
-            pass
         chioces = self._db_chioces(req, objtype, **kwargs)
         if not chioces:
             raise InvalidArgument('Auto selete database fail')
@@ -550,7 +549,8 @@ class AppEntityReuest(BaseContorller):
         # 选择实例运行数据库
         databases = self._dbselect(req, objtype, **body)
         # 校验数据库信息
-        self._validate_databases(objtype, databases)
+        if not self._validate_databases(objtype, databases):
+            raise InvalidArgument('Miss some database')
         LOG.info('Find agent and database for entity success')
         session = endpoint_session()
         query = model_query(session, Group, filter=Group.group_id == group_id)

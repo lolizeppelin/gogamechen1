@@ -81,6 +81,8 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
         return results
 
     def objfile_send(self, uuid, objtype, body=None):
+        body = body or {}
+        body.setdefault('objtype', objtype)
         resp, results = self.retryable_post(action=self.objfile_path_ex % (uuid, 'send'), body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='send gogamechen1 objfiles fail:%d' % results['resultcode'],
