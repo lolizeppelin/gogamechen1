@@ -83,6 +83,7 @@ class GogameDatabaseCreateTask(AppCreateBase):
             self.middleware.dberrors.append(dict(database_id=database_id, schema=schema, unquotes=unquotes,
                                                  reason='%s :%s' % (e.__class__.__name__, e.message)))
         else:
+            LOG.info('Drop schema %s success' % schema)
             self.middleware.set_return(self.taskname, task_common.REVERTED)
 
 
