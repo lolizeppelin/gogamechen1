@@ -581,14 +581,14 @@ class AppEntityReuest(BaseContorller):
                 #                                resultcode=manager_common.RESULT_ERROR)
                 for _entity in _group.entitys:
                     if _entity.objtype == common.GMSERVER:
-                        return resultutils.results('create entity fail, %s duplicate in group' % objtype,
+                        return resultutils.results(result='create entity fail, %s duplicate in group' % objtype,
                                                    resultcode=manager_common.RESULT_ERROR)
             else:
                 # 非gm实体添加需要先找到同组的gm
                 try:
                     gm = typemap[common.GMSERVER][0]
                 except KeyError as e:
-                    return resultutils.results('Create entity fail, can not find GMSERVER: %s' % e.message,
+                    return resultutils.results(result='Create entity fail, can not find GMSERVER: %s' % e.message,
                                                resultcode=manager_common.RESULT_ERROR)
                 if objtype == common.GAMESERVER:
 
@@ -596,14 +596,14 @@ class AppEntityReuest(BaseContorller):
                                             filter=and_(GameArea.group_id == group_id,
                                                         or_(GameArea.area_id == next_area,
                                                             GameArea.areaname == areaname))):
-                        return resultutils.results('Create entity fail, area id or name exist',
+                        return resultutils.results(result='Create entity fail, area id or name exist',
                                                    resultcode=manager_common.RESULT_ERROR)
                     cross = None
                     # 游戏服务器需要在同组中找到cross实例
                     try:
                         crossservers = typemap[common.CROSSSERVER]
                     except KeyError as e:
-                        return resultutils.results('create entity fail, can not find my chief: %s' % e.message,
+                        return resultutils.results(result='create entity fail, can not find my chief: %s' % e.message,
                                                    resultcode=manager_common.RESULT_ERROR)
                     # 如果指定了cross实例id
                     if cross_id:

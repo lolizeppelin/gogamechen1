@@ -205,7 +205,7 @@ class ObjtypeFileReuest(BaseContorller):
                                                       status=status))
             except DBDuplicateEntry:
                 raise InvalidArgument('File info Duplicate error')
-        return resultutils.results('creat file for %s success' % objtype,
+        return resultutils.results(result='creat file for %s success' % objtype,
                                    data=[dict(uuid=objtype_file.uuid, uri=uri)])
 
     def show(self, req, uuid, body=None):
@@ -215,12 +215,12 @@ class ObjtypeFileReuest(BaseContorller):
         objtype_file = query.one()
         show_result = file_controller.show(req, objtype_file.uuid)
         if show_result['resultcode'] != manager_common.RESULT_SUCCESS:
-            return resultutils.results('get file of %s fail, %s' % (uuid, show_result.get('result')))
+            return resultutils.results(result='get file of %s fail, %s' % (uuid, show_result.get('result')))
         file_info = show_result['data'][0]
         file_info.setdefault('subtype', objtype_file.subtype)
         file_info.setdefault('objtype', objtype_file.objtype)
         file_info.setdefault('version', objtype_file.version)
-        return resultutils.results('get file of %s success' % uuid,
+        return resultutils.results(result='get file of %s success' % uuid,
                                    data=[file_info, ])
 
     def delete(self, req, uuid, body=None):
@@ -467,7 +467,7 @@ class PackageReuest(BaseContorller):
         # 确认cdn资源
         resource = resource_cache_map(package.resource_id)
         group = group_controller.show(req, package.group_id)['data'][0]
-        return resultutils.results('Show package success',
+        return resultutils.results(result='Show package success',
                                    data=[dict(package_id=package.package_id,
                                               package_name=package.package_name,
                                               group=group,
@@ -537,7 +537,7 @@ class PackageReuest(BaseContorller):
                 package.rversion = rversion
             session.flush()
         eventlet.spawn_n(notify.resource)
-        return resultutils.results('Update package success')
+        return resultutils.results(result='Update package success')
 
     def delete(self, req, group_id, package_id, body=None):
         body = body or {}
@@ -576,7 +576,7 @@ class PackageReuest(BaseContorller):
             session.delete(package)
             session.flush()
         eventlet.spawn_n(notify.resource)
-        return resultutils.results('Delete package success')
+        return resultutils.results(result='Delete package success')
 
     def upgrade(self, req, group_id, package_id, body=None):
         """更新资源版本"""
@@ -757,7 +757,7 @@ class PackageFileReuest(BaseContorller):
                            'fail': dict(action=url, method='DELETE')}
                 uri = gopcdn_upload(req, resource_id, body,
                                     fileinfo=fileinfo, notify=_notify)
-        return resultutils.results('add package file for %d success' % package_id,
+        return resultutils.results(result='add package file for %d success' % package_id,
                                    data=[dict(pfile_id=pfile.pfile_id, uri=uri)])
 
     def show(self, req, package_id, pfile_id, body=None):
@@ -767,7 +767,7 @@ class PackageFileReuest(BaseContorller):
         if pfile.package_id != package_id:
             raise InvalidArgument('Package File package id not match')
         package = pfile.package
-        return resultutils.results('Show package file success',
+        return resultutils.results(result='Show package file success',
                                    data=[dict(package_id=pfile.package_id,
                                               pfile_id=pfile.pfile_id,
                                               quote_id=pfile.quote_id,
@@ -798,7 +798,7 @@ class PackageFileReuest(BaseContorller):
             data = {'status': status}
             query.update(data)
         eventlet.spawn_n(notify.resource)
-        return resultutils.results('update package file  for %d success' % package_id,
+        return resultutils.results(result='update package file  for %d success' % package_id,
                                    data=[dict(pfile_id=pfile_id)])
 
     def delete(self, req, package_id, pfile_id, body=None):
@@ -829,5 +829,5 @@ class PackageFileReuest(BaseContorller):
         session.delete(pfile)
         session.flush()
         eventlet.spawn_n(notify.resource)
-        return resultutils.results('delete package file  for %d success' % package_id,
+        return resultutils.results(result='delete package file  for %d success' % package_id,
                                    data=[dict(pfile_id=pfile_id)])
