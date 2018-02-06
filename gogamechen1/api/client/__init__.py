@@ -323,10 +323,10 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
-    def appentity_vunquote(self, group_id, objtype, entity, body=None):
+    def appentity_vunquote(self, group_id, objtype, entity, package_id):
         resp, results = self.delete(action=self.appentity_path_ex % (str(group_id), objtype,
                                                                      str(entity), 'quote'),
-                                    body=body)
+                                    body=dict(package_id=package_id))
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='version unquote %s fail:%d' % (objtype, results['resultcode']),
                                             code=resp.status_code,
