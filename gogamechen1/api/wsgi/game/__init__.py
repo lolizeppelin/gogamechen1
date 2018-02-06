@@ -594,8 +594,9 @@ class AppEntityReuest(BaseContorller):
 
                     if model_count_with_key(session, GameArea,
                                             filter=and_(GameArea.group_id == group_id,
-                                                        GameArea.area_id == next_area)):
-                        return resultutils.results('Create entity fail, next area id exist',
+                                                        or_(GameArea.area_id == next_area,
+                                                            GameArea.areaname == areaname))):
+                        return resultutils.results('Create entity fail, area id or name exist',
                                                    resultcode=manager_common.RESULT_ERROR)
                     cross = None
                     # 游戏服务器需要在同组中找到cross实例

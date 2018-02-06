@@ -57,15 +57,15 @@ class AreaDatabase(TableBase):
 
 
 class GameArea(TableBase):
-    area_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
-    areaname = sa.Column(VARCHAR(128), nullable=False)
     group_id = sa.Column(sa.ForeignKey('groups.group_id', ondelete="RESTRICT", onupdate='RESTRICT'),
                          nullable=False, primary_key=True)
+    area_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
+    areaname = sa.Column(VARCHAR(128), nullable=False)
     entity = sa.Column(sa.ForeignKey('appentitys.entity', ondelete="RESTRICT", onupdate='RESTRICT'),
                        nullable=False)
 
     __table_args__ = (
-        # sa.UniqueConstraint('name', name='name_unique'),
+        sa.UniqueConstraint('group_id', 'areaname', name='name_unique'),
         sa.Index('group_index', 'group_id'),
         InnoDBTableBase.__table_args__
     )
