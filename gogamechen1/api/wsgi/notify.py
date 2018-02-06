@@ -25,17 +25,14 @@ FrontInfo = {}
 
 if CONF[common.NAME].notify_resource_url:
     FrontInfo.setdefault('resource', dict(url=CONF[common.NAME].notify_resource_url, method='GET',
-                                          params={'m': 'Admin', 'c': 'Package', 'a': 'notify'},
                                           timeout=10))
 
 if CONF[common.NAME].notify_areas_url:
     FrontInfo.setdefault('areas', dict(url=CONF[common.NAME].notify_areas_url, method='GET',
-                                       params={'m': 'Admin', 'c': 'GameServerGroup', 'a': 'notify'},
                                        timeout=10))
 
 if CONF[common.NAME].notify_entity_url:
     FrontInfo.setdefault('entity', dict(url=CONF[common.NAME].notify_entity_url, method='GET',
-                                        params={'m': 'Admin', 'c': 'Entity', 'a': 'notify'},
                                         timeout=10))
 
 notify = FrontNotify(FrontInfo)
