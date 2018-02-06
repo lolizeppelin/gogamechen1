@@ -694,6 +694,7 @@ class AppEntityReuest(BaseContorller):
                            databases=rpc_result.get('databases'))
             if objtype == common.GAMESERVER:
                 _result.setdefault('area_id', next_area)
+                _result.setdefault('cross_id', cross_id)
 
             threadpool.add_thread(entity_controller.post_create_entity,
                                   _entity.get('entity'), common.NAME, objtype=objtype,
@@ -924,7 +925,8 @@ class AppEntityReuest(BaseContorller):
         for _entity in query:
             if entitys == 'all' or _entity.entity in entitys:
                 if action != 'stop' and _entity.status != common.OK:
-                    raise InvalidArgument('Entity %d status not ok' % _entity.entity)
+                    # raise InvalidArgument('Entity %d status not ok' % _entity.entity)
+                    continue
                 agents.add(_entity.agent_id)
                 _entitys.add(_entity.entity)
 

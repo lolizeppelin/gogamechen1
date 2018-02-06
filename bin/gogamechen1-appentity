@@ -214,6 +214,7 @@ def create():
     print 'agent id: %d' % appentity.get('agent_id')
     print 'objtype: %s' % appentity.get('objtype')
     if objtype == common.GAMESERVER:
+        print 'cross id: %d' % appentity.get('cross_id')
         print 'opentime: %s' % timeutils.unix_to_iso(CONF.opentime)
         print 'area id: %d' % appentity.get('area_id')
         print 'area name: %s' % CONF.name
@@ -232,6 +233,7 @@ def create():
         print 'database_id: %d' % database.get('database_id')
         print 'quote_id: %d' % database.get('quote_id')
         print '---------------------------------------'
+
 
 def show():
     CONF.register_cli_opts(one_opts)
