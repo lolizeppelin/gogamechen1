@@ -292,7 +292,7 @@ def show():
     print 'extension: %s' % package.get('extension')
     print 'rversion: %s' % package.get('rversion')
     print '---------Resource Info---------'
-    print 'rversion quote id: %d' % package.get('rquote_id')
+    print 'rversion quote id: %s' % package.get('rquote_id')
     print 'resource_id: %d' % package.get('resource_id')
     print 'versions: %s' % package.get('versions')
     print 'urls: %s' % package.get('urls')
