@@ -164,7 +164,7 @@ def packages():
     area_heads = ['id', 'name', 'mark', 'status', 'resource_id']
     tb = table.PleasantTable(ident=0, columns=area_heads, counter=True)
     for package in data:
-        tb.add_row([package.get('package_id'), package.get('name'),
+        tb.add_row([package.get('package_id'), package.get('package_name'),
                     package.get('mark'), package.get('status'),
                     package.get('resource_id')])
     print tb.pformat()

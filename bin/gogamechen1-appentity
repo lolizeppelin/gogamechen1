@@ -3,11 +3,13 @@
 import logging
 import time
 import sys
+import eventlet
 
 from simpleutil.config import cfg
 from simpleutil.config import types
 from simpleutil.utils import table
 from simpleutil.utils import timeutils
+from simpleutil.utils import argutils
 
 from goperation.manager import common as manager_common
 from goperation.api.client.config import client_opts
@@ -114,6 +116,25 @@ package_opt = cfg.IntOpt('package_id',
                          help='Package id')
 
 
+def maps(client, group_id):
+    code, result, data = prepare_results(client.group_maps, group_id)
+    if code:
+        print('\033[1;31;40m')
+        print 'Get areas map fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    _maps = {}
+    for kv in data:
+        entity = kv.get('entity')
+        area = kv.get('area')
+        try:
+            _maps[entity].append(area)
+        except KeyError:
+            _maps[entity] = [area]
+    return _maps
+
 
 def _objtype():
     _opt = objtype_opt
@@ -146,6 +167,7 @@ def list():
     CONF.register_cli_opt(objtype_opt)
     CONF(project='cmd')
     _client = client()
+    th = eventlet.spawn(maps, _client, CONF.group_id)
     code, result, data = prepare_results(_client.appentitys_index, CONF.group_id, CONF.objtype)
     if code:
         print('\033[1;31;40m')
@@ -154,16 +176,19 @@ def list():
             print data
         print('\033[0m')
         sys.exit(1)
-    entity_heads = ['group_id', 'entity', 'agent_id', 'status', 'objtype']
+    entity_heads = ['group', 'entity', 'areas', 'agent_id', 'status', 'objtype']
     if CONF.objtype == common.GAMESERVER:
         entity_heads.append('opentime')
     print '\033[1;32;40m\r',
     print 'List %s entitys success' % CONF.objtype
     print 'status DELETED:-2  UNACTIVE:-1  ACTIVE:0',
     print '\033[0m'
+    areamap = th.wait()
     tb = table.PleasantTable(ident=0, columns=entity_heads, counter=True)
     for appentity in data:
-        row = [appentity.get('group_id'), appentity.get('entity'), appentity.get('agent_id'),
+        row = [appentity.get('group_id'), appentity.get('entity'),
+               ','.join(argutils.unmap(areamap[appentity.get('entity')])),
+               appentity.get('agent_id'),
                appentity.get('status'), appentity.get('objtype')
                ]
         if CONF.objtype == common.GAMESERVER:
@@ -369,6 +394,7 @@ def async(action):
     else:
         target = CONF.entity
     _client = client()
+    th = eventlet.spawn(maps, _client, CONF.group_id)
     _func = getattr(_client, 'appentity_%s' % action)
     if not _func:
         raise AttributeError
@@ -389,6 +415,12 @@ def async(action):
     dead = asyncrequest.get('deadline') - now
     print '%s % request %s has been sended' % (objtype, action, request_id)
     print 'Result will respon after %d, dead after %d' % (sleep, dead)
+    areamap = th.wait()
+    map_heads = ['entity', 'areas']
+    tb = table.PleasantTable(ident=0, columns=map_heads, counter=True)
+    for entity in sorted(areamap.keys()):
+        tb.add_row([entity, ','.join(argutils.unmap(areamap[entity]))])
+    print tb.pformat()
     if not wait_finish(_client, asyncrequest):
         print('\033[1;31;40m')
         print 'Async request not finish after deadline'
