@@ -127,14 +127,8 @@ def maps(client, group_id):
         sys.exit(1)
     _maps = {}
     for kv in data:
-        entity = kv.get('entity')
-        area = kv.get('area')
-        try:
-            _maps[entity].append(area)
-        except KeyError:
-            _maps[entity] = [area]
+        _maps[kv.get('entity')] = kv.get('areas')
     return _maps
-
 
 def _objtype():
     _opt = objtype_opt

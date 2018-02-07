@@ -201,7 +201,7 @@ class GroupReuest(BaseContorller):
         group_id = int(group_id)
         maps = areas_map(group_id)
         return resultutils.results(result='get group areas map success',
-                                   data=[dict(entity=k, area=v) for k, v in maps])
+                                   data=[dict(entity=k, areas=v) for k, v in six.iteritems(maps)])
 
     def _chiefs(self, group_ids=None, cross=True):
         if cross:
