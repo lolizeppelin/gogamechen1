@@ -82,7 +82,7 @@ class Routers(router.RoutersBase):
         collection.member.link('maps', method='GET')
         collection.member.link('chiefs', method='GET')
         collection.member.link('areas', method='GET')
-        # collection.member.link('start', method='POST')
+        collection.member.link('packages', method='GET')
         # collection.member.link('stop', method='POST')
         # collection.member.link('status', method='GET')
         # collection.member.link('upgrade', method='POST')

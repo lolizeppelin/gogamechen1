@@ -273,6 +273,21 @@ class GroupReuest(BaseContorller):
         return resultutils.results(result='list group areas success',
                                    data=self._areas(group_id))
 
+    def packages(self, req, group_id, body=None):
+        body = body or {}
+        group_id = int(group_id)
+        session = endpoint_session(readonly=True)
+        query = model_query(session, Group, filter=Group.group_id == group_id)
+        query = query.options(joinedload(Group.packages, innerjoin=False))
+        _group = query.one()
+        return resultutils.results(result='list group packages success',
+                                   data=[dict(package_id=package.package_id,
+                                              package_name=package.package_name,
+                                              mark=package.mark,
+                                              status=package.status,
+                                              resource_id=package.resource_id,
+                                              ) for package in _group.packages])
+
 
 @singleton.singleton
 class AppEntityReuest(BaseContorller):

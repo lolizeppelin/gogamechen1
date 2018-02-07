@@ -150,6 +150,14 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
+    def group_packages(self, group_id, body=None):
+        resp, results = self.get(action=self.group_path_ex % (str(group_id), 'packages'), body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='get gogamechen1 group packages fail:%d' % results['resultcode'],
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
     # -----------bond database api-----------------
     def bondto(self, entity, databases):
         resp, results = self.post(action=self.bond_path % str(entity), body=dict(databases=databases),

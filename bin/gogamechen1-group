@@ -146,6 +146,30 @@ def areas():
     print tb.pformat()
 
 
+def packages():
+    CONF.register_cli_opts(one_opts)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.group_packages, CONF.group_id)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    print '\033[1;32;40m\r',
+    print 'List all packages of group: %d success' % CONF.group_id
+    print '\033[0m'
+    area_heads = ['id', 'name', 'mark', 'status', 'resource_id']
+    tb = table.PleasantTable(ident=0, columns=area_heads, counter=True)
+    for package in data:
+        tb.add_row([package.get('package_id'), package.get('name'),
+                    package.get('mark'), package.get('status'),
+                    package.get('resource_id')])
+    print tb.pformat()
+
+
 def show():
     CONF.register_cli_opts(one_opts)
     CONF(project='cmd')
