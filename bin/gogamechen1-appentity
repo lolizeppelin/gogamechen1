@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # -*- encoding: utf-8 -*-
+import six
 import logging
 import time
 import sys
@@ -130,6 +131,15 @@ def maps(client, group_id):
         _maps[kv.get('entity')] = kv.get('areas')
     return _maps
 
+
+def invert(areamap):
+    _invert_maps = {}
+    for entity, areas in six.iteritems(areamap):
+        for area in areas:
+            _invert_maps[area] = entity
+    return _invert_maps
+
+
 def _objtype():
     _opt = objtype_opt
     prefixs = ['--%s' % _opt.name]
@@ -161,7 +171,8 @@ def list():
     CONF.register_cli_opt(objtype_opt)
     CONF(project='cmd')
     _client = client()
-    th = eventlet.spawn(maps, _client, CONF.group_id)
+    if CONF.objtype == common.GAMESERVER:
+        th = eventlet.spawn(maps, _client, CONF.group_id)
     code, result, data = prepare_results(_client.appentitys_index, CONF.group_id, CONF.objtype)
     if code:
         print('\033[1;31;40m')
@@ -177,11 +188,15 @@ def list():
     print 'List %s entitys success' % CONF.objtype
     print 'status DELETED:-2  UNACTIVE:-1  ACTIVE:0',
     print '\033[0m'
-    areamap = th.wait()
+    if CONF.objtype == common.GAMESERVER:
+        areamap = th.wait()
     tb = table.PleasantTable(ident=0, columns=entity_heads, counter=True)
+    areas = None
     for appentity in data:
-        row = [appentity.get('group_id'), appentity.get('entity'),
-               ','.join(argutils.unmap(areamap[appentity.get('entity')])),
+        entity = appentity.get('entity')
+        if CONF.objtype == common.GAMESERVER:
+            areas = ','.join(argutils.unmap(areamap[entity]))
+        row = [appentity.get('group_id'), entity, areas,
                appentity.get('agent_id'),
                appentity.get('status'), appentity.get('objtype')
                ]
@@ -381,14 +396,27 @@ def async(action):
         CONF.register_cli_opts(one_opts)
     if action == 'stop':
         CONF.register_cli_opt(stop_opt)
-
     CONF(project='cmd')
+    _client = client()
+
     if objtype == common.GAMESERVER:
-        target = ','.join(CONF.areas)
+        th = eventlet.spawn(maps, _client, CONF.group_id)
+        if CONF.areas == 'all':
+            target = CONF.areas
+        else:
+            areamap = th.wait()
+            invert_maps = invert(areamap)
+            areas = argutils.map_to_int(CONF.areas)
+            entitys = set()
+            for area in areas:
+                try:
+                    entitys.add(invert_maps[area])
+                except KeyError:
+                    raise ValueError('Area %d can not be found' % area)
+            target = argutils.unmap(entitys)
     else:
         target = CONF.entity
-    _client = client()
-    th = eventlet.spawn(maps, _client, CONF.group_id)
+
     _func = getattr(_client, 'appentity_%s' % action)
     if not _func:
         raise AttributeError
@@ -409,12 +437,13 @@ def async(action):
     dead = asyncrequest.get('deadline') - now
     print '%s % request %s has been sended' % (objtype, action, request_id)
     print 'Result will respon after %d, dead after %d' % (sleep, dead)
-    areamap = th.wait()
-    map_heads = ['entity', 'areas']
-    tb = table.PleasantTable(ident=0, columns=map_heads, counter=True)
-    for entity in sorted(areamap.keys()):
-        tb.add_row([entity, ','.join(argutils.unmap(areamap[entity]))])
-    print tb.pformat()
+    if CONF.objtype == common.GAMESERVER:
+        areamap = th.wait()
+        map_heads = ['entity', 'areas']
+        tb = table.PleasantTable(ident=0, columns=map_heads, counter=True)
+        for entity in sorted(areamap.keys()):
+            tb.add_row([entity, ','.join(argutils.unmap(areamap[entity]))])
+        print tb.pformat()
     if not wait_finish(_client, asyncrequest):
         print('\033[1;31;40m')
         print 'Async request not finish after deadline'
