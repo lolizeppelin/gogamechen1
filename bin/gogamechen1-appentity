@@ -398,11 +398,10 @@ def async(action):
         CONF.register_cli_opt(stop_opt)
     CONF(project='cmd')
     _client = client()
-
     if objtype == common.GAMESERVER:
         th = eventlet.spawn(maps, _client, CONF.group_id)
-        if CONF.areas == 'all':
-            target = CONF.areas
+        if 'all' in CONF.areas:
+            target = 'all'
         else:
             areamap = th.wait()
             invert_maps = invert(areamap)
@@ -413,9 +412,10 @@ def async(action):
                     entitys.add(invert_maps[area])
                 except KeyError:
                     raise ValueError('Area %d can not be found' % area)
-            target = argutils.unmap(entitys)
+            target = ','.join(argutils.unmap(entitys))
     else:
         target = CONF.entity
+        entitys = [CONF.entity]
 
     _func = getattr(_client, 'appentity_%s' % action)
     if not _func:
