@@ -98,6 +98,8 @@ create_opts = [group_opt, objtype_opt,
 
 gamesvr_create_opt = [area_name_opt, logdb_opt, area_name_opt, opentime_opt, cross_opt]
 
+area_opt = cfg.IntOpt('area', help='Target area id')
+
 areas_opt = cfg.ListOpt('areas',
                         required=True,
                         item_type=types.String(regex=manager_common.ENABLEIDS),
@@ -277,10 +279,30 @@ def create():
 
 
 def show():
+    objtype = _objtype()
+    if objtype == common.GAMESERVER:
+        entity_opt.required = False
+        CONF.register_cli_opt(area_opt)
     CONF.register_cli_opts(one_opts)
     CONF(project='cmd')
     _client = client()
-    code, result, data = prepare_results(_client.appentity_show, CONF.group_id, CONF.objtype, CONF.entity)
+    target = CONF.entity
+    if objtype == common.GAMESERVER:
+        if CONF.area:
+            areamap = invert(maps(_client, CONF.group_id))
+            try:
+                target = areamap[CONF.area]
+            except KeyError:
+                print('\033[1;31;40m')
+                print 'area can not be found for %s' % common.GAMESERVER
+                print('\033[0m')
+                sys.exit(1)
+        elif not CONF.entity:
+            print('\033[1;31;40m')
+            print 'area or entity must be set for show %s' % common.GAMESERVER
+            print('\033[0m')
+            sys.exit(1)
+    code, result, data = prepare_results(_client.appentity_show, CONF.group_id, CONF.objtype, target)
     if code:
         print('\033[1;31;40m')
         print 'Fail, code %d, result %s' % (code, result)
@@ -388,17 +410,20 @@ def unvquote():
 def async(action):
     objtype = _objtype()
     CONF.register_cli_opt(timeout_opt)
+    CONF.register_cli_opts(one_opts)
     if objtype == common.GAMESERVER:
-        CONF.register_cli_opt(group_opt)
-        CONF.register_cli_opt(objtype_opt)
+        entity_opt.required = False
         CONF.register_cli_opt(areas_opt)
-    else:
-        CONF.register_cli_opts(one_opts)
     if action == 'stop':
         CONF.register_cli_opt(stop_opt)
     CONF(project='cmd')
     _client = client()
     if objtype == common.GAMESERVER:
+        if CONF.entity:
+            print('\033[1;31;40m')
+            print 'Use --areas for %s' % common.GAMESERVER
+            print('\033[0m')
+            sys.exit(1)
         th = eventlet.spawn(maps, _client, CONF.group_id)
         if 'all' in CONF.areas:
             target = 'all'

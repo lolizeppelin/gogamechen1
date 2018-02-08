@@ -8,8 +8,9 @@ import webob.exc
 from six.moves import zip
 from collections import OrderedDict
 
-from sqlalchemy import func
-from sqlalchemy import desc
+from requests.exceptions import ConnectTimeout
+from requests.exceptions import ReadTimeout
+
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm.exc import MultipleResultsFound
 from sqlalchemy.orm.exc import NoResultFound
@@ -75,7 +76,7 @@ FAULT_MAP = {InvalidArgument: webob.exc.HTTPClientError,
              CacheStoneError: webob.exc.HTTPInternalServerError,
              RpcPrepareError: webob.exc.HTTPInternalServerError,
              NoResultFound: webob.exc.HTTPNotFound,
-             MultipleResultsFound: webob.exc.HTTPInternalServerError
+             MultipleResultsFound: webob.exc.HTTPInternalServerError,
              }
 
 entity_controller = EntityReuest()
@@ -1117,12 +1118,19 @@ class AppEntityReuest(BaseContorller):
                                                 endpoint=common.NAME,
                                                 body={'ports': True})['data'][0]
             message = body.get('message') or ''
-            port = entityinfo.get('port')[0]
-            ipaddr = entityinfo.get('metadata').get('loacl_ip')
+            port = entityinfo.get('ports')[0]
+            ipaddr = entityinfo.get('metadata').get('local_ip')
             url = 'http://%s:%d/closegameserver' % (ipaddr, port)
             body = jsonutils.dumps_as_bytes(OrderedDict(RealSvrIds=list(entitys),
                                                         Msg=message, DelayTime=0))
-            requests.post(url, data=body, timeout=5)
+            try:
+                requests.post(url, data=body, timeout=5)
+            except ConnectTimeout:
+                return resultutils.results(result='Stop request catch ReadTimeout error',
+                                           resultcode=manager_common.RESULT_ERROR)
+            except ReadTimeout:
+                return resultutils.results(result='Stop request catch ReadTimeout error',
+                                           resultcode=manager_common.RESULT_ERROR)
             body.update({'delay': 10})
             finishtime, timeout = rpcfinishtime(body.get('request_time'))
             body.update({'finishtime': finishtime + 10})
