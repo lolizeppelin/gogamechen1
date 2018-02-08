@@ -168,9 +168,13 @@ class GroupReuest(BaseContorller):
             _entitys = {}
             for entity in _group.entitys:
                 objtype = entity.objtype
-                entityinfo = dict(entity=entity.entity)
+                entityinfo = dict(entity=entity.entity, status=entity.status)
                 if objtype == common.GAMESERVER:
                     entityinfo.setdefault('areas', [area.area_id for area in entity.areas])
+                try:
+                    _entitys[objtype].append(entityinfo)
+                except KeyError:
+                    _entitys[objtype] = [entityinfo, ]
             group_info.setdefault('entitys', _entitys)
         return resultutils.results(result='show group success', data=[group_info, ])
 

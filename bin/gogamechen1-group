@@ -186,6 +186,7 @@ def show():
     entitys = group.get('entitys')
     print '\033[1;32;40m\r',
     print 'Show package success'
+    print 'status DELETED:-2  UNACTIVE:-1  ACTIVE:0',
     print '\033[0m'
     print 'group id: %s' % group.get('group_id')
     print 'group name: %s' % group.get('name')
@@ -198,26 +199,29 @@ def show():
                                                fill='-', align="^", size=25)
         print '\033[0m'
         print '%s entity: %d' % (common.GMSERVER, gm.get('entity'))
+        print '%s status: %d' % (common.GMSERVER, gm.get('status'))
     cross_s = entitys.get(common.CROSSSERVER)
     if cross_s:
         print '\033[1;32;40m\r',
         print '{0:{fill}{align}{size}}'.format(common.CROSSSERVER,
                                                fill='-', align="^", size=25)
         print '\033[0m'
-        _entitys = []
-        for c in cross_s:
-            _entitys.append(c.get('entity'))
-        print '%s entitys: %s' % (common.CROSSSERVER, ','.join(map(str, cross_s)))
+        cross_heads = ['entity', '', 'status']
+        tb = table.PleasantTable(ident=0, columns=cross_heads, counter=True)
+        for cross in cross_s:
+            tb.add_row([cross.get('entity'), cross.get('status')])
+        print tb.pformat()
     games = entitys.get(common.GAMESERVER)
     if games:
-        game_heads = ['entity', 'areas']
+        game_heads = ['entity', 'areas', 'status']
         print '\033[1;32;40m\r',
         print '{0:{fill}{align}{size}}'.format(common.GAMESERVER,
                                                fill='-', align="^", size=25)
         print '\033[0m'
         tb = table.PleasantTable(ident=0, columns=game_heads, counter=True)
         for game in games:
-            tb.add_row([game.get('entity'), ','.join(map(str, game.get('areas')))])
+            tb.add_row([game.get('entity'), ','.join(map(str, game.get('areas'))),
+                        game.get('status')])
         print tb.pformat()
 
 
