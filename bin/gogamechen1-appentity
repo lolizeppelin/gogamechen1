@@ -118,6 +118,10 @@ package_opt = cfg.IntOpt('package_id',
                          required=True,
                          help='Package id')
 
+delete_opt = cfg.BoolOpt('delete',
+                         default=False,
+                         help='Delete database when clean entity, if flase, just revmove quote')
+
 
 def maps(client, group_id):
     code, result, data = prepare_results(client.group_maps, group_id)
@@ -359,6 +363,26 @@ def delete():
     appentity = data[0]
     print('\033[1;32;40m')
     print 'Delete entity success'
+    print('\033[0m')
+
+
+def clean():
+    CONF.register_cli_opts(one_opts)
+    CONF.register_cli_opts(delete_opt)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.appentity_clean, CONF.group_id, CONF.objtype, CONF.entity,
+                                         CONF.delete)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    appentity = data[0]
+    print('\033[1;32;40m')
+    print 'Clean entity success'
     print('\033[0m')
 
 

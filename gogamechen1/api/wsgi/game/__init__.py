@@ -991,6 +991,8 @@ class AppEntityReuest(BaseContorller):
                             LOG.error('Unquote %d fail, try rollback' % _database.quote_id)
                 token = uuidutils.generate_uuid()
                 LOG.info('Send delete command with token %s' % token)
+                session.delete(_entity)
+                session.flush()
                 try:
                     entity_controller.delete(req, common.NAME, entity=entity, body=dict(token=token))
                 except Exception as e:
@@ -1010,7 +1012,6 @@ class AppEntityReuest(BaseContorller):
 
                     threadpool.add_thread(_rollback)
                     raise e
-                query.delete()
         eventlet.spawn_n(notify.areas, group_id)
         return resultutils.results(result='delete %s:%d success' % (objtype, entity),
                                    data=[dict(entity=entity, objtype=objtype,
@@ -1065,22 +1066,29 @@ class AppEntityReuest(BaseContorller):
         session = endpoint_session(readonly=True)
         query = model_query(session, AppEntity, filter=and_(AppEntity.group_id == group_id,
                                                             AppEntity.objtype == objtype))
-        agents = set()
-        _entitys = set()
-        for _entity in query:
-            if entitys == 'all' or _entity.entity in entitys:
-                if action != 'stop' and _entity.status != common.OK:
-                    # raise InvalidArgument('Entity %d status not ok' % _entity.entity)
-                    continue
-                agents.add(_entity.agent_id)
-                _entitys.add(_entity.entity)
+        emaps = dict()
 
-        if entitys != 'all' and len(_entitys) != len(entitys):
-            raise InvalidArgument('Some entitys not found')
+        for _entity in query:
+            if _entity.status <= common.DELETED:
+                continue
+            if _entity.status != common.OK and action != 'stop':
+                continue
+            emaps.setdefault(_entity.entity, _entity.agent_id)
+
+        if entitys == 'all':
+            entitys = emaps.keys()
+            agents = set(emaps.values())
+        else:
+            if entitys - set(emaps.keys()):
+                raise InvalidArgument('Some entitys not found')
+            agents = set()
+            for entity in emaps:
+                if entity in entitys:
+                    agents.add(emaps[entity])
 
         rpc_ctxt = dict(agents=list(agents))
         rpc_method = '%s_entitys' % action
-        rpc_args = dict(entitys=list(_entitys))
+        rpc_args = dict(entitys=list(entitys))
         rpc_args.update(body)
 
         def wapper():
