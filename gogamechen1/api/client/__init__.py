@@ -275,7 +275,7 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
         return results
 
     def appentity_stop(self, group_id, objtype, entity, body=None):
-        resp, results = self.post(action=self.appentity_path_ex % (str(group_id), objtype, str(entity), 'start'),
+        resp, results = self.post(action=self.appentity_path_ex % (str(group_id), objtype, str(entity), 'stop'),
                                   body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='stop %s fail:%d' % (objtype, results['resultcode']),
