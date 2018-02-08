@@ -352,6 +352,8 @@ def delete():
     CONF.register_cli_opts(one_opts)
     CONF(project='cmd')
     _client = client()
+    if CONF.objtype == common.GAMESERVER:
+        areamap = maps(_client, CONF.group_id)
     code, result, data = prepare_results(_client.appentity_delete, CONF.group_id, CONF.objtype, CONF.entity)
     if code:
         print('\033[1;31;40m')
@@ -362,9 +364,21 @@ def delete():
         sys.exit(1)
     appentity = data[0]
     print('\033[1;32;40m')
-    print 'Delete entity success'
+    print result
     print('\033[0m')
-
+    entity = appentity.get('entity')
+    metadata = appentity.get('metadata')
+    print 'objtype: %s' % CONF.objtype
+    print 'entity: %d' % entity
+    if CONF.objtype == common.GAMESERVER:
+        if entity in areamap:
+            areas = ','.join(argutils.unmap(areamap[entity]))
+        else:
+            areas = None
+        print 'areas: %s' % areas
+    print 'ports: %s' % ','.join(map(str, appentity.get('ports')))
+    print 'local_ip: %s' % metadata.get('local_ip')
+    print 'external_ips: %s' % str(metadata.get('external_ips'))
 
 def clean():
     CONF.register_cli_opts(one_opts)
@@ -384,7 +398,12 @@ def clean():
     print('\033[1;32;40m')
     print 'Clean entity success'
     print('\033[0m')
-
+    metadata = appentity.get('metadata')
+    print 'objtype: %s' % CONF.objtype
+    print 'entity: %d' % appentity.get('entity')
+    print 'ports: %s' % ','.join(map(str, appentity.get('ports')))
+    print 'local_ip: %s' % metadata.get('local_ip')
+    print 'external_ips: %s' % str(metadata.get('external_ips'))
 
 def vquote():
     CONF.register_cli_opts(one_opts)
