@@ -1100,20 +1100,26 @@ class AppEntityReuest(BaseContorller):
         if objtype == common.GAMESERVER and not kill:
             session = endpoint_session(readonly=True)
             entitys = set()
+            gm = None
             for _entity in model_query(session, AppEntity,
-                                       filter=and_(AppEntity.objtype == common.GAMESERVER,
+                                       filter=and_(AppEntity.objtype.in_([common.GAMESERVER, common.GMSERVER]),
                                                    AppEntity.group_id == group_id)):
+                if _entity.status == common.DELETED:
+                    continue
+                if _entity.objtype == common.GMSERVER:
+                    gm = _entity
+                    continue
                 entitys.add(_entity.entity)
-            if entity != 'all':
+            if not gm:
+                return resultutils.results(result='No %s found or status is not acitve' % common.GMSERVER,
+                                           resultcode=manager_common.RESULT_ERROR)
+            if entity == 'all':
                 entitys = list(entitys)
             else:
                 targits = argutils.map_to_int(entity)
                 if targits - entitys:
-                    raise InvalidArgument('Entity not exist')
+                    raise InvalidArgument('Entity not exist or not mark as deleted')
                 entitys = targits
-            query = model_query(session, AppEntity, filter=and_(AppEntity.objtype == common.GMSERVER,
-                                                                AppEntity.group_id == group_id))
-            gm = query.one()
             entityinfo = entity_controller.show(req=req, entity=gm.entity,
                                                 endpoint=common.NAME,
                                                 body={'ports': True})['data'][0]
@@ -1121,10 +1127,10 @@ class AppEntityReuest(BaseContorller):
             port = entityinfo.get('ports')[0]
             ipaddr = entityinfo.get('metadata').get('local_ip')
             url = 'http://%s:%d/closegameserver' % (ipaddr, port)
-            body = jsonutils.dumps_as_bytes(OrderedDict(RealSvrIds=list(entitys),
-                                                        Msg=message, DelayTime=0))
+            jdata = jsonutils.dumps_as_bytes(OrderedDict(RealSvrIds=list(entitys),
+                                                         Msg=message, DelayTime=0))
             try:
-                requests.post(url, data=body, timeout=5)
+                requests.post(url, data=jdata, timeout=5)
             except ConnectTimeout:
                 return resultutils.results(result='Stop request catch ReadTimeout error',
                                            resultcode=manager_common.RESULT_ERROR)

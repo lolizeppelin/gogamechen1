@@ -197,7 +197,10 @@ def list():
     for appentity in data:
         entity = appentity.get('entity')
         if CONF.objtype == common.GAMESERVER:
-            areas = ','.join(argutils.unmap(areamap[entity]))
+            if entity in areamap:
+                areas = ','.join(argutils.unmap(areamap[entity]))
+            else:
+                areas = None
         row = [appentity.get('group_id'), entity, areas,
                appentity.get('agent_id'),
                appentity.get('status'), appentity.get('objtype')
