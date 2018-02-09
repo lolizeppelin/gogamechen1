@@ -382,7 +382,7 @@ def delete():
 
 def clean():
     CONF.register_cli_opts(one_opts)
-    CONF.register_cli_opts(delete_opt)
+    CONF.register_cli_opt(delete_opt)
     CONF(project='cmd')
     _client = client()
     code, result, data = prepare_results(_client.appentity_clean, CONF.group_id, CONF.objtype, CONF.entity,

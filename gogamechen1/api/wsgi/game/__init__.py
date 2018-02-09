@@ -46,6 +46,7 @@ from goperation.manager.wsgi.exceptions import RpcPrepareError
 from goperation.manager.wsgi.exceptions import RpcResultError
 
 from gopdb import common as dbcommon
+from gopdb.api.wsgi.exceptions import GopdbError
 from gopdb.api.wsgi.controller import SchemaReuest
 from gopdb.api.wsgi.controller import DatabaseReuest
 
@@ -61,7 +62,6 @@ from gogamechen1.models import Group
 from gogamechen1.models import AppEntity
 from gogamechen1.models import GameArea
 from gogamechen1.models import AreaDatabase
-from gogamechen1.models import Package
 
 from gogamechen1.api.wsgi.notify import notify
 
@@ -958,10 +958,12 @@ class AppEntityReuest(BaseContorller):
                         quotes = schema_controller.show(req=req, database_id=_database.database_id,
                                                         schema=schema,
                                                         body={'quotes': True})['data'][0]['quotes']
-                        if set(quotes) != set([_database.quote_id]):
+                        if _database.quote_id not in quotes:
+                            # if set(quotes) != set([_database.quote_id]):
                             result = 'delete %s:%d fail' % (objtype, entity)
                             reason = ': database [%d].%s quote: %s' % (_database.database_id, schema, str(quotes))
-                            return resultutils.results(result=(result + reason))
+                            return resultutils.results(result=(result + reason),
+                                                       resultcode=manager_common.RESULT_ERROR)
                         LOG.info('Delete quotes check success for %s' % schema)
                 # clean database
                 rollbacks = []
@@ -972,8 +974,11 @@ class AppEntityReuest(BaseContorller):
                         try:
                             schema_controller.delete(req=req, database_id=_database.database_id,
                                                      schema=schema, body={'unquotes': [_database.quote_id]})
+                        except GopdbError as e:
+                            LOG.error('Delete schema:%s from %d fail, %s' % (schema, _database.database_id,
+                                                                             e.message))
                         except Exception:
-                            LOG.error('Delete %s from %d fail' % (schema, _database.database_id))
+                            LOG.error('Delete schema:%s from %d fail' % (schema, _database.database_id))
                             if LOG.isEnabledFor(logging.DEBUG):
                                 LOG.exception('Delete schema fail')
                     elif action == 'unquote':
