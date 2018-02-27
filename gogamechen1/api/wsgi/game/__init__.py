@@ -321,7 +321,7 @@ class AppEntityReuest(BaseContorller):
                                        'backup': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
                                                   'description': '是否更新前备份程序,默认是'},
                                        'rollback': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
-                                                    'description': '是否连带回滚(其他步骤失败数据库也回滚),默认否'},
+                                                    'description': '是否连带回滚(回滚前方已经成功的步骤),默认否'},
                                        }},
                     common.DATADB: {
                         'type': 'object',
@@ -333,7 +333,7 @@ class AppEntityReuest(BaseContorller):
                             'backup': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
                                        'description': '是否更新前备份游戏数据库,默认否'},
                             'rollback': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
-                                         'description': '是否连带回滚(其他步骤失败数据库也回滚),默认否'}}},
+                                         'description': '是否连带回滚(回滚前方已经成功的步骤),默认否'}}},
                     common.LOGDB: {
                         'type': 'object',
                         'required': ['uuid', 'timeout'],
@@ -344,7 +344,7 @@ class AppEntityReuest(BaseContorller):
                             'backup': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
                                        'description': '是否更新前备份日志数据库,默认否'},
                             'rollback': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
-                                         'description': '是否连带回滚(其他步骤失败数据库也回滚),默认否'}}},}
+                                         'description': '是否连带回滚(回滚前方已经成功的步骤),默认否'}}},}
                 }
 
     UPGRADE = {'type': 'object',
@@ -1162,7 +1162,7 @@ class AppEntityReuest(BaseContorller):
         body = body or {}
         jsonutils.schema_validate(body, self.UPGRADE)
         objfiles = body.get('objfiles')
-        if objfiles:
+        if not objfiles:
             raise InvalidArgument('Not objfile found for upgrade')
         finishtime = int(time.time()) + 5
         for objfile in objfiles:

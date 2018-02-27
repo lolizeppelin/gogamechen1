@@ -72,7 +72,7 @@ opentime_opt = cfg.IntOpt('opentime',
                           required=True,
                           default=int(time.time()),
                           short='t',
-                          help='Game server opentime time')
+                          help='Game server opentime time, default is now')
 
 area_name_opt = cfg.StrOpt('name',
                            required=True,
@@ -380,6 +380,7 @@ def delete():
     print 'local_ip: %s' % metadata.get('local_ip')
     print 'external_ips: %s' % str(metadata.get('external_ips'))
 
+
 def clean():
     CONF.register_cli_opts(one_opts)
     CONF.register_cli_opt(delete_opt)
@@ -404,6 +405,7 @@ def clean():
     print 'ports: %s' % ','.join(map(str, appentity.get('ports')))
     print 'local_ip: %s' % metadata.get('local_ip')
     print 'external_ips: %s' % str(metadata.get('external_ips'))
+
 
 def vquote():
     CONF.register_cli_opts(one_opts)

@@ -247,12 +247,13 @@ class ObjtypeFileReuest(BaseContorller):
         send file to agents
         """
         body = body or {}
-        objtype = body.pop('objtype')
+        objtype = body.get('objtype')
         if body.pop('all', True):
             # 发文件到所有匹配的agent
-            includes = ['metadata.gogamechen1-aff&%d' % common.APPAFFINITYS[objtype],
-                        'metadata.agent_type=application', ]
-            zone = body.pop('zone', None)
+            includes = ['metadata.agent_type=application', ]
+            if objtype is not None:
+                includes.insert(0, 'metadata.gogamechen1-aff&%d' % common.APPAFFINITYS[objtype])
+            zone = body.get('zone', None)
             if zone:
                 includes.insert(0, 'metadata.zone=%s' % zone)
             agents = self.chioces(endpoint=common.NAME, includes=includes)
