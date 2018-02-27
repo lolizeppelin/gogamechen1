@@ -547,6 +547,7 @@ def opentime():
     CONF.register_cli_opt(opentime_opt)
     CONF(project='cmd')
     _client = client()
+    emap = maps(_client, CONF.group_id)
     code, result, data = prepare_results(_client.game_opentime, CONF.group_id, CONF.entity,
                                          CONF.opentime)
     if code:
@@ -556,7 +557,6 @@ def opentime():
             print data
         print('\033[0m')
         sys.exit(1)
-    emap = maps(_client, CONF.group_id)
     areas = emap[CONF.entity]
     print('\033[1;32;40m')
     print 'Change %s opentime success' % common.GAMESERVER
