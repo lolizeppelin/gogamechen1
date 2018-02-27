@@ -388,8 +388,8 @@ class AppEntityReuest(BaseContorller):
             {'metadata.gogamechen1-aff': None},
             {'cputime': 5},
             {'cpu': -1},
-            {'free': 200},
-            {'left': 500},
+            {'free': -200},
+            {'left': -500},
             {'process': None}]
         chioces = self.chioces(common.NAME, includes=includes, weighters=weighters)
         return chioces
