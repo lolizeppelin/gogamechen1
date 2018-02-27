@@ -226,8 +226,8 @@ def send():
     CONF.register_cli_opts(one_opts)
     CONF.register_cli_opts(timeout_opts)
     CONF.register_cli_opts(game_type_opts)
-    CONF.register_cli_opts(zone_opt)
-    CONF.register_cli_opts(send_to_all_opt)
+    CONF.register_cli_opt(zone_opt)
+    CONF.register_cli_opt(send_to_all_opt)
     CONF(project='cmd')
     if not CONF.objtype:
         print('\033[1;31;40m')
