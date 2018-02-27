@@ -1017,6 +1017,7 @@ class AppEntityReuest(BaseContorller):
 
                     threadpool.add_thread(_rollback)
                     raise e
+        eventlet.spawn_n(notify.entity, group_id, objtype, entity, True)
         eventlet.spawn_n(notify.areas, group_id)
         return resultutils.results(result='delete %s:%d success' % (objtype, entity),
                                    data=[dict(entity=entity, objtype=objtype,

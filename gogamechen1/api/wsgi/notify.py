@@ -7,11 +7,12 @@ CONF = cfg.CONF
 
 
 class FrontNotify(HttpNotify):
-    def entity(self, group_id, objtype, entity):
-        self._do('entity', replace={'params': {'group_id': group_id,
-                                               'objtype': objtype,
-                                               'entity': entity,
-                                               }})
+    def entity(self, group_id, objtype, entity, delete=False):
+        params = {'group_id': group_id, 'objtype': objtype,
+                  'entity': entity}
+        if delete:
+            params.setdefault('op', 'del')
+        self._do('entity', replace={'params': params})
 
     def areas(self, group_id):
         self._do('areas', replace={'params': {'group_id': group_id}})

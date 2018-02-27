@@ -61,6 +61,7 @@ create_opts = [
                help='Uploade file version'),
 ]
 send_to_all_opt = cfg.BoolOpt('all',
+                              default=True,
                               help='Send file to all agents match objtype in zone')
 
 def client(session=None):
