@@ -17,7 +17,6 @@ class FrontNotify(HttpNotify):
     def areas(self, group_id):
         self._do('areas', replace={'params': {'group_id': group_id}})
 
-
     def resource(self):
         self._do('resource')
 
