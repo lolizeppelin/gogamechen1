@@ -1142,7 +1142,7 @@ class AppEntityReuest(BaseContorller):
             ipaddr = entityinfo.get('metadata').get('local_ip')
             url = 'http://%s:%d/closegameserver' % (ipaddr, port)
             jdata = jsonutils.dumps_as_bytes(OrderedDict(RealSvrIds=list(entitys),
-                                                         Msg=message, DelayTime=0))
+                                                         Msg=message, DelayTime=0 if not message else 30))
             try:
                 requests.post(url, data=jdata, timeout=5)
             except ConnectTimeout:

@@ -574,10 +574,11 @@ class PackageReuest(BaseContorller):
                 checked.add(entity)
                 versions = area.get('versions')
                 if versions:
-                    for version in versions:
-                        if version.get('package_id') == package_id:
+                    for p in versions:
+                        if int(p) == package_id:
+                            version = versions[p]
                             raise InvalidArgument('Entity %d set package %d, version %s' %
-                                                  (area.get('entity', package_id, version.get('version'))))
+                                                  (entity, package_id, version.get('version')))
             # 版本资源引用删除
             if package.rquote_id:
                 cdnquote_controller.delete(req, package.rquote_id)
