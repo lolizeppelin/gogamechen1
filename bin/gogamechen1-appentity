@@ -542,10 +542,33 @@ def flushconfig():
     async('flushconfig')
 
 
+def opentime():
+    CONF.register_cli_opts(one_opts)
+    CONF.register_cli_opt(opentime_opt)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.game_opentime, CONF.group_id, CONF.entity,
+                                         CONF.opentime)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    emap = maps(_client, CONF.group_id)
+    areas = emap[CONF.entity]
+    print('\033[1;32;40m')
+    print 'Change %s opentime success' % common.GAMESERVER
+    print 'entity: %s' % CONF.entity
+    print 'areas: %s' % ','.join(areas)
+    print('\033[0m')
+
+
 def main():
     FUNCS = ['list', 'create', 'show', 'delete',
              'start', 'stop', 'status', 'flushconfig',
-             'vquote', 'unvquote', 'clean']
+             'vquote', 'unvquote', 'clean', 'opentime']
     try:
         func = sys.argv.pop(1)
         if func not in FUNCS:
