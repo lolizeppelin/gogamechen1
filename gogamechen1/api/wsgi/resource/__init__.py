@@ -248,13 +248,16 @@ class ObjtypeFileReuest(BaseContorller):
         """
         body = body or {}
         objtype = body.pop('objtype')
-        zone = body.pop('zone', None)
         if body.pop('all', True):
-            # 发文件到所以匹配的agent
+            # 发文件到所有匹配的agent
             includes = ['metadata.gogamechen1-aff&%d' % common.APPAFFINITYS[objtype],
                         'metadata.agent_type=application', ]
-            includes.insert(0, 'metadata.zone=%s' % zone)
+            zone = body.pop('zone', None)
+            if zone:
+                includes.insert(0, 'metadata.zone=%s' % zone)
             agents = self.chioces(endpoint=common.NAME, includes=includes)
+            if not agents:
+                return resultutils.results(result='No agents has been selected', resultcode=1)
         else:
             # 只发文件到已经有实体的agent
             session = endpoint_session(readonly=True)
