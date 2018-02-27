@@ -1047,12 +1047,12 @@ class AppEntityReuest(BaseContorller):
             target.namespace = common.NAME
             rpc = get_client()
             finishtime, timeout = rpcfinishtime()
-            with session.begin():
-                rpc_ret = rpc.call(target, ctxt={'finishtime': finishtime},
-                                   msg={'method': 'opentime_entity',
-                                        'args': dict(entity=entity, opentime=opentime)},
-                                   timeout=timeout)
-                query.update({'opentime': opentime})
+            # with session.begin():
+            rpc_ret = rpc.call(target, ctxt={'finishtime': finishtime},
+                               msg={'method': 'opentime_entity',
+                                    'args': dict(entity=entity, opentime=opentime)},
+                               timeout=timeout)
+            query.update({'opentime': opentime})
             if not rpc_ret:
                 raise RpcResultError('change entity opentime result is None')
             if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:

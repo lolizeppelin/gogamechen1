@@ -533,7 +533,7 @@ class Application(AppEndpointBase):
         objtype = self.konwn_appentitys[entity].get('objtype')
         if objtype != common.GAMESERVER:
             raise ValueError('%s has no opentime conf' % object)
-        with self.lock(entity=[entity]):
+        with self.lock(entity=entity):
             self.konwn_appentitys[entity]['opentime'] = opentime
             self.flush_config(entity, opentime=opentime)
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
