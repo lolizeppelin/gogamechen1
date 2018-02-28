@@ -93,7 +93,7 @@ create_pfile_opts = [
                help='Package file version'),
     cfg.StrOpt('ftype',
                required=True,
-               choices=common.PackageTypeMap.values(),
+               choices=[common.FULL_PACKAGE, common.SMALL_PACKAGE],
                help='Package file type, small, update, full'),
     cfg.StrOpt('desc',
                help='Package file desc'),

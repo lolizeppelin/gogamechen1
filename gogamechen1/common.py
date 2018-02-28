@@ -52,24 +52,24 @@ DBAFFINITYS = {GAMESERVER: {DATADB: 1, LOGDB: 2},
 ENABLE = 1
 DISABLE = 0
 
-ANY = 0
-ANDROID = 1
-IOS = 2
+ANY = 'any'
+ANDROID = 'android'
+IOS = 'ios'
 
-EntityTypeMap = {IOS: 'ios',
-                 ANDROID: 'android',
-                 ANY: 'any'}
+# EntityTypeMap = {IOS: 'ios',
+#                  ANDROID: 'android',
+#                  ANY: 'any'}
+#
+# InvertEntityTypeMap = dict([(v, k) for k, v in EntityTypeMap.iteritems()])
 
-InvertEntityTypeMap = dict([(v, k) for k, v in EntityTypeMap.iteritems()])
+SMALL_PACKAGE = 'small'
+UPDATE_PACKAGE = 'update'
+FULL_PACKAGE = 'full'
 
-SMALL_PACKAGE = 0
-UPDATE_PACKAGE = 1
-FULL_PACKAGE = 2
-
-PackageTypeMap = {SMALL_PACKAGE: 'small',
-                  UPDATE_PACKAGE: 'update',
-                  FULL_PACKAGE: 'full'}
+# PackageTypeMap = {SMALL_PACKAGE: 'small',
+#                   UPDATE_PACKAGE: 'update',
+#                   FULL_PACKAGE: 'full'}
 
 # from itertools import izip
 # InvertPackageTypeMap = dict(izip(PackageTypeMap.itervalues(), PackageTypeMap.iterkeys()))
-InvertPackageTypeMap = dict([(v, k) for k, v in PackageTypeMap.iteritems()])
+# InvertPackageTypeMap = dict([(v, k) for k, v in PackageTypeMap.iteritems()])
