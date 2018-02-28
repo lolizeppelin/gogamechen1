@@ -99,11 +99,10 @@ create_pfile_opts = [
                help='Package file desc'),
 ]
 
-version_opts = [
-    cfg.StrOpt('rversion',
-               required=True,
-               help='Cdn resource version'),
-]
+rversion_opt = cfg.StrOpt('rversion', required=True, help='Cdn resource version')
+
+gversion_opt = cfg.StrOpt('gversion', required=True, help='Package file version')
+
 
 
 def client(session=None):
@@ -332,7 +331,7 @@ def delete():
 
 def upgrade():
     CONF.register_cli_opts(one_opts)
-    CONF.register_cli_opts(version_opts)
+    CONF.register_cli_opt(rversion_opt)
     CONF.register_cli_opts(timeout_opts)
     CONF(project='cmd')
     _client = client()
@@ -366,7 +365,7 @@ def upgrade():
 
 def rversion():
     CONF.register_cli_opts(one_opts)
-    CONF.register_cli_opts(version_opts)
+    CONF.register_cli_opt(rversion_opt)
     CONF(project='cmd')
     _client = client()
     body = dict(rversion=CONF.rversion)
@@ -381,6 +380,26 @@ def rversion():
     print('\033[1;32;40m')
     print 'Change package default resource version success'
     print('\033[0m')
+
+
+def gversion():
+    CONF.register_cli_opts(one_opts)
+    CONF.register_cli_opt(gversion_opt)
+    CONF(project='cmd')
+    _client = client()
+    body = dict(gversion=CONF.gversion)
+    code, result, data = prepare_results(_client.package_update, CONF.group_id, CONF.package_id, body=body)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    print('\033[1;32;40m')
+    print 'Change package gversion success'
+    print('\033[0m')
+
 
 
 def enable():
@@ -485,7 +504,7 @@ def upload():
 
 def main():
     FUNCS = ['all', 'list', 'show', 'create', 'delete',
-             'upgrade', 'rversion', 'resources',
+             'upgrade', 'gversion', 'rversion', 'resources',
              'enable', 'disable', 'upload']
 
     try:

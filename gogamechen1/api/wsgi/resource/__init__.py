@@ -229,7 +229,7 @@ class ObjtypeFileReuest(BaseContorller):
         query = model_query(session, ObjtypeFile, filter=ObjtypeFile.uuid == uuid)
         pfile = query.one()
         package = pfile.package
-        if package.gversion == package.gversion:
+        if package.gversion == package.gversion and pfile.ftype == common.SMALL_PACKAGE:
             raise InvalidArgument('Package file with version %s is quote' % package.gversion)
         query.delete()
         return file_controller.delete(req, pfile.uuid)
@@ -546,7 +546,8 @@ class PackageReuest(BaseContorller):
                 package.extension = jsonutils.dumps(default_extension)
             if gversion:
                 if gversion in [pfile.gversion for pfile in package.files
-                                if pfile.status == manager_common.DOWNFILE_FILEOK]:
+                                if pfile.ftype == common.SMALL_PACKAGE
+                                and pfile.status == manager_common.DOWNFILE_FILEOK]:
                     package.gversion = gversion
                 else:
                     raise InvalidArgument('Package version can not be found')
