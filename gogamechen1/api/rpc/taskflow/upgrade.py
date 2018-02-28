@@ -48,7 +48,7 @@ def upgrade_entitys(appendpoint, entitys, objfiles, objtype):
         _objfiles[common.APPFILE] = application.AppUpgradeFile(source=upinfo['uuid'])
         if upinfo.get('backup', True):
             backupfile = os.path.join(appendpoint.endpoint_backup,
-                                      '%s.%s.%d.zip' % (objtype, common.APPFILE, int(time.time())))
+                                      '%s.%s.%d.gz' % (objtype, common.APPFILE, int(time.time())))
         rollback = upinfo.get('rollback', False)
         if rollback and not backupfile:
             raise ValueError('%s rollback need backupfile')
@@ -68,7 +68,8 @@ def upgrade_entitys(appendpoint, entitys, objfiles, objtype):
                 timeout = _objfiles[subtype]['timeout']
                 backup = None
                 if _objfiles[subtype]['backup']:
-                    backup = os.path.join(appendpoint.bakpath(entity), '%s.%d.bak' % (subtype, int(time.time())))
+                    backup = os.path.join(appendpoint.bakpath(entity), '%s.%s.%d.sql' % (objtype, subtype,
+                                                                                         int(time.time())))
                     if os.path.exists(backup):
                         raise ValueError('%s backup file exist' % subtype)
                 _database.append(GogameDatabase(backup=backup, update=update,

@@ -1057,7 +1057,7 @@ class AppEntityReuest(BaseContorller):
                 raise RpcResultError('change entity opentime result is None')
             if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
                 raise RpcResultError('change entity opentime fail %s' % rpc_ret.get('result'))
-        return resultutils.results(result='change entity opentime' % entity)
+        return resultutils.results(result='change entity %d opentime success' % entity)
 
     def _async_bluck_rpc(self, action, group_id, objtype, entity, body):
         caller = inspect.stack()[0][3]
@@ -1151,9 +1151,10 @@ class AppEntityReuest(BaseContorller):
             except ReadTimeout:
                 return resultutils.results(result='Stop request catch ReadTimeout error',
                                            resultcode=manager_common.RESULT_ERROR)
-            body.update({'delay': 10})
+            delay = 10 if not message else 40
+            body.update({'delay': delay})
             finishtime, timeout = rpcfinishtime(body.get('request_time'))
-            body.update({'finishtime': finishtime + 10})
+            body.update({'finishtime': finishtime + delay})
         return self._async_bluck_rpc('stop', group_id, objtype, entity, body)
 
     def status(self, req, group_id, objtype, entity, body=None):

@@ -138,6 +138,7 @@ def all():
         print '\033[0m'
         print 'package id: %s' % package.get('package_id')
         print 'package name: %s' % package.get('package_name')
+        print 'package version: %s' % package.get('gversion')
         print 'mark: %s' % package.get('mark')
         print 'etype: %s' % package.get('etype')
         print 'name: %s' % package.get('name')
@@ -208,14 +209,17 @@ def list():
             print data
         print('\033[0m')
         sys.exit(1)
-    package_heads = ['package_id', 'package_name', 'mark', 'group_id', 'rversion', 'resource_id',
+
+    package_heads = ['package_id', 'package_name', 'gversion',
+                     'mark', 'group_id', 'rversion', 'resource_id',
                      'status', 'magic', 'extension']
     print '\033[1;32;40m\r',
     print 'List game packages success'
     print '\033[0m'
     tb = table.PleasantTable(ident=0, columns=package_heads, counter=True)
     for package in data:
-        tb.add_row([package.get('package_id'), package.get('package_name'), package.get('mark'),
+        tb.add_row([package.get('package_id'), package.get('package_name'), package.get('gversion'),
+                    package.get('mark'),
                     package.get('group_id'), package.get('rversion'), package.get('resource_id'),
                     package.get('status'), package.get('magic'), package.get('extension'),
                     ])
@@ -284,6 +288,7 @@ def show():
     print 'desc: %s' % package.get('desc')
     print 'package id: %s' % package.get('package_id')
     print 'package name: %s' % package.get('package_name')
+    print 'package version: %s' % package.get('gversion')
     print 'status: %s' % package.get('status')
     print 'mark: %s' % package.get('mark')
     print 'etype: %s' % package.get('etype')

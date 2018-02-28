@@ -227,9 +227,12 @@ class ObjtypeFileReuest(BaseContorller):
         body = body or {}
         session = endpoint_session(readonly=True)
         query = model_query(session, ObjtypeFile, filter=ObjtypeFile.uuid == uuid)
-        objtype_file = query.one()
+        pfile = query.one()
+        package = pfile.package
+        if package.gversion == package.gversion:
+            raise InvalidArgument('Package file with version %s is quote' % package.gversion)
         query.delete()
-        return file_controller.delete(req, objtype_file.uuid)
+        return file_controller.delete(req, pfile.uuid)
 
     def update(self, req, uuid, body=None):
         raise NotImplementedError
@@ -340,6 +343,7 @@ class PackageReuest(BaseContorller):
             resource = resource_cache_map(resource_id=package.resource_id)
             info = dict(dict(package_id=package.package_id,
                              package_name=package.package_name,
+                             gversion=package.gversion,
                              rversion=package.rversion,
                              group_id=package.group_id,
                              etype=resource.get('etype'),
@@ -406,6 +410,7 @@ class PackageReuest(BaseContorller):
                                            model=Package,
                                            columns=[Package.package_id,
                                                     Package.package_name,
+                                                    Package.gversion,
                                                     Package.group_id,
                                                     Package.rversion,
                                                     Package.resource_id,
@@ -482,6 +487,7 @@ class PackageReuest(BaseContorller):
         return resultutils.results(result='Show package success',
                                    data=[dict(package_id=package.package_id,
                                               package_name=package.package_name,
+                                              gversion=package.gversion,
                                               group=group,
                                               resource_id=package.resource_id,
                                               rversion=package.rversion,
@@ -517,9 +523,13 @@ class PackageReuest(BaseContorller):
         status = body.get('status')
         desc = body.get('desc')
         rversion = body.get('rversion')
+        gversion = body.get('gversion')
         session = endpoint_session()
+        query = model_query(session, Package, filter=Package.package_id == package_id)
+        if gversion:
+            query.options(joinedload(Package.files, innerjoin=False))
         with session.begin():
-            package = model_query(session, Package, filter=Package.package_id == package_id).one()
+            package = query.one()
             if package.group_id != group_id:
                 raise InvalidArgument('Group id not the same')
             if status:
@@ -534,6 +544,12 @@ class PackageReuest(BaseContorller):
                 default_extension = jsonutils.loads_as_bytes(package.extension) if package.extension else {}
                 default_extension.update(extension)
                 package.extension = jsonutils.dumps(default_extension)
+            if gversion:
+                if gversion in [pfile.gversion for pfile in package.files
+                                if pfile.status == manager_common.DOWNFILE_FILEOK]:
+                    package.gversion = gversion
+                else:
+                    raise InvalidArgument('Package version can not be found')
             if rversion:
                 # 没有引用过默认version,添加资源引用
                 if not package.rquote_id:

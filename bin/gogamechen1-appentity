@@ -561,7 +561,7 @@ def opentime():
     print('\033[1;32;40m')
     print 'Change %s opentime success' % common.GAMESERVER
     print 'entity: %s' % CONF.entity
-    print 'areas: %s' % ','.join(areas)
+    print 'areas: %s' % ','.join(map(str, areas))
     print('\033[0m')
 
 
