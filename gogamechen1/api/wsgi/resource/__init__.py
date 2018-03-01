@@ -733,8 +733,8 @@ class PackageFileReuest(BaseContorller):
                                                     PackageFile.gversion,
                                                     PackageFile.address,
                                                     PackageFile.status,
-                                                    PackageFile.utime],
-                                           counter=Package.pfile_id,
+                                                    PackageFile.uptime],
+                                           counter=PackageFile.pfile_id,
                                            order=order,
                                            filter=PackageFile.package_id == package_id,
                                            page_num=page_num)
@@ -808,7 +808,7 @@ class PackageFileReuest(BaseContorller):
                                               ftype=pfile.ftype,
                                               gversion=pfile.gversion,
                                               status=pfile.address,
-                                              utime=pfile.utime,
+                                              uptime=pfile.uptime,
                                               package_name=package.package_name,
                                               group_id=package.group_id,
                                               )])
