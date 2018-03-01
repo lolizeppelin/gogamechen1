@@ -304,6 +304,9 @@ class PackageReuest(BaseContorller):
                 'magic': {'oneOf': [{'type': 'string'},
                                     {'type': 'object'},
                                     {'type': 'null'}]},
+                'extension': {'oneOf': [{'type': 'string'},
+                                        {'type': 'object'},
+                                        {'type': 'null'}]},
                 'desc': {'oneOf': [{'type': 'string'}, {'type': 'null'}]},
             }
     }
@@ -315,7 +318,8 @@ class PackageReuest(BaseContorller):
                 'magic': {'type': 'object'},
                 'extension': {'type': 'object'},
                 'desc': {'type': 'string'},
-                'version': {'type': 'string'},
+                'gversion': {'type': 'string'},
+                'rversion': {'type': 'string'},
                 'status': {'type': 'integer', 'enum': [common.ENABLE, common.DISABLE]}
             }
     }
@@ -433,6 +437,7 @@ class PackageReuest(BaseContorller):
         group_id = int(group_id)
         mark = body.pop('mark')
         magic = body.get('magic')
+        extension = body.get('extension')
         desc = body.get('desc')
         session = endpoint_session()
         with session.begin():
@@ -453,6 +458,7 @@ class PackageReuest(BaseContorller):
                               group_id=group_id,
                               mark=mark,
                               magic=jsonutils.dumps(magic) if magic else None,
+                              extension=jsonutils.dumps(extension) if extension else None,
                               desc=desc)
             session.add(package)
             session.flush()
@@ -722,7 +728,7 @@ class PackageFileReuest(BaseContorller):
                                            model=PackageFile,
                                            columns=[PackageFile.package_id,
                                                     PackageFile.pfile_id,
-                                                    PackageFile.quote_id,
+                                                    # PackageFile.quote_id,
                                                     PackageFile.ftype,
                                                     PackageFile.gversion,
                                                     PackageFile.address,
@@ -798,7 +804,7 @@ class PackageFileReuest(BaseContorller):
         return resultutils.results(result='Show package file success',
                                    data=[dict(package_id=pfile.package_id,
                                               pfile_id=pfile.pfile_id,
-                                              quote_id=pfile.quote_id,
+                                              # quote_id=pfile.quote_id,
                                               ftype=pfile.ftype,
                                               gversion=pfile.gversion,
                                               status=pfile.address,
@@ -857,5 +863,5 @@ class PackageFileReuest(BaseContorller):
         session.delete(pfile)
         session.flush()
         eventlet.spawn_n(notify.resource)
-        return resultutils.results(result='delete package file  for %d success' % package_id,
+        return resultutils.results(result='delete package file for %d success' % package_id,
                                    data=[dict(pfile_id=pfile_id)])
