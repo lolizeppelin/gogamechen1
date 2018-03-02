@@ -67,8 +67,8 @@ def _format_chiefs(cfile, chiefs):
         if chief in chiefs:
             port = chiefs[chief]['ports'][0]
             if chief == common.GMSERVER:
-                if len(chiefs[chief]['ports']) != 2:
-                    raise ValueError('Port count of %s is not 2' % chief)
+                # if len(chiefs[chief]['ports']) != 2:
+                #     raise ValueError('Port count of %s is not 2' % chief)
                 port = chiefs[chief]['ports'][1]
             new.setdefault(chief, '%s:%d' % (chiefs[chief]['local_ip'], port))
 
@@ -129,6 +129,7 @@ def gamesvr_make(logpath, local_ip, ports, entity, areas, databases, opentime, c
     conf.setdefault('LogLevel', 'release')
     conf.setdefault('LogPath', logpath)
     conf.setdefault('TCPAddr', '%s:%d' % ('0.0.0.0', ports[0]))
+    conf.setdefault('ListenAddr', '%s:%d' % (local_ip, ports[1]))
     conf.setdefault('RealServerId', entity)
     conf.setdefault('ShowServerIds', areas)
     conf.setdefault('StartServerTime', opentime)

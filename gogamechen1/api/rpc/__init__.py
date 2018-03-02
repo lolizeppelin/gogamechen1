@@ -174,18 +174,15 @@ class Application(AppEndpointBase):
 
     @contextlib.contextmanager
     def _allocate_port(self, entity, objtype, ports):
-        if isinstance(ports, (int, long)):
-            ports = [ports]
-        elif not ports:
-            ports = [None,]
-        if objtype == common.GMSERVER:
-            if len(ports) == 1:
-                ports.append(None)
-            if len(ports) != 2:
-                raise ValueError('%s need two ports' % common.GMSERVER)
-        else:
-            if len(ports) > 1:
-                raise ValueError('Too many ports')
+        need = common.POSTS_COUNT[objtype]
+
+        if ports is not None:
+            ports = [None] * need
+
+        if len(ports) != need:
+            raise ValueError('%s need %d ports, but found %d' % (objtype,
+                                                                 need,
+                                                                 len(ports)))
         with self.manager.frozen_ports(common.NAME, entity, ports=ports) as ports:
             ports = sorted(ports)
             yield ports
@@ -380,6 +377,7 @@ class Application(AppEndpointBase):
 
     def rpc_create_entity(self, ctxt, entity, **kwargs):
         timeout = count_timeout(ctxt, kwargs)
+        _ports = kwargs.pop('ports', None)
         chiefs = kwargs.pop('chiefs', None)
         objtype = kwargs.pop('objtype')
         databases = kwargs.pop('databases')
@@ -397,7 +395,7 @@ class Application(AppEndpointBase):
                 confdir = os.path.split(self._objconf(entity, objtype))[0]
                 os.makedirs(confdir, mode=0755)
                 systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
-                with self._allocate_port(entity, objtype, None) as ports:
+                with self._allocate_port(entity, objtype, _ports) as ports:
                     middleware = taskcreate.create_entity(self, entity, objtype, databases,
                                                           chiefs, appfile, timeout)
                     if not middleware.success:
@@ -455,11 +453,16 @@ class Application(AppEndpointBase):
                                                   result='entity is running, can not reset')
             objtype = self.konwn_appentitys[entity].get('objtype')
             ports = self._get_ports(entity)
-            if not ports:
-                LOG.info('%s.%d port is miss' % (objtype, entity) )
-                with self._allocate_port(entity, objtype, ports) as ports:
+            miss = len(ports) - common.POSTS_COUNT[objtype]
+            if miss:
+                if miss < 0:
+                    LOG.error('Miss posrt count less then 0')
+                    raise ValueError('need %d ports, but %d found' % (common.POSTS_COUNT[objtype],
+                                                                      len(ports)))
+                LOG.info('%s.%d port is miss' % (objtype, entity))
+                with self.manager.frozen_ports(common.NAME, entity, ports=[None] * miss) as more_posts:
                     self.client.ports_add(agent_id=self.manager.agent_id, endpoint=common.NAME,
-                                          entity=entity, ports=ports)
+                                          entity=entity, ports=more_posts)
                     LOG.info('Miss port of %s.%d, success allocate' % (objtype, entity))
             if appfile:
                 appfile = self.filemanager.get(appfile, download=False)

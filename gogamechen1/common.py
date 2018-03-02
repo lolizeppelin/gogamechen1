@@ -16,6 +16,12 @@ UNACTIVE = -1
 OK = 0
 DELETED = -2
 
+POSTS_COUNT = {
+    GAMESERVER: 2,
+    GMSERVER: 2,
+    CROSSSERVER: 1
+}
+
 APPAFFINITYS = {GAMESERVER: 1, CROSSSERVER: 2, GMSERVER: 4}
 #    map app affinitys by bitwise operation
 #    GM    CROSS  GAME
