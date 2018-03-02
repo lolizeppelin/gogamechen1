@@ -240,16 +240,29 @@ class Application(AppEndpointBase):
     def flush_config(self, entity, databases=None,
                      opentime=None, chiefs=None):
         eventlet.sleep(0.01)
+        objtype = self._objtype(entity)
+        ports = self._get_ports(entity)
+
+        miss = common.POSTS_COUNT[objtype] - len(ports)
+        if miss:
+            if miss < 0:
+                LOG.error('Miss ports count less then 0')
+                raise ValueError('need %d ports, but %d found' % (common.POSTS_COUNT[objtype],
+                                                                  len(ports)))
+            LOG.info('%s.%d port miss some port' % (objtype, entity))
+            with self.manager.frozen_ports(common.NAME, entity, ports=[None] * miss) as more_posts:
+                self.client.ports_add(agent_id=self.manager.agent_id, endpoint=common.NAME,
+                                      entity=entity, ports=more_posts)
+                LOG.info('Miss port of %s.%d, success allocate' % (objtype, entity))
+            ports = self._get_ports(entity)
         try:
-            objtype = self._objtype(entity)
             areas = self.konwn_appentitys[entity].get('areas')
             cfile = self._objconf(entity, objtype)
-            posts = self._get_ports(entity)
             databases = gconfig.format_databases(objtype, cfile, databases)
             chiefs = gconfig.format_chiefs(objtype, cfile, chiefs)
             opentime = gconfig.format_opentime(objtype, cfile, opentime)
             confobj = gconfig.make(objtype, self.logpath(entity),
-                                   self.manager.local_ip, posts,
+                                   self.manager.local_ip, ports,
                                    entity, areas,
                                    databases, opentime, chiefs)
         except Exception:
@@ -452,18 +465,6 @@ class Application(AppEndpointBase):
                                                   resultcode=manager_common.RESULT_ERROR,
                                                   result='entity is running, can not reset')
             objtype = self.konwn_appentitys[entity].get('objtype')
-            ports = self._get_ports(entity)
-            miss = common.POSTS_COUNT[objtype] - len(ports)
-            if miss:
-                if miss < 0:
-                    LOG.error('Miss posrt count less then 0')
-                    raise ValueError('need %d ports, but %d found' % (common.POSTS_COUNT[objtype],
-                                                                      len(ports)))
-                LOG.info('%s.%d port is miss' % (objtype, entity))
-                with self.manager.frozen_ports(common.NAME, entity, ports=[None] * miss) as more_posts:
-                    self.client.ports_add(agent_id=self.manager.agent_id, endpoint=common.NAME,
-                                          entity=entity, ports=more_posts)
-                    LOG.info('Miss port of %s.%d, success allocate' % (objtype, entity))
             if appfile:
                 appfile = self.filemanager.get(appfile, download=False)
                 gfile.check(objtype, appfile)

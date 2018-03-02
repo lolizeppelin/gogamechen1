@@ -750,7 +750,7 @@ class PackageFileReuest(BaseContorller):
 
         gversion = body.pop('gversion')
         ftype = body.pop('ftype')
-        desc = body.pop('desc')
+        desc = body.get('desc')
         address = body.get('address')
 
         session = endpoint_session()

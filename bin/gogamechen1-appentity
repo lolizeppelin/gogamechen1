@@ -29,7 +29,7 @@ CONF = cfg.CONF
 
 timeout_opt = cfg.IntOpt('timeout',
                          default=30,
-                         help='Send file/Upgrade/Uploade timeout')
+                         help='Send file/Upgrade/Uploade/Reset request timeout')
 
 entity_opt = cfg.IntOpt('entity',
                         short='e',
@@ -95,6 +95,16 @@ create_opts = [group_opt, objtype_opt,
                agent_opt, zone_opt,
                appfile_opt,
                datadb_opt]
+
+reset_opts = [
+    cfg.BoolOpt('databases',
+                short='d',
+                help='Reset databases of entity, default not'),
+    cfg.BoolOpt('chiefs',
+                short='c',
+                help='Reset chiefs of entity, default not, only for %s' % common.GAMESERVER),
+]
+
 
 gamesvr_create_opt = [area_name_opt, logdb_opt, area_name_opt, opentime_opt, cross_opt]
 
@@ -165,9 +175,9 @@ def _objtype():
     return objtype
 
 
-def client(session=None):
+def client(session=None, timeout=None):
     return GogameChen1DBClient(httpclient=ManagerClient(url=CONF.gcenter, port=CONF.gcenter_port,
-                                                        retries=CONF.retries, timeout=CONF.apitimeout,
+                                                        retries=CONF.retries, timeout=CONF.apitimeout or timeout,
                                                         token=CONF.trusted, session=session))
 
 
@@ -407,6 +417,34 @@ def clean():
     print 'external_ips: %s' % str(metadata.get('external_ips'))
 
 
+def reset():
+    appfile_opt.required = False
+    timeout_opt.default = 15
+    CONF.register_cli_opts(one_opts)
+    CONF.register_cli_opts(appfile_opt)
+    CONF.register_cli_opt(reset_opts)
+    CONF.register_cli_opt(timeout_opt)
+    CONF(project='cmd')
+    body = dict(databases=CONF.databases, appfile=CONF.appfile, chiefs=CONF.chiefs)
+    timeout = CONF.timeout
+    if CONF.appfile:
+        timeout = max(CONF.timeout, 40)
+    _client = client(timeout=timeout)
+    code, result, data = prepare_results(_client.appentity_reset, CONF.group_id, CONF.objtype, CONF.entity, body)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    print('\033[1;32;40m')
+    print 'Reset entity success'
+    print('\033[0m')
+    print 'objtype: %s' % CONF.objtype
+    print 'entity: %d' % CONF.entity
+
+
 def vquote():
     CONF.register_cli_opts(one_opts)
     CONF.register_cli_opt(version_opts)
@@ -540,11 +578,6 @@ def status():
 
 def flushconfig():
     async('flushconfig')
-
-
-def reset():
-    appfile_opt.required = False
-    async('reset', [appfile_opt, ])
 
 
 def opentime():

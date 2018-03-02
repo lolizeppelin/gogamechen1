@@ -1205,8 +1205,12 @@ class AppEntityReuest(BaseContorller):
         body = body or {}
         group_id = int(group_id)
         entity = int(entity)
-        # 重置文件信息,为空表示不需要重置文件
+        # 重置程序文件,为空表示不需要重置程序文件
         appfile = body.pop(common.APPFILE, None)
+        # 重置数据库信息
+        databases = body.pop('databases', False)
+        # 重置主服务器信息(gameserver专用)
+        chiefs = body.pop('chiefs', False)
         # 查询entity信息
         session = endpoint_session()
         query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
@@ -1216,107 +1220,112 @@ class AppEntityReuest(BaseContorller):
             raise InvalidArgument('Entity is not %s' % objtype)
         if _entity.group_id != group_id:
             raise InvalidArgument('Entity group %d not match  %d' % (_entity.group_id, group_id))
-        chiefs = {}
-        databases = {}
-        # 从本地查询数据库信息
-        for database in _entity.databases:
-            subtype = database.subtype
-            schema = '%s_%s_%s_%d' % (common.NAME, objtype, subtype, entity)
-            databases[subtype] = dict(host=database.host,
-                                      port=database.port,
-                                      user=database.user,
-                                      passwd=database.passwd,
-                                      schema=schema,
-                                      character_set=database.character_set)
-        miss = []
-        # 必要数据库信息
-        NEEDED = common.DBAFFINITYS[objtype].keys()
-        # 数据库信息不匹配,从gopdb接口反查数据库信息
-        if set(NEEDED) != set(databases.keys()):
-            LOG.warning('Database not match, try find schema info from gopdb')
-            quotes = schema_controller.quotes(req, body=dict(entitys=[entity, ], endpoint=common.NAME))['data']
-            for subtype in NEEDED:
-                if subtype not in databases:
-                    # 从gopdb接口查询引用信息
-                    schema = '%s_%s_%s_%d' % (common.NAME, objtype, subtype, entity)
-                    for quote_detail in quotes:
-                        # 确认引用不是从库且结构名称相等
-                        if quote_detail['qdatabase_id'] == quote_detail['database_id'] \
-                                and quote_detail['schema'] == schema:
-                            databases.setdefault(common.DATADB,
-                                                 dict(host=quote_detail['host'],
-                                                      port=quote_detail['port'],
-                                                      user=quote_detail['user'],
-                                                      passwd=quote_detail['passwd'],
-                                                      schema=schema,
-                                                      character_set=quote_detail['character_set']))
-                            miss.append(AreaDatabase(quote_id=quote_detail['quote_id'],
-                                                     database_id=quote_detail['qdatabase_id'],
-                                                     entity=entity,
-                                                     subtype=subtype,
-                                                     host=quote_detail['host'], port=quote_detail['port'],
-                                                     user=quote_detail['user'], passwd=quote_detail['passwd'],
-                                                     ro_user=quote_detail['ro_user'],
-                                                     ro_passwd=quote_detail['ro_passwd'],
-                                                     character_set=quote_detail['character_set'])
-                                        )
-                            quotes.remove(quote_detail)
-                            break
-                    if subtype not in databases:
-                        LOG.critical('Miss database of %s' % schema)
-                        # 数据库信息无法从gopdb中反查到
-                        raise ValueError('Not %s.%s database found for %d' % (objtype, subtype, entity))
-        self._validate_databases(objtype, databases)
         entityinfo = entity_controller.show(req=req, entity=entity,
                                             endpoint=common.NAME,
                                             body={'ports': False})['data'][0]
-        # ports = entityinfo['ports']
         agent_id = entityinfo['agent_id']
         metadata = entityinfo['metadata']
         if not metadata:
             raise InvalidArgument('Agent is off line, can not reset entity')
-        with session.begin():
-            if objtype == common.GAMESERVER:
-                cross_id = _entity.cross_id
-                if cross_id is None:
-                    raise ValueError('%s.%d cross_id is None' % (objtype, entity))
-                query = model_query(session, AppEntity,
-                                    filter=and_(AppEntity.group_id == group_id,
-                                                or_(AppEntity.entity == cross_id,
-                                                    AppEntity.objtype == common.GMSERVER)))
-                _chiefs = query.all()
-                if len(_chiefs) != 2:
-                    raise ValueError('Try find %s.%d chiefs from local database error' % (objtype, entity))
-                for chief in _chiefs:
-                    for _objtype in (common.GMSERVER, common.CROSSSERVER):
-                        _metadata, ports = self._entityinfo(req, chief.entity)
-                        if not _metadata:
-                            raise InvalidArgument('Metadata of %s.%d is none' % (_objtype, chief.entity))
-                        if chief.objtype == _objtype:
-                            chiefs[_objtype] = dict(entity=chief.entity,
-                                                    ports=ports,
-                                                    local_ip=metadata.get('local_ip'))
-                if len(chiefs) != 2:
-                    raise ValueError('%s.%d chiefs error' % (objtype, entity))
+        # 需要更新数据库
+        if databases:
+            miss = []
+            databases = {}
+            # 从本地查询数据库信息
+            for database in _entity.databases:
+                subtype = database.subtype
+                schema = '%s_%s_%s_%d' % (common.NAME, objtype, subtype, entity)
+                databases[subtype] = dict(host=database.host,
+                                          port=database.port,
+                                          user=database.user,
+                                          passwd=database.passwd,
+                                          schema=schema,
+                                          character_set=database.character_set)
+
+            # 必要数据库信息
+            NEEDED = common.DBAFFINITYS[objtype].keys()
+            # 数据库信息不匹配,从gopdb接口反查数据库信息
+            if set(NEEDED) != set(databases.keys()):
+                LOG.warning('Database not match, try find schema info from gopdb')
+                quotes = schema_controller.quotes(req, body=dict(entitys=[entity, ],
+                                                                 endpoint=common.NAME))['data']
+                for subtype in NEEDED:
+                    if subtype not in databases:
+                        # 从gopdb接口查询引用信息
+                        schema = '%s_%s_%s_%d' % (common.NAME, objtype, subtype, entity)
+                        for quote_detail in quotes:
+                            # 确认引用不是从库且结构名称相等
+                            if quote_detail['qdatabase_id'] == quote_detail['database_id'] \
+                                    and quote_detail['schema'] == schema:
+                                databases.setdefault(common.DATADB,
+                                                     dict(host=quote_detail['host'],
+                                                          port=quote_detail['port'],
+                                                          user=quote_detail['user'],
+                                                          passwd=quote_detail['passwd'],
+                                                          schema=schema,
+                                                          character_set=quote_detail['character_set']))
+                                miss.append(AreaDatabase(quote_id=quote_detail['quote_id'],
+                                                         database_id=quote_detail['qdatabase_id'],
+                                                         entity=entity,
+                                                         subtype=subtype,
+                                                         host=quote_detail['host'], port=quote_detail['port'],
+                                                         user=quote_detail['user'], passwd=quote_detail['passwd'],
+                                                         ro_user=quote_detail['ro_user'],
+                                                         ro_passwd=quote_detail['ro_passwd'],
+                                                         character_set=quote_detail['character_set'])
+                                            )
+                                quotes.remove(quote_detail)
+                                break
+                        if subtype not in databases:
+                            LOG.critical('Miss database of %s' % schema)
+                            # 数据库信息无法从gopdb中反查到
+                            raise ValueError('Not %s.%s database found for %d' % (objtype, subtype, entity))
+            self._validate_databases(objtype, databases)
             # 有数据库信息遗漏
             if miss:
-                for obj in miss:
-                    session.add(obj)
-                    session.flush()
-            target = targetutils.target_agent_by_string(metadata.get('agent_type'), metadata.get('host'))
-            target.namespace = common.NAME
-            rpc = get_client()
-            finishtime, timeout = rpcfinishtime()
-            if appfile:
-                finishtime += 30
-                timeout += 35
-            rpc_ret = rpc.call(target, ctxt={'finishtime': finishtime, 'agents': [agent_id, ]},
-                               msg={'method': 'reset_entity',
-                                    'args': dict(entity=entity, appfile=appfile,
-                                                 databases=databases, chiefs=chiefs)},
-                               timeout=timeout)
-            if not rpc_ret:
-                raise RpcResultError('reset entity result is None')
-            if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
-                raise RpcResultError('reset entity fail %s' % rpc_ret.get('result'))
-            return resultutils.results(result='reset entity %d success' % entity)
+                with session.begin():
+                    for obj in miss:
+                        session.add(obj)
+                        session.flush()
+
+        if objtype == common.GAMESERVER and chiefs:
+            chiefs = {}
+            cross_id = _entity.cross_id
+            if cross_id is None:
+                raise ValueError('%s.%d cross_id is None' % (objtype, entity))
+            query = model_query(session, AppEntity,
+                                filter=and_(AppEntity.group_id == group_id,
+                                            or_(AppEntity.entity == cross_id,
+                                                AppEntity.objtype == common.GMSERVER)))
+            _chiefs = query.all()
+            if len(_chiefs) != 2:
+                raise ValueError('Try find %s.%d chiefs from local database error' % (objtype, entity))
+            for chief in _chiefs:
+                for _objtype in (common.GMSERVER, common.CROSSSERVER):
+                    _metadata, ports = self._entityinfo(req, chief.entity)
+                    if not _metadata:
+                        raise InvalidArgument('Metadata of %s.%d is none' % (_objtype, chief.entity))
+                    if chief.objtype == _objtype:
+                        chiefs[_objtype] = dict(entity=chief.entity,
+                                                ports=ports,
+                                                local_ip=metadata.get('local_ip'))
+            if len(chiefs) != 2:
+                raise ValueError('%s.%d chiefs error' % (objtype, entity))
+
+        target = targetutils.target_agent_by_string(metadata.get('agent_type'), metadata.get('host'))
+        target.namespace = common.NAME
+        rpc = get_client()
+        finishtime, timeout = rpcfinishtime()
+        if appfile:
+            finishtime += 30
+            timeout += 35
+        rpc_ret = rpc.cast(target, ctxt={'finishtime': finishtime, 'agents': [agent_id, ]},
+                           msg={'method': 'reset_entity',
+                                'args': dict(entity=entity, appfile=appfile,
+                                             databases=databases, chiefs=chiefs)},
+                           timeout=timeout)
+        if not rpc_ret:
+            raise RpcResultError('reset entity result is None')
+        if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
+            raise RpcResultError('reset entity fail %s' % rpc_ret.get('result'))
+        return resultutils.results(result='reset entity %d success' % entity)
