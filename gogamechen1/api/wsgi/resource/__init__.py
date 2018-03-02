@@ -301,11 +301,9 @@ class PackageReuest(BaseContorller):
                                 'description': '安装包关联的游戏cdn资源'},
                 'package_name': {'type': 'string'},
                 'mark': {'type': 'string', 'description': '渠道标记'},
-                'magic': {'oneOf': [{'type': 'string'},
-                                    {'type': 'object'},
+                'magic': {'oneOf': [{'type': 'object'},
                                     {'type': 'null'}]},
-                'extension': {'oneOf': [{'type': 'string'},
-                                        {'type': 'object'},
+                'extension': {'oneOf': [{'type': 'object'},
                                         {'type': 'null'}]},
                 'desc': {'oneOf': [{'type': 'string'}, {'type': 'null'}]},
             }
