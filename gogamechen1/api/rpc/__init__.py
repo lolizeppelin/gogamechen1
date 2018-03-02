@@ -453,7 +453,7 @@ class Application(AppEndpointBase):
                                                   result='entity is running, can not reset')
             objtype = self.konwn_appentitys[entity].get('objtype')
             ports = self._get_ports(entity)
-            miss = len(ports) - common.POSTS_COUNT[objtype]
+            miss = common.POSTS_COUNT[objtype] - len(ports)
             if miss:
                 if miss < 0:
                     LOG.error('Miss posrt count less then 0')

@@ -531,7 +531,7 @@ def start():
 
 
 def stop():
-    async('stop', stop_opt)
+    async('stop', [stop_opt, ])
 
 
 def status():
@@ -544,7 +544,7 @@ def flushconfig():
 
 def reset():
     appfile_opt.required = False
-    async('reset', appfile_opt)
+    async('reset', [appfile_opt, ])
 
 
 def opentime():

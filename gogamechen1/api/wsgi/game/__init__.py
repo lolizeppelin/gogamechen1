@@ -1281,8 +1281,9 @@ class AppEntityReuest(BaseContorller):
                 if cross_id is None:
                     raise ValueError('%s.%d cross_id is None' % (objtype, entity))
                 query = model_query(session, AppEntity,
-                                    filter=or_(AppEntity.entity == entity,
-                                               AppEntity.objtype == common.GMSERVER))
+                                    filter=and_(AppEntity.group_id == group_id,
+                                                or_(AppEntity.entity == cross_id,
+                                                    AppEntity.objtype == common.GMSERVER)))
                 _chiefs = query.all()
                 if len(_chiefs) != 2:
                     raise ValueError('Try find %s.%d chiefs from local database error' % (objtype, entity))
