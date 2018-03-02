@@ -28,7 +28,6 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
 
     bond_path = '/gogamechen1/entity/%s'
     appentitys_all_path = '/gogamechen1/entitys'
-    reset_path = '/gogamechen1/group/%s/%s/entitys/%s/reset'
 
     all_packages_path = '/gogamechen1/packages'
     all_resources_path = '/gogamechen1/resources'
@@ -173,15 +172,6 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                  timeout=15)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='get gogamechen1 entitys fail:%d' % results['resultcode'],
-                                            code=resp.status_code,
-                                            resone=results['result'])
-        return results
-
-    def reset(self,  group_id, objtype, entity, body=None):
-        resp, results = self.post(action=self.reset_path % (str(group_id), objtype, str(entity)), body=body)
-        if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='reset gogamechen1 %s.%d fail:%d' % (results['resultcode'],
-                                                                                         objtype, entity),
                                             code=resp.status_code,
                                             resone=results['result'])
         return results

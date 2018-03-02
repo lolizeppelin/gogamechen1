@@ -455,15 +455,15 @@ def unvquote():
     print('\033[0m')
 
 
-def async(action):
+def async(action, ext_opts=None):
     objtype = _objtype()
     CONF.register_cli_opt(timeout_opt)
     CONF.register_cli_opts(one_opts)
     if objtype == common.GAMESERVER:
         entity_opt.required = False
         CONF.register_cli_opt(areas_opt)
-    if action == 'stop':
-        CONF.register_cli_opt(stop_opt)
+    if ext_opts:
+        CONF.register_cli_opts(ext_opts)
     CONF(project='cmd')
     _client = client()
     if objtype == common.GAMESERVER:
@@ -531,7 +531,7 @@ def start():
 
 
 def stop():
-    async('stop')
+    async('stop', stop_opt)
 
 
 def status():
@@ -540,6 +540,11 @@ def status():
 
 def flushconfig():
     async('flushconfig')
+
+
+def reset():
+    appfile_opt.required = False
+    async('reset', appfile_opt)
 
 
 def opentime():
@@ -567,7 +572,7 @@ def opentime():
 
 def main():
     FUNCS = ['list', 'create', 'show', 'delete',
-             'start', 'stop', 'status', 'flushconfig',
+             'start', 'stop', 'status', 'flushconfig', 'reset',
              'vquote', 'unvquote', 'clean', 'opentime']
     try:
         func = sys.argv.pop(1)
