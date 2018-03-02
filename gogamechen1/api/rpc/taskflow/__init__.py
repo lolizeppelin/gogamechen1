@@ -3,11 +3,13 @@ from goperation.manager.rpc.agent.application.taskflow.database import Database
 
 
 class GogameMiddle(EntityMiddleware):
+
     def __init__(self, entity, endpoint, objtype):
         super(GogameMiddle, self).__init__(entity, endpoint)
         self.objtype = objtype
         self.databases = {}
         self.waiter = None
+        self._exclude = lambda x: True if x and x.endswith('.log') else False
 
 
 class GogameDatabase(Database):

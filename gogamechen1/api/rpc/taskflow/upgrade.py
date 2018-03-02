@@ -29,6 +29,8 @@ class GogameStop(application.AppStopBase):
 
 def upgrade_entitys(appendpoint, entitys, objfiles, objtype):
     _objfiles = {}
+
+    # 下载数据库更新文件任务
     for subtype in (common.DATADB, common.LOGDB):
         if subtype in objfiles:
             upinfo = objfiles[subtype]
@@ -44,7 +46,9 @@ def upgrade_entitys(appendpoint, entitys, objfiles, objtype):
     backupfile = None
     rollback = None
     if common.APPFILE in objfiles:
+        # 下载程序更新文件任务
         upinfo = objfiles[common.APPFILE]
+        # TODO 程序文件校验函数,程序文件备份过滤函数
         _objfiles[common.APPFILE] = application.AppUpgradeFile(source=upinfo['uuid'])
         if upinfo.get('backup', True):
             backupfile = os.path.join(appendpoint.endpoint_backup,
@@ -61,6 +65,7 @@ def upgrade_entitys(appendpoint, entitys, objfiles, objtype):
         middleware = GogameMiddle(endpoint=appendpoint, entity=entity, objtype=objtype)
         middlewares.append(middleware)
         _database = []
+        # 备份数据库信息
         for subtype in (common.DATADB, common.LOGDB):
             if subtype in _objfiles:
                 dbinfo = appendpoint.local_database_info(entity, subtype)
@@ -74,6 +79,7 @@ def upgrade_entitys(appendpoint, entitys, objfiles, objtype):
                         raise ValueError('%s backup file exist' % subtype)
                 _database.append(GogameDatabase(backup=backup, update=update,
                                                 timeout=timeout, **dbinfo))
+        # 备份程序文件任务
         upgradetask = None
         if _objfiles.get(common.APPFILE):
             upgradetask = application.AppFileUpgradeByFile(middleware, rollback=rollback)

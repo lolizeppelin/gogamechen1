@@ -1294,7 +1294,7 @@ class AppEntityReuest(BaseContorller):
                             raise InvalidArgument('Metadata of %s.%d is none' % (_objtype, chief.entity))
                         if chief.objtype == _objtype:
                             chiefs[_objtype] = dict(entity=chief.entity,
-                                                    posts=ports,
+                                                    ports=ports,
                                                     local_ip=metadata.get('local_ip'))
                 if len(chiefs) != 2:
                     raise ValueError('%s.%d chiefs error' % (objtype, entity))
