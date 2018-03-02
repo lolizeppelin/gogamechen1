@@ -48,8 +48,8 @@ def upgrade_entitys(appendpoint, entitys, objfiles, objtype):
     if common.APPFILE in objfiles:
         # 下载程序更新文件任务
         upinfo = objfiles[common.APPFILE]
-        # TODO 程序文件校验函数,程序文件备份过滤函数
-        _objfiles[common.APPFILE] = application.AppUpgradeFile(source=upinfo['uuid'])
+        # TODO 程序文件校验函数
+        _objfiles[common.APPFILE] = application.AppUpgradeFile(source=upinfo['uuid'], checker=None)
         if upinfo.get('backup', True):
             backupfile = os.path.join(appendpoint.endpoint_backup,
                                       '%s.%s.%d.gz' % (objtype, common.APPFILE, int(time.time())))
