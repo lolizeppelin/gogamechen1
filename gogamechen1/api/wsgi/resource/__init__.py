@@ -785,8 +785,11 @@ class PackageFileReuest(BaseContorller):
                                     uptime=uptime, gversion=gversion,
                                     address=address, status=manager_common.DOWNFILE_UPLOADING,
                                     desc=desc)
-                session.add(pfile)
-                session.flush()
+                try:
+                    session.add(pfile)
+                    session.flush()
+                except DBDuplicateEntry:
+                    raise InvalidArgument('Address %s duplicate' % address)
                 url = '/%s/package/%d/pfiles/%d' % (common.NAME, package_id, pfile.pfile_id)
                 _notify = {'success': dict(action=url, method='PUT',
                                            body=dict(status=manager_common.DOWNFILE_FILEOK)),

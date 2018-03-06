@@ -48,7 +48,7 @@ objtype_opt = cfg.StrOpt('objtype',
 subtype_opt = cfg.StrOpt('subtype',
                          required=True,
                          short='s',
-                         choices=['datadb', 'logdb', 'appfile'],
+                         choices=[common.DATADB, common.LOGDB, common.APPFILE],
                          help='Game subtype objfile for')
 
 agent_opt = cfg.IntOpt('agent',
@@ -57,16 +57,20 @@ agent_opt = cfg.IntOpt('agent',
                        help='Game install agent, if not set, auto select'
                        )
 
-
-appfile_opt = cfg.StrOpt('appfile',
+appfile_opt = cfg.StrOpt(common.APPFILE,
                          required=True,
-                         short='f',
                          help='Game appfile file uuid')
 
-datadb_opt = cfg.IntOpt('datadb',
-                        short='d',
-                        min=1,
-                        help='Game data database id')
+upgraed_opts = [
+    cfg.StrOpt(common.DATADB,
+               help='Game datadb upgraed file uuid'),
+    cfg.StrOpt(common.LOGDB,
+               help='Game logdb upgraed file uuid'),
+    cfg.StrOpt('backup',
+               choices=[common.DATADB, common.LOGDB, common.APPFILE],
+               help='Backup when upgrade')
+]
+
 
 opentime_opt = cfg.IntOpt('opentime',
                           required=True,
@@ -78,6 +82,12 @@ area_name_opt = cfg.StrOpt('name',
                            required=True,
                            short='n',
                            help='Game server area name')
+
+datadb_opt = cfg.IntOpt('datadb',
+                        short='d',
+                        min=1,
+                        help='Game data database id')
+
 
 logdb_opt = cfg.IntOpt('logdb',
                        short='l',
@@ -105,8 +115,7 @@ reset_opts = [
                 help='Reset chiefs of entity, default not, only for %s' % common.GAMESERVER),
 ]
 
-
-gamesvr_create_opt = [area_name_opt, logdb_opt, area_name_opt, opentime_opt, cross_opt]
+gamesvr_create_ext_opt = [area_name_opt, logdb_opt, area_name_opt, opentime_opt, cross_opt]
 
 area_opt = cfg.IntOpt('area', help='Target area id')
 
@@ -229,7 +238,7 @@ def create():
     objtype = _objtype()
     CONF.register_cli_opts(create_opts)
     if objtype == common.GAMESERVER:
-        CONF.register_cli_opts(gamesvr_create_opt)
+        CONF.register_cli_opts(gamesvr_create_ext_opt)
 
     CONF(project='cmd')
     _client = client()
@@ -493,13 +502,15 @@ def unvquote():
     print('\033[0m')
 
 
-def async(action, ext_opts=None):
+def async(action, ext_opt=None, ext_opts=None):
     objtype = _objtype()
     CONF.register_cli_opt(timeout_opt)
     CONF.register_cli_opts(one_opts)
     if objtype == common.GAMESERVER:
         entity_opt.required = False
         CONF.register_cli_opt(areas_opt)
+    if ext_opt:
+        CONF.register_cli_opt(ext_opt)
     if ext_opts:
         CONF.register_cli_opts(ext_opts)
     CONF(project='cmd')
@@ -537,9 +548,21 @@ def async(action, ext_opts=None):
     now = int(time.time())
     body = dict(request_time=now,
                 finishtime=now + timeout)
+
     if action == 'stop':
         if CONF.kill:
             body.setdefault('kill', CONF.kill)
+
+    elif action == 'upgrade':
+        backup = CONF.backup or []
+        objfiles = dict()
+        for subtype in (common.APPFILE, common.LOGDB, common.DATADB):
+            if CONF[subtype]:
+                objfiles[subtype] = dict(uuid=CONF[subtype], timeout=CONF.timeout)
+                if subtype in backup:
+                    objfiles[subtype]['backup'] = True
+        body.setdefault('objfiles', objfiles)
+
     code, result, data = prepare_results(_func,
                                          CONF.group_id, CONF.objtype, target, body=body)
     asyncrequest = data[0]
@@ -569,7 +592,7 @@ def start():
 
 
 def stop():
-    async('stop', [stop_opt, ])
+    async('stop', stop_opt)
 
 
 def status():
@@ -578,6 +601,11 @@ def status():
 
 def flushconfig():
     async('flushconfig')
+
+
+def upgrade():
+    appfile_opt.required = False
+    async('upgrade', appfile_opt, upgraed_opts)
 
 
 def opentime():
@@ -605,8 +633,8 @@ def opentime():
 
 def main():
     FUNCS = ['list', 'create', 'show', 'delete',
-             'start', 'stop', 'status', 'flushconfig', 'reset',
-             'vquote', 'unvquote', 'clean', 'opentime']
+             'start', 'stop', 'status', 'flushconfig', 'upgrade',
+             'vquote', 'unvquote', 'clean', 'opentime', 'reset']
     try:
         func = sys.argv.pop(1)
         if func not in FUNCS:

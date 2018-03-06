@@ -328,7 +328,7 @@ class AppEntityReuest(BaseContorller):
                         'required': ['uuid', 'timeout'],
                         'properties': {
                             'uuid': {'type': 'string', 'format': 'uuid', 'description': '更新游戏库所需文件'},
-                            'timeout': {'type': 'integer', 'minimum': 60, 'maxmum': 1200,
+                            'timeout': {'type': 'integer', 'minimum': 30, 'maxmum': 1200,
                                         'description': '更新超时时间'},
                             'backup': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
                                        'description': '是否更新前备份游戏数据库,默认否'},
@@ -339,7 +339,7 @@ class AppEntityReuest(BaseContorller):
                         'required': ['uuid', 'timeout'],
                         'properties': {
                             'uuid': {'type': 'string', 'format': 'uuid', 'description': '更新日志库所需文件'},
-                            'timeout': {'type': 'integer', 'minimum': 90, 'maxmum': 3600,
+                            'timeout': {'type': 'integer', 'minimum': 30, 'maxmum': 3600,
                                         'description': '更新超时时间'},
                             'backup': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
                                        'description': '是否更新前备份日志数据库,默认否'},
@@ -1166,7 +1166,7 @@ class AppEntityReuest(BaseContorller):
         objfiles = body.get('objfiles')
         if not objfiles:
             raise InvalidArgument('Not objfile found for upgrade')
-        finishtime = int(time.time()) + 5
+        finishtime = body.get('request_time') + 5
         for objfile in objfiles:
             finishtime += objfile.get('timeout')
         body.update({'finishtime': finishtime,

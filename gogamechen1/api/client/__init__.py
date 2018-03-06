@@ -292,9 +292,9 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
         return results
 
     def appentity_flushconfig(self, group_id, objtype, entity, body=None):
-        resp, results = self.post(action=self.appentity_path_ex % (str(group_id), objtype,
-                                                                   str(entity), 'flushconfig'),
-                                  body=body)
+        resp, results = self.put(action=self.appentity_path_ex % (str(group_id), objtype,
+                                                                  str(entity), 'flushconfig'),
+                                 body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='flushconfig %s fail:%d' % (objtype, results['resultcode']),
                                             code=resp.status_code,
