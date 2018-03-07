@@ -7,6 +7,7 @@ CONF = cfg.CONF
 
 
 class FrontNotify(HttpNotify):
+
     def entity(self, group_id, objtype, entity, delete=False):
         params = {'group_id': group_id, 'objtype': objtype,
                   'entity': entity}
@@ -35,4 +36,4 @@ if CONF[common.NAME].notify_entity_url:
     FrontInfo.setdefault('entity', dict(url=CONF[common.NAME].notify_entity_url, method='GET',
                                         timeout=10))
 
-notify = FrontNotify(FrontInfo)
+notify = FrontNotify(FrontInfo, delay=1)

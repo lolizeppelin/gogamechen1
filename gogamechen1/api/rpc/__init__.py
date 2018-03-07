@@ -70,6 +70,7 @@ def count_timeout(ctxt, kwargs):
 
 
 class CreateResult(resultutils.AgentRpcResult):
+
     def __init__(self, agent_id, ctxt=None,
                  resultcode=0, result=None, databases=None):
         super(CreateResult, self).__init__(agent_id, ctxt, resultcode, result)
@@ -394,9 +395,7 @@ class Application(AppEndpointBase):
         chiefs = kwargs.pop('chiefs', None)
         objtype = kwargs.pop('objtype')
         databases = kwargs.pop('databases')
-        appfile = self.filemanager.get(kwargs.pop(common.APPFILE), download=False)
-        gfile.check(objtype, appfile)
-
+        appfile = kwargs.pop(common.APPFILE)
         entity = int(entity)
         with self.lock(entity):
             if entity in self.entitys:
@@ -466,7 +465,8 @@ class Application(AppEndpointBase):
                                                   result='entity is running, can not reset')
             objtype = self.konwn_appentitys[entity].get('objtype')
             if appfile:
-                appfile = self.filemanager.get(appfile, download=False)
+                localfile = self.filemanager.get(appfile, download=False)
+                appfile = localfile
                 gfile.check(objtype, appfile)
                 apppath = self.apppath(entity)
                 cfile = self._objconf(entity, objtype)

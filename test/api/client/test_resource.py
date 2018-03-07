@@ -30,12 +30,10 @@ client = GogameChen1DBClient(httpclient)
 
 def file_create(objtype, version, path):
     md5 = digestutils.filemd5(path)
-    crc32 = digestutils.filecrc32(path)
     size = os.path.getsize(path)
     ext = os.path.splitext(path)[1][1:]
     filename = os.path.split(path)[1]
     fileinfo = {'size': size,
-                'crc32': crc32,
                 'md5': md5,
                 'ext': ext,
                 'filename': filename,
@@ -69,8 +67,8 @@ def file_index():
         print r
 
 
-def send_file(uuid, objtype):
-    print client.objfile_send(uuid, objtype,
+def send_file(md5, objtype):
+    print client.objfile_send(md5, objtype,
                               body={'request_time': int(time.time())})
 
 

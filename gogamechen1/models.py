@@ -3,8 +3,6 @@ import sqlalchemy as sa
 from sqlalchemy import orm
 from sqlalchemy.ext import declarative
 
-from simpleutil.utils import uuidutils
-
 from sqlalchemy.dialects.mysql import VARCHAR
 from sqlalchemy.dialects.mysql import TINYINT
 from sqlalchemy.dialects.mysql import SMALLINT
@@ -93,8 +91,7 @@ class Package(TableBase):
 
 
 class ObjtypeFile(TableBase):
-    uuid = sa.Column(CHAR(36), default=uuidutils.generate_uuid,
-                     nullable=False, primary_key=True)
+    md5 = sa.Column(CHAR(36), nullable=False, primary_key=True)
     objtype = sa.Column(VARCHAR(64), nullable=False)
     subtype = sa.Column(VARCHAR(64), nullable=False)
     version = sa.Column(VARCHAR(64), nullable=False)

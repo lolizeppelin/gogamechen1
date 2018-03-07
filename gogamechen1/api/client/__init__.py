@@ -60,29 +60,29 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
-    def objfile_show(self, uuid):
-        resp, results = self.get(action=self.objfile_path % uuid, body=None)
+    def objfile_show(self, md5):
+        resp, results = self.get(action=self.objfile_path % md5, body=None)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='show gogamechen1 objfiles fail:%d' % results['resultcode'],
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
 
-    def objfile_update(self, uuid):
+    def objfile_update(self, md5):
         raise NotImplementedError
 
-    def objfile_delete(self, uuid):
-        resp, results = self.delete(action=self.objfile_path % uuid)
+    def objfile_delete(self, md5):
+        resp, results = self.delete(action=self.objfile_path % md5)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='delete gogamechen1 objfiles fail:%d' % results['resultcode'],
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
 
-    def objfile_send(self, uuid, objtype, body=None):
+    def objfile_send(self, md5, objtype, body=None):
         body = body or {}
         body.setdefault('objtype', objtype)
-        resp, results = self.retryable_post(action=self.objfile_path_ex % (uuid, 'send'), body=body)
+        resp, results = self.retryable_post(action=self.objfile_path_ex % (md5, 'send'), body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='send gogamechen1 objfiles fail:%d' % results['resultcode'],
                                             code=resp.status_code,

@@ -28,10 +28,10 @@ timeout_opts = [
 ]
 
 one_opts = [
-    cfg.StrOpt('uuid',
-               short='u',
+    cfg.StrOpt('md5',
+               short='m',
                required=True,
-               help='Target objfile uuid'),
+               help='Target objfile md5'),
 ]
 
 game_type_opts = [
@@ -92,13 +92,13 @@ def list():
             print data
         print('\033[0m')
         sys.exit(1)
-    objfile_heads = ['uuid', 'objtype', 'subtype', 'version']
+    objfile_heads = ['md5', 'objtype', 'subtype', 'version']
     print('\033[1;32;40m')
     print 'List game objfiles success'
     print('\033[0m')
     tb = table.PleasantTable(ident=0, columns=objfile_heads, counter=True)
     for objfile in data:
-        tb.add_row([objfile.get('uuid'), objfile.get('objtype'),
+        tb.add_row([objfile.get('md5'), objfile.get('objtype'),
                     objfile.get('subtype'), objfile.get('version')])
     print tb.pformat()
 
@@ -137,7 +137,7 @@ def create():
     if not CONF.address:
         print('\033[1;32;40m')
         print 'Create objfile success'
-        print 'File uuid is %s' % info.get('uuid')
+        print 'File md5 is %s' % info.get('md5')
         print('\033[0m')
     else:
         uri = info.get('uri')
@@ -166,7 +166,7 @@ def show():
     CONF.register_cli_opts(one_opts)
     CONF(project='cmd')
     _client = client()
-    code, result, data = prepare_results(_client.objfile_show, CONF.uuid)
+    code, result, data = prepare_results(_client.objfile_show, CONF.md5)
     if code:
         print('\033[1;31;40m')
         print 'Fail, code %d, result %s' % (code, result)
@@ -179,10 +179,10 @@ def show():
         print 'Now objfile success'
         print('\033[0m')
     objfile = data[0]
-    fmarks = objfile.get('marks')
+    md5 = objfile.get('md5')
     print('\033[1;32;40m')
     print 'Show objfile success'
-    print 'uuid: %s' % fmarks.get('uuid')
+    print 'md5: %s' % md5.get('md5')
     print 'objtype: %s' % objfile.get('objtype')
     print 'subtype: %s' % objfile.get('subtype')
     print 'version: %s' % objfile.get('version')
@@ -193,8 +193,6 @@ def show():
     print '---------File deatils----------'
     print 'ext: %s' % objfile.get('ext')
     print 'size: %d' % objfile.get('size')
-    print 'md5: %s' % fmarks.get('md5')
-    print 'crc32: %s' % fmarks.get('crc32')
     print('\033[0m')
 
 
@@ -202,7 +200,7 @@ def delete():
     CONF.register_cli_opts(one_opts)
     CONF(project='cmd')
     _client = client()
-    code, result, data = prepare_results(_client.objfile_delete, CONF.uuid)
+    code, result, data = prepare_results(_client.objfile_delete, CONF.md5)
     if code:
         print('\033[1;31;40m')
         print 'Fail, code %d, result %s' % (code, result)
@@ -213,9 +211,8 @@ def delete():
     objfile = data[0]
     print('\033[1;32;40m')
     print 'Delete objfile success'
-    print 'uuid: %s' % objfile.get('uuid')
     print 'md5: %s' % objfile.get('md5')
-    print 'crc32: %s' % objfile.get('crc32')
+    print 'md5: %s' % objfile.get('md5')
     print 'size: %d' % objfile.get('size')
     print 'uploadtime: %s' % objfile.get('uploadtime')
     print 'downloader: %s' % objfile.get('downloader')
@@ -246,7 +243,7 @@ def send():
     if CONF.all is not None:
         body.setdefault('all', CONF.all)
     _client = client()
-    code, result, data = prepare_results(_client.objfile_send, CONF.uuid, CONF.objtype, body=body)
+    code, result, data = prepare_results(_client.objfile_send, CONF.md5, CONF.objtype, body=body)
     if code:
         print('\033[1;31;40m')
         print 'Fail, code %d, result %s' % (code, result)
@@ -261,7 +258,7 @@ def send():
     dead = asyncrequest.get('deadline') - now
     print('\033[1;32;40m')
     print 'Send objfile to agents async request %s has been sended' % request_id
-    print 'uuid: %s' % CONF.uuid
+    print 'md5: %s' % CONF.md5
     print 'objtype: %s' % CONF.objtype
     print('\033[0m')
     print 'Result will respon after %d, dead after %d' % (sleep, dead)

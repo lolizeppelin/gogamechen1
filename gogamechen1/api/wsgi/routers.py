@@ -24,7 +24,7 @@ class Routers(router.RoutersBase):
                                        resource_name=resource_name,
                                        controller=objfile_controller,
                                        path_prefix='/%s' % common.NAME,
-                                       member_prefix='/{uuid}',
+                                       member_prefix='/{md5}',
                                        collection_actions=COLLECTION_ACTIONS,
                                        member_actions=MEMBER_ACTIONS)
         collection.member.link('send', method='POST')

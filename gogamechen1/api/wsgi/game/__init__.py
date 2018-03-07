@@ -296,8 +296,8 @@ class AppEntityReuest(BaseContorller):
     CREATEAPPENTITY = {'type': 'object',
                        'required': [common.APPFILE],
                        'properties': {
-                           common.APPFILE: {'type': 'string', 'format': 'uuid',
-                                            'description': '需要下载的文件的uuid'},
+                           common.APPFILE: {'type': 'string', 'format': 'md5',
+                                            'description': '需要下载的文件的md5'},
                            'agent_id': {'type': 'integer', 'minimum': 1,
                                         'description': '程序安装的目标机器,不填自动分配'},
                            'zone': {'type': 'string', 'description': '自动分配的安装区域,默认zone为all'},
@@ -313,8 +313,8 @@ class AppEntityReuest(BaseContorller):
                 'properties': {
                     common.APPFILE: {
                         'type': 'object',
-                        'required': ['uuid', 'timeout'],
-                        'properties': {'uuid': {'type': 'string', 'format': 'uuid',
+                        'required': ['md5', 'timeout'],
+                        'properties': {'md5': {'type': 'string', 'format': 'uuid',
                                                 'description': '更新程序文件所需文件'},
                                        'timeout': {'type': 'integer', 'minimum': 5, 'maxmum': 300,
                                                    'description': '更新超时时间'},
@@ -325,9 +325,9 @@ class AppEntityReuest(BaseContorller):
                                        }},
                     common.DATADB: {
                         'type': 'object',
-                        'required': ['uuid', 'timeout'],
+                        'required': ['md5', 'timeout'],
                         'properties': {
-                            'uuid': {'type': 'string', 'format': 'uuid', 'description': '更新游戏库所需文件'},
+                            'md5': {'type': 'string', 'format': 'md5', 'description': '更新游戏库所需文件'},
                             'timeout': {'type': 'integer', 'minimum': 30, 'maxmum': 1200,
                                         'description': '更新超时时间'},
                             'backup': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
@@ -336,9 +336,9 @@ class AppEntityReuest(BaseContorller):
                                          'description': '是否连带回滚(回滚前方已经成功的步骤),默认否'}}},
                     common.LOGDB: {
                         'type': 'object',
-                        'required': ['uuid', 'timeout'],
+                        'required': ['md5', 'timeout'],
                         'properties': {
-                            'uuid': {'type': 'string', 'format': 'uuid', 'description': '更新日志库所需文件'},
+                            'uuid': {'type': 'string', 'format': 'md5', 'description': '更新日志库所需文件'},
                             'timeout': {'type': 'integer', 'minimum': 30, 'maxmum': 3600,
                                         'description': '更新超时时间'},
                             'backup': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
@@ -834,13 +834,12 @@ class AppEntityReuest(BaseContorller):
                 raise InvalidArgument('Group id not match')
             versions = jsonutils.loads_as_bytes(_entity.versions) if _entity.versions else {}
             str_key = str(package_id)
-            with session.begin():
-                if str_key in versions:
-                    quote = versions.pop(str_key)
-                    cdnquote_controller.delete(req, quote.get('quote_id'))
-                    _entity.versions = jsonutils.dumps(versions)
-                    session.flush()
-        return resultutils.results(result='entity version unquote success' % objtype,
+            if str_key in versions:
+                quote = versions.pop(str_key)
+                cdnquote_controller.delete(req, quote.get('quote_id'))
+                _entity.versions = jsonutils.dumps(versions) if versions else None
+                session.flush()
+        return resultutils.results(result='%s entity version unquote success' % objtype,
                                    data=[dict(version=quote.get('version') if quote else None,
                                               quote_id=quote.get('quote_id') if quote else None)])
 

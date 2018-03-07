@@ -14,8 +14,8 @@ from sqlalchemy.sql import and_
 from simpleutil.common.exceptions import InvalidArgument
 from simpleutil.log import log as logging
 from simpleutil.utils import jsonutils
-from simpleutil.utils import uuidutils
 from simpleutil.utils import singleton
+from simpleutil.utils import digestutils
 from simpleutil.config import cfg
 
 from simpleservice.ormdb.api import model_query
@@ -136,7 +136,7 @@ class ObjtypeFileReuest(BaseContorller):
             filters.append(ObjtypeFile.subtype == subtype)
 
         session = endpoint_session(readonly=True)
-        columns = [ObjtypeFile.uuid,
+        columns = [ObjtypeFile.md5,
                    ObjtypeFile.objtype,
                    ObjtypeFile.subtype,
                    ObjtypeFile.version]
@@ -144,7 +144,7 @@ class ObjtypeFileReuest(BaseContorller):
         results = resultutils.bulk_results(session,
                                            model=ObjtypeFile,
                                            columns=columns,
-                                           counter=ObjtypeFile.uuid,
+                                           counter=ObjtypeFile.md5,
                                            order=order, desc=desc,
                                            filter=and_(*filters) if filters else None,
                                            page_num=page_num)
@@ -154,8 +154,6 @@ class ObjtypeFileReuest(BaseContorller):
         body = body or {}
         jsonutils.schema_validate(body, self.CREATESCHEMA)
         uri = None
-        uuid = uuidutils.generate_uuid()
-
         subtype = utils.validate_string(body.pop('subtype'))
         objtype = body.pop('objtype')
         version = body.pop('version')
@@ -174,11 +172,12 @@ class ObjtypeFileReuest(BaseContorller):
             if not resource.get('internal'):
                 raise InvalidArgument('objtype file resource not a internal resource')
             address = resource_url(resource_id, fileinfo)[0]
+            md5 = digestutils.strmd5(address)
             # 上传结束后通知
-            notify = {'success': dict(action='/files/%s' % uuid,
+            notify = {'success': dict(action='/files/%s' % md5,
                                       method='PUT',
                                       body=dict(status=manager_common.DOWNFILE_FILEOK)),
-                      'fail': dict(action='/gogamechen1/objfiles/%s' % uuid,
+                      'fail': dict(action='/gogamechen1/objfiles/%s' % md5,
                                    method='DELETE')}
             uri = gopcdn_upload(req, resource_id, body,
                                 fileinfo=fileinfo, notify=notify)
@@ -187,54 +186,53 @@ class ObjtypeFileReuest(BaseContorller):
             status = manager_common.DOWNFILE_FILEOK
 
         md5 = fileinfo.get('md5')
-        crc32 = fileinfo.get('crc32')
         ext = fileinfo.get('ext')
         size = fileinfo.get('size')
 
         session = endpoint_session()
         with session.begin():
-            objtype_file = ObjtypeFile(uuid=uuid, objtype=objtype,
+            objtype_file = ObjtypeFile(md5=md5, objtype=objtype,
                                        version=version, subtype=subtype)
             session.add(objtype_file)
             session.flush()
             try:
-                file_controller.create(req, body=dict(uuid=uuid,
+                file_controller.create(req, body=dict(md5=md5,
                                                       address=address,
-                                                      size=size, md5=md5, crc32=crc32,
+                                                      size=size,
                                                       ext=ext,
                                                       status=status))
             except DBDuplicateEntry:
                 raise InvalidArgument('File info Duplicate error')
         return resultutils.results(result='creat file for %s success' % objtype,
-                                   data=[dict(uuid=objtype_file.uuid, uri=uri)])
+                                   data=[dict(md5=objtype_file.md5, uri=uri)])
 
-    def show(self, req, uuid, body=None):
+    def show(self, req, md5, body=None):
         body = body or {}
         session = endpoint_session(readonly=True)
-        query = model_query(session, ObjtypeFile, filter=ObjtypeFile.uuid == uuid)
+        query = model_query(session, ObjtypeFile, filter=ObjtypeFile.md5 == md5)
         objtype_file = query.one()
-        show_result = file_controller.show(req, objtype_file.uuid)
+        show_result = file_controller.show(req, objtype_file.md5)
         if show_result['resultcode'] != manager_common.RESULT_SUCCESS:
-            return resultutils.results(result='get file of %s fail, %s' % (uuid, show_result.get('result')))
+            return resultutils.results(result='get file of %s fail, %s' % (md5, show_result.get('result')))
         file_info = show_result['data'][0]
         file_info.setdefault('subtype', objtype_file.subtype)
         file_info.setdefault('objtype', objtype_file.objtype)
         file_info.setdefault('version', objtype_file.version)
-        return resultutils.results(result='get file of %s success' % uuid,
+        return resultutils.results(result='get file of %s success' % md5,
                                    data=[file_info, ])
 
-    def delete(self, req, uuid, body=None):
+    def delete(self, req, md5, body=None):
         body = body or {}
         session = endpoint_session(readonly=True)
-        query = model_query(session, ObjtypeFile, filter=ObjtypeFile.uuid == uuid)
+        query = model_query(session, ObjtypeFile, filter=ObjtypeFile.md5 == md5)
         pfile = query.one()
         package = pfile.package
         if package.gversion == package.gversion and pfile.ftype == common.SMALL_PACKAGE:
             raise InvalidArgument('Package file with version %s is quote' % package.gversion)
         query.delete()
-        return file_controller.delete(req, pfile.uuid)
+        return file_controller.delete(req, pfile.md5)
 
-    def update(self, req, uuid, body=None):
+    def update(self, req, md5, body=None):
         raise NotImplementedError
 
     def find(self, objtype, subtype, version):
@@ -243,9 +241,9 @@ class ObjtypeFileReuest(BaseContorller):
                                                               ObjtypeFile.subtype == subtype,
                                                               ObjtypeFile.version == version))
         objfile = query.one()
-        return objfile['uuid']
+        return objfile['md5']
 
-    def send(self, req, uuid, body=None):
+    def send(self, req, md5, body=None):
         """call by client, and asyncrequest
         send file to agents
         """
@@ -276,7 +274,7 @@ class ObjtypeFileReuest(BaseContorller):
         target = targetutils.target_endpoint(common.NAME)
         target.namespace = manager_common.NAME
         rpc_method = 'getfile'
-        rpc_args = {'mark': uuid, 'timeout': asyncrequest.deadline - 1}
+        rpc_args = {'md5': md5, 'timeout': asyncrequest.deadline - 1}
         rpc_ctxt = {}
         rpc_ctxt.setdefault('agents', agents)
 
@@ -863,10 +861,10 @@ class PackageFileReuest(BaseContorller):
                                                                body=dict(filename=pfile.filename))
                         except Exception:
                             LOG.error('Remove file %s from %d fail' % (pfile.resource_id, pfile.filename))
+                    notify.resource()
             eventlet.spawn_n(wapper)
 
         session.delete(pfile)
         session.flush()
-        eventlet.spawn_n(notify.resource)
         return resultutils.results(result='delete package file for %d success' % package_id,
                                    data=[dict(pfile_id=pfile_id)])

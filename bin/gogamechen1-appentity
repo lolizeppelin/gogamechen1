@@ -59,13 +59,13 @@ agent_opt = cfg.IntOpt('agent',
 
 appfile_opt = cfg.StrOpt(common.APPFILE,
                          required=True,
-                         help='Game appfile file uuid')
+                         help='Game appfile file md5')
 
 upgraed_opts = [
     cfg.StrOpt(common.DATADB,
-               help='Game datadb upgraed file uuid'),
+               help='Game datadb upgraed file md5'),
     cfg.StrOpt(common.LOGDB,
-               help='Game logdb upgraed file uuid'),
+               help='Game logdb upgraed file md5'),
     cfg.StrOpt('backup',
                choices=[common.DATADB, common.LOGDB, common.APPFILE],
                help='Backup when upgrade')
@@ -558,7 +558,7 @@ def async(action, ext_opt=None, ext_opts=None):
         objfiles = dict()
         for subtype in (common.APPFILE, common.LOGDB, common.DATADB):
             if CONF[subtype]:
-                objfiles[subtype] = dict(uuid=CONF[subtype], timeout=CONF.timeout)
+                objfiles[subtype] = dict(md5=CONF[subtype], timeout=CONF.timeout)
                 if subtype in backup:
                     objfiles[subtype]['backup'] = True
         body.setdefault('objfiles', objfiles)

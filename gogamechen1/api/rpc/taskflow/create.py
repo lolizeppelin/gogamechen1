@@ -12,11 +12,12 @@ from simpleflow.engines.engine import ParallelActionEngine
 from goperation.manager.rpc.agent import sqlite
 from goperation.manager.rpc.agent.application.taskflow import application
 
-from goperation.manager.rpc.agent.application.taskflow.application import AppCreateBase
+from goperation.manager.rpc.agent.application.taskflow.database import MysqlCreate
 from goperation.manager.rpc.agent.application.taskflow import pipe
 from goperation.taskflow import common as task_common
 
 from gogamechen1 import common
+from gogamechen1.api import gfile
 from gogamechen1.api.rpc.taskflow import GogameMiddle
 from gogamechen1.api.rpc.taskflow import GogameDatabase
 
@@ -26,14 +27,16 @@ CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
 
 
-class GogameDatabaseCreateTask(AppCreateBase):
-    @property
-    def taskname(self):
-        return self.__class__.__name__ + '-' + self.database.subtype
+class CreateFileDownLoad(application.AppUpgradeFile):
+    def __init__(self, source, objtype):
+        super(CreateFileDownLoad, self).__init__(source, revertable=False, rollback=False)
+        self.objtype = objtype
 
-    def __init__(self, middleware, database):
-        self.database = database
-        super(GogameDatabaseCreateTask, self).__init__(middleware)
+    def post_check(self):
+        gfile.check(self.objtype, self.file)
+
+
+class GogameDatabaseCreateTask(MysqlCreate):
 
     def execute(self):
         appendpoint = self.middleware.reflection()
@@ -87,30 +90,20 @@ class GogameDatabaseCreateTask(AppCreateBase):
             self.middleware.set_return(self.taskname, task_common.REVERTED)
 
 
-def create_db_flowfactory(app, store):
-    # 数据库创建工作流生成
-    middleware = app.middleware
-    entity = middleware.entity
-    objtype = middleware.objtype
-    uflow = uf.Flow('create_%s_%s_%d' % (common.NAME, objtype, entity))
-    for database in app.databases:
-        uflow.add(GogameDatabaseCreateTask(middleware, database))
-    return uflow
-
-
 class GogameAppCreate(application.AppCreateBase):
+
     def __init__(self, middleware, timeout):
         super(GogameAppCreate, self).__init__(middleware)
         self.timeout = timeout
 
-    def execute(self, appfile, chiefs=None):
+    def execute(self, upgradefile, chiefs=None):
         if self.middleware.is_success(self.taskname):
             return
         appendpoint = self.middleware.reflection()
         # 创建实体
         self.middleware.waiter = appendpoint.create_entity(self.middleware.entity,
                                                            self.middleware.objtype,
-                                                           appfile, self.timeout,
+                                                           upgradefile, self.timeout,
                                                            self.middleware.databases, chiefs)
 
     def revert(self, result, **kwargs):
@@ -139,7 +132,7 @@ def create_entity(appendpoint, entity, objtype, databases,
                     source='%s/%s' % (appendpoint.manager.ipnetwork.network,
                                       appendpoint.manager.ipnetwork.netmask))
         LOG.debug('Create schema %s in %d with auth %s' % (schema, database_id, str(auth)))
-        _database.append(GogameDatabase(backup=None, update=None,
+        _database.append(GogameDatabase(create=True, backup=None, update=None,
                                         database_id=database_id, schema=schema,
                                         character_set='utf8',
                                         subtype=subtype,
@@ -150,10 +143,12 @@ def create_entity(appendpoint, entity, objtype, databases,
                                   databases=_database)
 
     book = LogBook(name='create_%s_%d' % (appendpoint.namespace, entity))
-    store = dict(appfile=appfile, chiefs=chiefs, download_timeout=timeout)
+    store = dict(chiefs=chiefs, download_timeout=timeout)
     taskflow_session = sqlite.get_taskflow_session()
-    create_flow = pipe.flow_factory(taskflow_session, applications=[app, ], store=store,
-                                    db_flow_factory=create_db_flowfactory)
+    create_flow = pipe.flow_factory(taskflow_session, applications=[app, ],
+                                    upgradefile=CreateFileDownLoad(source=appfile, objtype=objtype),
+                                    store=store,
+                                    create_cls=GogameDatabaseCreateTask)
     connection = Connection(taskflow_session)
     engine = load(connection, create_flow, store=store,
                   book=book, engine_cls=ParallelActionEngine)
