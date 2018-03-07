@@ -182,7 +182,7 @@ def show():
     md5 = objfile.get('md5')
     print('\033[1;32;40m')
     print 'Show objfile success'
-    print 'md5: %s' % md5.get('md5')
+    print 'md5: %s' % md5
     print 'objtype: %s' % objfile.get('objtype')
     print 'subtype: %s' % objfile.get('subtype')
     print 'version: %s' % objfile.get('version')
@@ -212,7 +212,6 @@ def delete():
     print('\033[1;32;40m')
     print 'Delete objfile success'
     print 'md5: %s' % objfile.get('md5')
-    print 'md5: %s' % objfile.get('md5')
     print 'size: %d' % objfile.get('size')
     print 'uploadtime: %s' % objfile.get('uploadtime')
     print 'downloader: %s' % objfile.get('downloader')
@@ -229,7 +228,7 @@ def send():
     CONF(project='cmd')
     if not CONF.objtype:
         print('\033[1;31;40m')
-        print 'Ojbtype is None, will send fiel to all agent'
+        print 'Ojbtype is None, will send file to all agent'
         print('\033[0m')
     timeout = CONF.timeout
     if not timeout:
