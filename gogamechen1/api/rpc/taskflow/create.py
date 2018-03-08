@@ -33,7 +33,11 @@ class CreateFileDownLoad(application.AppUpgradeFile):
         self.objtype = objtype
 
     def post_check(self):
-        gfile.check(self.objtype, self.file)
+        try:
+            gfile.check(self.objtype, self.file)
+        except ValueError as e:
+            LOG.error('Create %s file check error becault %s' % e.message)
+            raise
 
 
 class GogameDatabaseCreateTask(MysqlCreate):
