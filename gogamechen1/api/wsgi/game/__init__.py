@@ -665,16 +665,21 @@ class AppEntityReuest(BaseContorller):
                         if v is None:
                             raise InvalidArgument('Get chiefs info error, agent not online?')
                     chiefs = dict()
-                    chiefs.setdefault(common.CROSSSERVER,
-                                      dict(entity=cross.entity,
-                                           ports=maps.get(cross.entity).get('ports'),
-                                           local_ip=maps.get(cross.entity).get('metadata').get('local_ip')
-                                           ))
-                    chiefs.setdefault(common.GMSERVER,
-                                      dict(entity=gm.entity,
-                                           ports=maps.get(gm.entity).get('ports'),
-                                           local_ip=maps.get(gm.entity).get('metadata').get('local_ip')
-                                           ))
+                    # 战场与GM服务器信息
+                    for chief in (cross, gm):
+                        metadata = maps.get(chief.entity).get('metadata')
+                        ports = maps.get(chief.entity).get('ports')
+                        if not metadata:
+                            raise InvalidArgument('%s.%d is offline' % (chief.objtype, chief.entity))
+                        need = common.POSTS_COUNT[chief.objtype]
+                        if need and len(ports) != need:
+                            raise InvalidArgument('%s.%d port count error, '
+                                                  'find %d, need %d' % (chief.objtype, chief.entity,
+                                                                        len(ports), need))
+                        chiefs.setdefault(common.CROSSSERVER,
+                                          dict(entity=chief.entity,
+                                               ports=ports,
+                                               local_ip=metadata.get('local_ip')))
                     cross_id = cross.entity
             # 完整的rpc数据包
             body = dict(objtype=objtype,

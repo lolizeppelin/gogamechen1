@@ -177,7 +177,7 @@ class Application(AppEndpointBase):
     def _allocate_port(self, entity, objtype, ports):
         need = common.POSTS_COUNT[objtype]
 
-        if ports is not None:
+        if ports is None:
             ports = [None] * need
 
         if len(ports) != need:

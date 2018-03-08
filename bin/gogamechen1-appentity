@@ -347,8 +347,8 @@ def show():
     print 'objtype: %s' % appentity.get('objtype')
     print 'entity: %d' % appentity.get('entity')
     print 'ports: %s' % ','.join(map(str, appentity.get('ports')))
-    print 'local_ip: %s' % metadata.get('local_ip')
-    print 'external_ips: %s' % str(metadata.get('external_ips'))
+    print 'local_ip: %s' % metadata.get('local_ip') if metadata else 'offline'
+    print 'external_ips: %s' % str(metadata.get('external_ips')) if metadata else 'offline'
     if appentity.get('objtype') == common.GAMESERVER:
         print 'versions: %s' % str(appentity.get('versions'))
         print '--------------areas  info--------------'
