@@ -109,9 +109,11 @@ create_opts = [group_opt, objtype_opt,
 reset_opts = [
     cfg.BoolOpt('databases',
                 short='d',
+                default=False,
                 help='Reset databases of entity, default not'),
     cfg.BoolOpt('chiefs',
                 short='c',
+                default=False,
                 help='Reset chiefs of entity, default not, only for %s' % common.GAMESERVER),
 ]
 
@@ -431,8 +433,8 @@ def reset():
     appfile_opt.required = False
     timeout_opt.default = 15
     CONF.register_cli_opts(one_opts)
-    CONF.register_cli_opts(appfile_opt)
-    CONF.register_cli_opt(reset_opts)
+    CONF.register_cli_opt(appfile_opt)
+    CONF.register_cli_opts(reset_opts)
     CONF.register_cli_opt(timeout_opt)
     CONF(project='cmd')
     body = dict(databases=CONF.databases, appfile=CONF.appfile, chiefs=CONF.chiefs)

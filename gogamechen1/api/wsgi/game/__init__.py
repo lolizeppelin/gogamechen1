@@ -1268,7 +1268,7 @@ class AppEntityReuest(BaseContorller):
                             # 确认引用不是从库且结构名称相等
                             if quote_detail['qdatabase_id'] == quote_detail['database_id'] \
                                     and quote_detail['schema'] == schema:
-                                databases.setdefault(common.DATADB,
+                                databases.setdefault(subtype,
                                                      dict(host=quote_detail['host'],
                                                           port=quote_detail['port'],
                                                           user=quote_detail['user'],
@@ -1330,9 +1330,10 @@ class AppEntityReuest(BaseContorller):
         if appfile:
             finishtime += 30
             timeout += 35
-        rpc_ret = rpc.cast(target, ctxt={'finishtime': finishtime, 'agents': [agent_id, ]},
+        rpc_ret = rpc.call(target, ctxt={'finishtime': finishtime, 'agents': [agent_id, ]},
                            msg={'method': 'reset_entity',
                                 'args': dict(entity=entity, appfile=appfile,
+                                             opentime=_entity.opentime,
                                              databases=databases, chiefs=chiefs)},
                            timeout=timeout)
         if not rpc_ret:

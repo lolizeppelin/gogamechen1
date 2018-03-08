@@ -261,7 +261,7 @@ class Application(AppEndpointBase):
             cfile = self._objconf(entity, objtype)
             databases = gconfig.format_databases(objtype, cfile, databases)
             chiefs = gconfig.format_chiefs(objtype, cfile, chiefs)
-            opentime = gconfig.format_opentime(objtype, cfile, opentime)
+            opentime = gconfig.format_opentime(objtype, cfile, opentime) if not opentime else opentime
             confobj = gconfig.make(objtype, self.logpath(entity),
                                    self.manager.local_ip, ports,
                                    entity, areas,
@@ -514,7 +514,8 @@ class Application(AppEndpointBase):
                 timeout -= used
                 waiter = self.create_entity(entity, objtype, appfile, timeout)
                 waiter()
-            self.flush_config(entity, databases=databases, chiefs=chiefs)
+            self.flush_config(entity, databases=databases,
+                              opentime=kwargs.get('opentime'), chiefs=chiefs)
 
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           ctxt=ctxt,

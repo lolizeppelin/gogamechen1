@@ -108,6 +108,8 @@ def format_chiefs(objtype, cfile, chiefs):
     if chiefs:
         return _format_chiefs(cfile, chiefs)
     else:
+        if not os.path.exists(cfile):
+            raise ValueError('No chiefs file found')
         conf = load(cfile)
         return conf.pop('ConnAddrs')
 
