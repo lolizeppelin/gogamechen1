@@ -28,6 +28,7 @@ LOG = logging.getLogger(__name__)
 
 
 class CreateFileDownLoad(application.AppUpgradeFile):
+
     def __init__(self, source, objtype):
         super(CreateFileDownLoad, self).__init__(source, revertable=False, rollback=False)
         self.objtype = objtype
@@ -100,15 +101,14 @@ class GogameAppCreate(application.AppCreateBase):
         super(GogameAppCreate, self).__init__(middleware)
         self.timeout = timeout
 
-    def execute(self, upgradefile, chiefs=None):
+    def execute(self, upgradefile):
         if self.middleware.is_success(self.taskname):
             return
         appendpoint = self.middleware.reflection()
-        # 创建实体
+        # 创建实体程序文件
         self.middleware.waiter = appendpoint.create_entity(self.middleware.entity,
                                                            self.middleware.objtype,
-                                                           upgradefile, self.timeout,
-                                                           self.middleware.databases, chiefs)
+                                                           upgradefile, self.timeout)
 
     def revert(self, result, **kwargs):
         if isinstance(result, failure.Failure):
@@ -117,8 +117,7 @@ class GogameAppCreate(application.AppCreateBase):
         self.middleware.set_return(self.taskname, task_common.REVERTED)
 
 
-def create_entity(appendpoint, entity, objtype, databases,
-                  chiefs, appfile, timeout):
+def create_entity(appendpoint, entity, objtype, databases, appfile, timeout):
     middleware = GogameMiddle(endpoint=appendpoint, entity=entity, objtype=objtype)
 
     conf = CONF['%s.%s' % (common.NAME, objtype)]
@@ -147,7 +146,7 @@ def create_entity(appendpoint, entity, objtype, databases,
                                   databases=_database)
 
     book = LogBook(name='create_%s_%d' % (appendpoint.namespace, entity))
-    store = dict(chiefs=chiefs, download_timeout=timeout)
+    store = dict(download_timeout=timeout)
     taskflow_session = sqlite.get_taskflow_session()
     create_flow = pipe.flow_factory(taskflow_session, applications=[app, ],
                                     upgradefile=CreateFileDownLoad(source=appfile, objtype=objtype),

@@ -676,7 +676,7 @@ class AppEntityReuest(BaseContorller):
                             raise InvalidArgument('%s.%d port count error, '
                                                   'find %d, need %d' % (chief.objtype, chief.entity,
                                                                         len(ports), need))
-                        chiefs.setdefault(common.CROSSSERVER,
+                        chiefs.setdefault(chief.objtype,
                                           dict(entity=chief.entity,
                                                ports=ports,
                                                local_ip=metadata.get('local_ip')))
@@ -693,6 +693,7 @@ class AppEntityReuest(BaseContorller):
                                                    endpoint=common.NAME, body=body)['data'][0]
                 entity = _entity.get('entity')
                 rpc_result = _entity.get('notify')
+                r_databases = rpc_result.get('databases')
                 LOG.info('Entity controller create rpc result %s' % str(rpc_result))
                 # 插入实体信息
                 appentity = AppEntity(entity=entity,
@@ -715,9 +716,23 @@ class AppEntityReuest(BaseContorller):
                     session.flush()
                     # 更新 group lastarea属性
                     query.update({'lastarea': next_area})
+                # 插入数据库绑定信息
+                if r_databases:
+                    for subtype, database in six.iteritems(r_databases):
+                        LOG.info('Bond entity %d to database %d' % (entity, database.get('database_id')))
+                        session.add(AreaDatabase(quote_id=database.get('quote_id'),
+                                                 database_id=database.get('database_id'),
+                                                 entity=entity, subtype=subtype,
+                                                 host=database.get('host'), port=database.get('port'),
+                                                 user=database.get('user'), passwd=database.get('passwd'),
+                                                 ro_user=database.get('ro_user'), ro_passwd=database.get('ro_passwd'),
+                                                 character_set=database.get('character_set')
+                                                 )
+                                    )
+                        session.flush()
 
             _result = dict(entity=entity, objtype=objtype, agent_id=agent_id,
-                           databases=rpc_result.get('databases'))
+                           databases=r_databases)
             if objtype == common.GAMESERVER:
                 _result.setdefault('area_id', next_area)
                 _result.setdefault('cross_id', cross_id)

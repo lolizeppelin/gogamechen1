@@ -292,38 +292,12 @@ class Application(AppEndpointBase):
             self.konwn_appentitys.pop(entity, None)
             systemutils.drop_user(self.entity_user(entity))
 
-    def create_entity(self, entity, objtype, appfile, timeout,
-                      databases, chiefs):
-        timeout = timeout if timeout else 30
-        overtime = int(time.time()) + timeout
+    def create_entity(self, entity, objtype, appfile, timeout):
         dst = self.apppath(entity)
         # 异步解压,没有报错说明解压开始
         waiter = zlibutils.async_extract(src=appfile, dst=dst, timeout=timeout,
                                          fork=functools.partial(safe_fork, self.entity_user(entity),
                                                                 self.entity_group(entity)))
-        def _postdo():
-            LOG.debug('wait %s extract to %s' % (appfile, dst))
-            waiter.wait()
-            while entity not in self.konwn_appentitys:
-                if int(time.time()) > overtime:
-                    LOG.error('Get entity %d from konwn appentity fail' % entity)
-                    LOG.error('%s' % str(chiefs))
-                    LOG.error('%s' % str(databases))
-                    return
-                eventlet.sleep(0.1)
-            opentime = self.konwn_appentitys[entity].get('opentime')
-            LOG.debug('Try bond database %s' % databases)
-            try:
-                self.client.bondto(entity, databases)
-            except Exception:
-                LOG.error('Notify bond database info fail')
-                LOG.error('Fail for %d %s' % (entity, str(databases)))
-                raise
-            LOG.info('Try bond database success, flush config')
-            eventlet.sleep(3)
-            self.flush_config(entity, databases, opentime, chiefs)
-
-        threadpool.add_thread(_postdo)
         # 返回解压waiter对象
         return waiter
 
@@ -409,18 +383,21 @@ class Application(AppEndpointBase):
                 systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
                 with self._allocate_port(entity, objtype, _ports) as ports:
                     middleware = taskcreate.create_entity(self, entity, objtype, databases,
-                                                          chiefs, appfile, timeout)
+                                                          appfile, timeout)
+                    # 有步骤失败
                     if not middleware.success:
-                        if middleware.waiter:
+                        if middleware.waiter is not None:
                             try:
                                 middleware.waiter.stop()
                             except Exception as e:
                                 LOG.error('Stop waiter catch error %s' % e.__class__.__name__)
+                            finally:
+                                middleware.waiter = None
                         LOG.error('create middleware result %s' % str(middleware))
                         raise RpcEntityError(endpoint=common.NAME, entity=entity,
                                              reason=str(middleware))
 
-                    def _port_notify():
+                    def _ports_notify():
                         """notify port bond"""
                         eventlet.sleep(0)
                         with self.lock(entity, timeout=15):
@@ -431,7 +408,54 @@ class Application(AppEndpointBase):
                                 LOG.error('Bond ports for %d fail')
                                 self._free_ports(entity)
 
-                    threadpool.add_thread(_port_notify)
+                    def _extract_wait():
+                        middleware.waiter.wait()
+                        middleware.waiter = None
+
+                    def _config_wait():
+                        overtime = int(time.time()) + timeout
+                        while (entity not in self.konwn_appentitys or middleware.waiter is not None):
+                            if int(time.time()) > overtime:
+                                break
+                            eventlet.sleep(0.1)
+                        success = True
+                        if entity not in self.konwn_appentitys:
+                            success = False
+                            LOG.error('Get entity %d from konwn appentity fail' % entity)
+                            LOG.error('%s' % str(chiefs))
+                            LOG.error('%s' % str(databases))
+
+                        if middleware.waiter is not None:
+                            success = False
+                            try:
+                                middleware.waiter.stop()
+                            except Exception as e:
+                                LOG.error('Stop waiter catch error %s' % e.__class__.__name__)
+                            finally:
+                                middleware.waiter = None
+                            LOG.error('Wait extract overtime')
+                        if not success:
+                            return
+                        opentime = self.konwn_appentitys[entity].get('opentime')
+                        self.flush_config(entity, middleware.databases, opentime, chiefs)
+
+                    # def database_notity():
+                    #     LOG.debug('Try bond database for %s.%d' % (objtype, entity))
+                    #     try:
+                    #         self.client.bondto(entity, middleware.databases)
+                    #     except Exception:
+                    #         LOG.error('Notify bond database info fail')
+                    #         LOG.error('Fail for %d %s' % (entity, str(databases)))
+                    #         raise
+                    #     LOG.info('Try bond database success, flush config')
+
+                    # 端口占用申请
+                    threadpool.add_thread(_ports_notify)
+                    # 等待解压完成
+                    threadpool.add_thread(_extract_wait)
+                    # 生成配置文件
+                    threadpool.add_thread(_config_wait)
+
 
         resultcode = manager_common.RESULT_SUCCESS
         result = 'create %s success' % objtype
@@ -488,12 +512,10 @@ class Application(AppEndpointBase):
                         json.dump(oldcf, f)
                 used = time.time() - _start
                 timeout -= used
-                waiter = zlibutils.async_extract(src=appfile, dst=apppath, timeout=timeout,
-                                                 fork=functools.partial(safe_fork, self.entity_user(entity),
-                                                                        self.entity_group(entity)))
+                waiter = self.create_entity(entity, objtype, appfile, timeout)
                 waiter()
-
             self.flush_config(entity, databases=databases, chiefs=chiefs)
+
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           ctxt=ctxt,
                                           resultcode=manager_common.RESULT_SUCCESS,
