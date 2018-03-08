@@ -437,6 +437,21 @@ class AppEntityReuest(BaseContorller):
         return resultutils.results(result='get databases  chioces success',
                                    data=chioces)
 
+    @staticmethod
+    def _bondto(session, entity, databases):
+        for subtype, database in six.iteritems(databases):
+            LOG.info('Bond entity %d to database %d' % (entity, database.get('database_id')))
+            session.add(AreaDatabase(quote_id=database.get('quote_id'),
+                                     database_id=database.get('database_id'),
+                                     entity=entity, subtype=subtype,
+                                     host=database.get('host'), port=database.get('port'),
+                                     user=database.get('user'), passwd=database.get('passwd'),
+                                     ro_user=database.get('ro_user'), ro_passwd=database.get('ro_passwd'),
+                                     character_set=database.get('character_set')
+                                     )
+                        )
+            session.flush()
+
     def bondto(self, req, entity, body=None):
         """本地记录数据库绑定信息"""
         body = body or {}
@@ -444,18 +459,7 @@ class AppEntityReuest(BaseContorller):
         databases = body.pop('databases')
         session = endpoint_session()
         with session.begin():
-            for subtype, database in six.iteritems(databases):
-                LOG.info('Bond entity %d to database %d' % (entity, database.get('database_id')))
-                session.add(AreaDatabase(quote_id=database.get('quote_id'),
-                                         database_id=database.get('database_id'),
-                                         entity=entity, subtype=subtype,
-                                         host=database.get('host'), port=database.get('port'),
-                                         user=database.get('user'), passwd=database.get('passwd'),
-                                         ro_user=database.get('ro_user'), ro_passwd=database.get('ro_passwd'),
-                                         character_set=database.get('character_set')
-                                         )
-                            )
-                session.flush()
+            self._bondto(session, entity, databases)
         return resultutils.results(result='bond entity %d database success' % entity)
 
     def entitys(self, req, body=None):
@@ -693,7 +697,6 @@ class AppEntityReuest(BaseContorller):
                                                    endpoint=common.NAME, body=body)['data'][0]
                 entity = _entity.get('entity')
                 rpc_result = _entity.get('notify')
-                r_databases = rpc_result.get('databases')
                 LOG.info('Entity controller create rpc result %s' % str(rpc_result))
                 # 插入实体信息
                 appentity = AppEntity(entity=entity,
@@ -717,22 +720,11 @@ class AppEntityReuest(BaseContorller):
                     # 更新 group lastarea属性
                     query.update({'lastarea': next_area})
                 # 插入数据库绑定信息
-                if r_databases:
-                    for subtype, database in six.iteritems(r_databases):
-                        LOG.info('Bond entity %d to database %d' % (entity, database.get('database_id')))
-                        session.add(AreaDatabase(quote_id=database.get('quote_id'),
-                                                 database_id=database.get('database_id'),
-                                                 entity=entity, subtype=subtype,
-                                                 host=database.get('host'), port=database.get('port'),
-                                                 user=database.get('user'), passwd=database.get('passwd'),
-                                                 ro_user=database.get('ro_user'), ro_passwd=database.get('ro_passwd'),
-                                                 character_set=database.get('character_set')
-                                                 )
-                                    )
-                        session.flush()
+                if rpc_result.get('databases'):
+                    self._bondto(session, entity, rpc_result.get('databases'))
 
             _result = dict(entity=entity, objtype=objtype, agent_id=agent_id,
-                           databases=r_databases)
+                           databases=rpc_result.get('databases'))
             if objtype == common.GAMESERVER:
                 _result.setdefault('area_id', next_area)
                 _result.setdefault('cross_id', cross_id)
