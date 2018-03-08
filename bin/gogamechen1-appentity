@@ -279,6 +279,7 @@ def create():
     print '\033[0m'
     appentity = data[0]
     databases = appentity.get('databases')
+    print 'entity: %d' % appentity.get('entity')
     print 'group id: %d' % CONF.group_id
     print 'agent id: %d' % appentity.get('agent_id')
     print 'objtype: %s' % appentity.get('objtype')
