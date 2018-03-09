@@ -13,7 +13,6 @@ class GogameMiddle(EntityMiddleware):
         self.objtype = objtype
         self.databases = {}
         self.waiter = None
-        self._exclude = lambda x: True if x and x.endswith('.log') else False
 
 
 class GogameDatabase(Database):
@@ -36,8 +35,11 @@ class GogameAppFile(AppUpgradeFile):
 
 
 class GogameAppBackupFile(AppLocalBackupFile):
+
     def __init__(self, destination, objtype):
-        super(GogameAppBackupFile, self).__init__(destination, native=True)
+        super(GogameAppBackupFile, self).__init__(destination,
+                                                  exclude=lambda x: True if x and x.endswith('.log') else False,
+                                                  native=True)
         self.objtype = objtype
 
     def post_check(self):

@@ -1192,7 +1192,7 @@ class AppEntityReuest(BaseContorller):
             if objfile.get('timeout') + request_time > finishtime:
                 raise InvalidArgument('%s timeout over finishtime' % subtype)
         body.update({'timeline': request_time,
-                     'deadline': runtime * 2})
+                     'deadline': finishtime + 3 + (runtime * 2)})
         body.setdefault('objtype', objtype)
         return self._async_bluck_rpc('upgrade', group_id, objtype, entity, body)
 

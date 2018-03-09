@@ -836,6 +836,7 @@ class Application(AppEndpointBase):
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           resultcode=resultcode,
                                           ctxt=ctxt,
+                                          details=details,
                                           result='upgrade %s entitys finish ' % objtype)
 
     def rpc_change_status(self, ctxt, entity, status, **kwargs):
