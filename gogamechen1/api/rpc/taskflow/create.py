@@ -5,7 +5,6 @@ from simpleutil.log import log as logging
 from simpleflow.api import load
 from simpleflow.types import failure
 from simpleflow.storage import Connection
-from simpleflow.patterns import unordered_flow as uf
 from simpleflow.storage.middleware import LogBook
 from simpleflow.engines.engine import ParallelActionEngine
 
@@ -17,28 +16,14 @@ from goperation.manager.rpc.agent.application.taskflow import pipe
 from goperation.taskflow import common as task_common
 
 from gogamechen1 import common
-from gogamechen1.api import gfile
 from gogamechen1.api.rpc.taskflow import GogameMiddle
 from gogamechen1.api.rpc.taskflow import GogameDatabase
+from gogamechen1.api.rpc.taskflow import GogameAppFile
 
 
 CONF = cfg.CONF
 
 LOG = logging.getLogger(__name__)
-
-
-class CreateFileDownLoad(application.AppUpgradeFile):
-
-    def __init__(self, source, objtype):
-        super(CreateFileDownLoad, self).__init__(source, revertable=False, rollback=False)
-        self.objtype = objtype
-
-    def post_check(self):
-        try:
-            gfile.check(self.objtype, self.file)
-        except ValueError as e:
-            LOG.error('Create %s file check error becault %s' % e.message)
-            raise
 
 
 class GogameDatabaseCreateTask(MysqlCreate):
@@ -149,7 +134,7 @@ def create_entity(appendpoint, entity, objtype, databases, appfile, timeout):
     store = dict(download_timeout=timeout)
     taskflow_session = sqlite.get_taskflow_session()
     create_flow = pipe.flow_factory(taskflow_session, applications=[app, ],
-                                    upgradefile=CreateFileDownLoad(source=appfile, objtype=objtype),
+                                    upgradefile=GogameAppFile(source=appfile, objtype=objtype),
                                     store=store,
                                     create_cls=GogameDatabaseCreateTask)
     connection = Connection(taskflow_session)

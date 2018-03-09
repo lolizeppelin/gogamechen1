@@ -791,24 +791,52 @@ class Application(AppEndpointBase):
                                               resultcode=manager_common.RESULT_ERROR,
                                               ctxt=ctxt,
                                               result='upgrade entity fail, no entitys found')
+        timeline = kwargs.get('timeline')
+        objfiles = kwargs.get('objfiles')
+        objtype = kwargs.get('objtype')
+        # 校验objtype是否一致
+        for entity in entitys:
+            if self._objtype(entity) != objtype:
+                return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                                  resultcode=manager_common.RESULT_ERROR,
+                                                  ctxt=ctxt,
+                                                  result='upgrade entity %d not %s' % (entity, objtype))
         details = []
-        # 启动前进程快照
-        proc_snapshot_before = utils.find_process()
         with self.locks(entitys):
+            # 启动前进程快照
+            proc_snapshot_before = utils.find_process()
             for entity in entitys:
                 if self._entity_process(entity, proc_snapshot_before):
                     for entity in entitys:
                         details.append(dict(detail_id=entity,
-                                            resultcode=manager_common.RESULT_SUCCESS,
+                                            resultcode=manager_common.RESULT_ERROR,
                                             result='upgrade not executed, some entity is running'))
                     return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                                       resultcode=manager_common.RESULT_ERROR,
                                                       ctxt=ctxt,
                                                       result='upgrade entity fail, entity %d running' % entity,
                                                       details=details)
-            middlewares = taskupgrade.upgrade_entitys(self, entitys, kwargs.get('objfiles'),
-                                                      kwargs.get('objtype'))
-        print middlewares
+            middlewares = taskupgrade.upgrade_entitys(self, objtype, objfiles, entitys, timeline)
+        resultcode = manager_common.RESULT_SUCCESS
+        for middleware in middlewares:
+            if objtype == common.GAMESERVER:
+                prefix = ','.join(map(str, self.konwn_appentitys[entity].get('areas')))
+            else:
+                prefix = '%s entity %d' % (objtype, entity)
+            if middleware.success:
+                details.append(dict(detail_id=middleware.entity,
+                                    resultcode=manager_common.RESULT_SUCCESS,
+                                    result='%s upgrade success' % prefix))
+            else:
+                resultcode = manager_common.RESULT_NOT_ALL_SUCCESS
+                details.append(dict(detail_id=middleware.entity,
+                                    resultcode=manager_common.RESULT_ERROR,
+                                    result='%s upgrade fail' % prefix))
+                LOG.error(str(middleware))
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          resultcode=resultcode,
+                                          ctxt=ctxt,
+                                          result='upgrade %s entitys finish ' % objtype)
 
     def rpc_change_status(self, ctxt, entity, status, **kwargs):
         if entity not in set(self.entitys):

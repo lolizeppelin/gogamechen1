@@ -316,10 +316,12 @@ class AppEntityReuest(BaseContorller):
                         'required': ['md5', 'timeout'],
                         'properties': {'md5': {'type': 'string', 'format': 'uuid',
                                                 'description': '更新程序文件所需文件'},
-                                       'timeout': {'type': 'integer', 'minimum': 5, 'maxmum': 300,
+                                       'timeout': {'type': 'integer', 'minimum': 10, 'maxmum': 300,
                                                    'description': '更新超时时间'},
                                        'backup': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
                                                   'description': '是否更新前备份程序,默认是'},
+                                       'revertable': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
+                                                      'description': '程序文件是否可以回滚,默认是'},
                                        'rollback': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
                                                     'description': '是否连带回滚(回滚前方已经成功的步骤),默认否'},
                                        }},
@@ -332,6 +334,8 @@ class AppEntityReuest(BaseContorller):
                                         'description': '更新超时时间'},
                             'backup': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
                                        'description': '是否更新前备份游戏数据库,默认否'},
+                            'revertable': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
+                                           'description': '游戏库是否可以回滚,默认否'},
                             'rollback': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
                                          'description': '是否连带回滚(回滚前方已经成功的步骤),默认否'}}},
                     common.LOGDB: {
@@ -343,6 +347,8 @@ class AppEntityReuest(BaseContorller):
                                         'description': '更新超时时间'},
                             'backup': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
                                        'description': '是否更新前备份日志数据库,默认否'},
+                            'revertable': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
+                                           'description': '日志库是否可以回滚,默认否'},
                             'rollback': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
                                          'description': '是否连带回滚(回滚前方已经成功的步骤),默认否'}}},}
                 }
@@ -351,7 +357,8 @@ class AppEntityReuest(BaseContorller):
                'required': ['request_time', 'objfiles'],
                'properties': {
                    'objfiles': OBJFILES,
-                   'request_time': {'type': 'integer', 'description': '异步请求时间'}}
+                   'request_time': {'type': 'integer', 'description': '异步请求时间'},
+                   'finishtime': {'type': 'integer', 'description': '异步请求完成时间'}}
                }
 
     @staticmethod
@@ -1177,11 +1184,15 @@ class AppEntityReuest(BaseContorller):
         objfiles = body.get('objfiles')
         if not objfiles:
             raise InvalidArgument('Not objfile found for upgrade')
-        finishtime = body.get('request_time') + 5
-        for objfile in objfiles:
-            finishtime += objfile.get('timeout')
-        body.update({'finishtime': finishtime,
-                     'deadline': finishtime + 60})
+        request_time = body.get('request_time')
+        finishtime = body.get('finishtime')
+        runtime = finishtime - request_time
+        for subtype in objfiles:
+            objfile = objfiles[subtype]
+            if objfile.get('timeout') + request_time > finishtime:
+                raise InvalidArgument('%s timeout over finishtime' % subtype)
+        body.update({'timeline': request_time,
+                     'deadline': runtime * 2})
         body.setdefault('objtype', objtype)
         return self._async_bluck_rpc('upgrade', group_id, objtype, entity, body)
 

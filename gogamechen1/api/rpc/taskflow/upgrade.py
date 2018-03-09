@@ -10,12 +10,16 @@ from simpleflow.storage.middleware import LogBook
 from simpleflow.engines.engine import ParallelActionEngine
 
 from goperation.manager.rpc.agent import sqlite
-from goperation.manager.rpc.agent.application.taskflow import application
+from goperation.manager.rpc.agent.application.taskflow.application import AppFileUpgradeByFile
+from goperation.manager.rpc.agent.application.taskflow.application import Application
 from goperation.manager.rpc.agent.application.taskflow.database import DbUpdateFile
+from goperation.manager.rpc.agent.application.taskflow.database import DbBackUpFile
 from goperation.manager.rpc.agent.application.taskflow import pipe
 from gogamechen1 import common
 from gogamechen1.api.rpc.taskflow import GogameMiddle
 from gogamechen1.api.rpc.taskflow import GogameDatabase
+from gogamechen1.api.rpc.taskflow import GogameAppFile
+from gogamechen1.api.rpc.taskflow import GogameAppBackupFile
 
 
 CONF = cfg.CONF
@@ -23,39 +27,26 @@ CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
 
 
-class GogameStop(application.AppStopBase):
-    pass
-
-
-def upgrade_entitys(appendpoint, entitys, objfiles, objtype):
-    _objfiles = {}
-
-    # 下载数据库更新文件任务
-    for subtype in (common.DATADB, common.LOGDB):
-        if subtype in objfiles:
-            upinfo = objfiles[subtype]
-            backup = upinfo.get('backup', False)
-            rollback = upinfo.get('rollback', False)
-            if rollback and not backup:
-                raise ValueError('%s rollback need backup')
-            _objfiles[subtype] = dict(update=DbUpdateFile(source=upinfo['uuid'],
-                                                          rollback=rollback,
-                                                          formater=None),
-                                      timeout=upinfo['timeout'],
-                                      backup=backup)
+def upgrade_entitys(appendpoint,
+                    objtype, objfiles,
+                    entitys, timeline):
+    upgradefile = None
     backupfile = None
-    rollback = None
+
     if common.APPFILE in objfiles:
-        # 下载程序更新文件任务
-        upinfo = objfiles[common.APPFILE]
-        # TODO 程序文件校验函数
-        _objfiles[common.APPFILE] = application.AppUpgradeFile(source=upinfo['uuid'], checker=None)
-        if upinfo.get('backup', True):
-            backupfile = os.path.join(appendpoint.endpoint_backup,
-                                      '%s.%s.%d.gz' % (objtype, common.APPFILE, int(time.time())))
-        rollback = upinfo.get('rollback', False)
-        if rollback and not backupfile:
-            raise ValueError('%s rollback need backupfile')
+        objfile = objfiles[common.APPFILE]
+        md5 = objfile.get('md5')
+        backup = objfile.get('backup', True)
+        revertable = objfile.get('revertable', False)
+        rollback = objfile.get('rollback', True)
+        # 程序更新文件
+        upgradefile = GogameAppFile(md5, objtype, rollback=rollback, revertable=revertable)
+        if backup:
+            # 备份entity在flow_factory随机抽取
+            outfile = os.path.join(appendpoint.endpoint_backup,
+                                   '%s.%s.%d.gz' % (objtype, common.APPFILE, timeline))
+            # 程序备份文件
+            backupfile = GogameAppBackupFile(outfile, objtype)
 
     applications = []
     middlewares = []
@@ -67,40 +58,41 @@ def upgrade_entitys(appendpoint, entitys, objfiles, objtype):
         _database = []
         # 备份数据库信息
         for subtype in (common.DATADB, common.LOGDB):
-            if subtype in _objfiles:
+            if subtype in objfiles:
+                objfile = objfiles[subtype]
+                md5 = objfile.get('md5')
+                revertable = objfile.get('revertable', False)
+                rollback = objfile.get('rollback', False)
+                timeout = objfile.get('timeout')
                 dbinfo = appendpoint.local_database_info(entity, subtype)
-                update = _objfiles[subtype]['update']
-                timeout = _objfiles[subtype]['timeout']
+                update = DbUpdateFile(md5, revertable, rollback)
+                # 数据库备份文件
                 backup = None
-                if _objfiles[subtype]['backup']:
-                    backup = os.path.join(appendpoint.bakpath(entity), '%s.%s.%d.sql' % (objtype, subtype,
-                                                                                         int(time.time())))
-                    if os.path.exists(backup):
-                        raise ValueError('%s backup file exist' % subtype)
+                if objfile.get('backup', False):
+                    outfile = os.path.join(appendpoint.endpoint_backup,
+                                           '%s.%d.%s.%d.gz' % (objtype, entity, subtype, timeline))
+                    backup = DbBackUpFile(outfile)
                 _database.append(GogameDatabase(backup=backup, update=update,
                                                 timeout=timeout, **dbinfo))
-        # 备份程序文件任务
+        # 更新程序文件任务
         upgradetask = None
-        if _objfiles.get(common.APPFILE):
-            upgradetask = application.AppFileUpgradeByFile(middleware, rollback=rollback)
-        app = application.Application(middleware,
-                                      upgradetask=upgradetask,
-                                      databases=_database)
+        if common.APPFILE in objfiles:
+            upgradetask = AppFileUpgradeByFile(middleware)
+        app = Application(middleware, upgradetask=upgradetask, databases=_database)
         applications.append(app)
 
     book = LogBook(name='upgrad_%s' % appendpoint.namespace)
-    # store = dict(objfile=objfile, chiefs=chiefs, download_timeout=timeout)
-    store = dict(download_timeout=60, db_dump_timeout=600)
+    store = dict(download_timeout=60)
     taskflow_session = sqlite.get_taskflow_session()
     upgrade_flow = pipe.flow_factory(taskflow_session,
                                      applications=applications,
-                                     upgradefile=_objfiles.get(common.APPFILE),
+                                     upgradefile=upgradefile,
                                      backupfile=backupfile,
                                      store=store)
     connection = Connection(taskflow_session)
     engine = load(connection, upgrade_flow, store=store,
-                  book=book, engine_cls=ParallelActionEngine)
-
+                  book=book, engine_cls=ParallelActionEngine,
+                  max_workers=4)
     try:
         engine.run()
     except Exception as e:

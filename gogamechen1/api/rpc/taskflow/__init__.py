@@ -1,5 +1,9 @@
 from goperation.manager.rpc.agent.application.taskflow.middleware import EntityMiddleware
 from goperation.manager.rpc.agent.application.taskflow.database import Database
+from goperation.manager.rpc.agent.application.taskflow.application import AppUpgradeFile
+from goperation.manager.rpc.agent.application.taskflow.application import AppLocalBackupFile
+
+from gogamechen1.api import gfile
 
 
 class GogameMiddle(EntityMiddleware):
@@ -20,3 +24,21 @@ class GogameDatabase(Database):
         self.subtype = kwargs.get('subtype')
         self.ro_user = kwargs.get('ro_user')
         self.ro_passwd = kwargs.get('ro_passwd')
+
+
+class GogameAppFile(AppUpgradeFile):
+    def __init__(self, source, objtype, revertable=False, rollback=False):
+        super(GogameAppFile, self).__init__(source, revertable, rollback)
+        self.objtype = objtype
+
+    def post_check(self):
+        gfile.check(self.objtype, self.file)
+
+
+class GogameAppBackupFile(AppLocalBackupFile):
+    def __init__(self, destination, objtype):
+        super(GogameAppBackupFile, self).__init__(destination, native=True)
+        self.objtype = objtype
+
+    def post_check(self):
+        gfile.check(self.objtype, self.file)
