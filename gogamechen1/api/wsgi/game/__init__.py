@@ -314,7 +314,7 @@ class AppEntityReuest(BaseContorller):
                     common.APPFILE: {
                         'type': 'object',
                         'required': ['md5', 'timeout'],
-                        'properties': {'md5': {'type': 'string', 'format': 'uuid',
+                        'properties': {'md5': {'type': 'string', 'format': 'md5',
                                                 'description': '更新程序文件所需文件'},
                                        'timeout': {'type': 'integer', 'minimum': 10, 'maxmum': 300,
                                                    'description': '更新超时时间'},
@@ -342,7 +342,7 @@ class AppEntityReuest(BaseContorller):
                         'type': 'object',
                         'required': ['md5', 'timeout'],
                         'properties': {
-                            'uuid': {'type': 'string', 'format': 'md5', 'description': '更新日志库所需文件'},
+                            'md5': {'type': 'string', 'format': 'md5', 'description': '更新日志库所需文件'},
                             'timeout': {'type': 'integer', 'minimum': 30, 'maxmum': 3600,
                                         'description': '更新超时时间'},
                             'backup': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
@@ -354,7 +354,7 @@ class AppEntityReuest(BaseContorller):
                 }
 
     UPGRADE = {'type': 'object',
-               'required': ['request_time', 'objfiles'],
+               'required': ['request_time', 'finishtime', 'objfiles'],
                'properties': {
                    'objfiles': OBJFILES,
                    'request_time': {'type': 'integer', 'description': '异步请求时间'},
