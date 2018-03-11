@@ -5,10 +5,19 @@ import zipfile
 import tarfile
 from gogamechen1 import common
 
+gamesvr_regx = re.compile('^bin(/|/libbehaviac.so|/libgointerface.so|/gamesvr)?$|'
+                          '^behaviac(/|/(?!.*?[\.])[\S]+?|/[\S]+?\.xml)?$|'
+                          '^(config|geology)(/|/[\S]+?\.json)?$')
 
-gamesvr_regx = re.compile('^bin/(libbehaviac.so|libgointerface.so|gamesvr)*?$|'
-                          '^behaviac/([\S]+?/|[\S]+?\.xml)*?$|'
-                          '^(config|geology)/([\S]+?\.json)*?$')
+exclude_regx = re.compile('(.*?/)*?conf(/.*)?$|.*?\.log$')
+
+
+def exclude(pathname):
+    if not pathname:
+        return False
+    if re.match(exclude_regx, pathname):
+        return True
+    return False
 
 
 def gamesvr_checker(filename):
@@ -17,12 +26,12 @@ def gamesvr_checker(filename):
 
 
 def loginsvr_checker(filename):
-    if filename not in ('bin/', 'bin/loginsvr'):
+    if filename not in ('bin', 'bin/', 'bin/loginsvr'):
         raise ValueError('%s not for loginsvr' % filename)
 
 
 def publicsvr_checker(filename):
-    if filename not in ('bin/', 'bin/publicsvr'):
+    if filename not in ('bin', 'bin/', 'bin/publicsvr'):
         raise ValueError('%s not for publicsvr' % filename)
 
 

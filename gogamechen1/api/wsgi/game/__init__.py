@@ -996,9 +996,7 @@ class AppEntityReuest(BaseContorller):
                             LOG.error('Delete schema:%s from %d fail, %s' % (schema, _database.database_id,
                                                                              e.message))
                         except Exception:
-                            LOG.error('Delete schema:%s from %d fail' % (schema, _database.database_id))
-                            if LOG.isEnabledFor(logging.DEBUG):
-                                LOG.exception('Delete schema fail')
+                            LOG.exception('Delete schema:%s from %d fail' % (schema, _database.database_id))
                     elif action == 'unquote':
                         LOG.info('Try unquote %d' % _database.quote_id)
                         try:

@@ -171,7 +171,7 @@ class Application(AppEndpointBase):
         return os.path.join(self.apppath(entity), 'conf', '%s.json' % objtype)
 
     def local_database_info(self, entity, subtype):
-        return gconfig.deacidizing(self._objtype(entity), common.DATADB)
+        return gconfig.deacidizing(self._objconf(entity), common.DATADB)
 
     @contextlib.contextmanager
     def _allocate_port(self, entity, objtype, ports):
@@ -382,8 +382,12 @@ class Application(AppEndpointBase):
                 os.makedirs(confdir, mode=0755)
                 systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
                 with self._allocate_port(entity, objtype, _ports) as ports:
-                    middleware = taskcreate.create_entity(self, entity, objtype, databases,
-                                                          appfile, timeout)
+                    try:
+                        middleware = taskcreate.create_entity(self, entity, objtype, databases,
+                                                              appfile, timeout)
+                    except Exception:
+                        LOG.exception('prepare create taskflow error')
+                        raise
                     # 有步骤失败
                     if not middleware.success:
                         if middleware.waiter is not None:
@@ -816,7 +820,11 @@ class Application(AppEndpointBase):
                                                       ctxt=ctxt,
                                                       result='upgrade entity fail, entity %d running' % entity,
                                                       details=details)
-            middlewares = taskupgrade.upgrade_entitys(self, objtype, objfiles, entitys, timeline)
+            try:
+                middlewares = taskupgrade.upgrade_entitys(self, objtype, objfiles, entitys, timeline)
+            except Exception:
+                LOG.exception('prepare upgrade taskflow error')
+                raise
         resultcode = manager_common.RESULT_SUCCESS
         for middleware in middlewares:
             if objtype == common.GAMESERVER:
@@ -832,7 +840,7 @@ class Application(AppEndpointBase):
                 details.append(dict(detail_id=middleware.entity,
                                     resultcode=manager_common.RESULT_ERROR,
                                     result='%s upgrade fail' % prefix))
-                LOG.error('%s.%d %s', (objtype, middleware.entity, str(middleware)))
+                LOG.debug('%s.%d %s', (objtype, middleware.entity, str(middleware)))
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           resultcode=resultcode,
                                           ctxt=ctxt,
