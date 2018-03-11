@@ -134,9 +134,9 @@ def create():
         print('\033[0m')
         sys.exit(1)
     info = data[0]
-    if not CONF.address:
+    if CONF.address:
         print('\033[1;32;40m')
-        print 'Create objfile success'
+        print 'Create objfile %s success' % CONF.address
         print 'File md5 is %s' % info.get('md5')
         print('\033[0m')
     else:
@@ -175,9 +175,10 @@ def show():
         print('\033[0m')
         sys.exit(1)
     if not data:
-        print('\033[1;32;40m')
-        print 'Now objfile success'
+        print('\033[1;31;40m')
+        print 'Not objfile info found'
         print('\033[0m')
+        sys.exit(1)
     objfile = data[0]
     md5 = objfile.get('md5')
     print('\033[1;32;40m')
@@ -190,6 +191,7 @@ def show():
     print 'downloader: %s' % objfile.get('downloader')
     print 'address: %s' % objfile.get('address')
     print 'uploadtime: %s' % objfile.get('uploadtime')
+    print 'status: %s' % objfile.get('status')
     print '---------File deatils----------'
     print 'ext: %s' % objfile.get('ext')
     print 'size: %d' % objfile.get('size')

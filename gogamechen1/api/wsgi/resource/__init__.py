@@ -163,6 +163,10 @@ class ObjtypeFileReuest(BaseContorller):
         if not fileinfo:
             raise InvalidArgument('Both fileinfo and address is none')
 
+        md5 = fileinfo.get('md5')
+        ext = fileinfo.get('ext')
+        size = fileinfo.get('size')
+
         # 没有地址,通过gopcdn上传
         if not address:
             resource_id = CONF[common.NAME].objfile_resource
@@ -172,7 +176,6 @@ class ObjtypeFileReuest(BaseContorller):
             if not resource.get('internal'):
                 raise InvalidArgument('objtype file resource not a internal resource')
             address = resource_url(resource_id, fileinfo)[0]
-            md5 = digestutils.strmd5(address)
             # 上传结束后通知
             notify = {'success': dict(action='/files/%s' % md5,
                                       method='PUT',
@@ -184,10 +187,6 @@ class ObjtypeFileReuest(BaseContorller):
             status = manager_common.DOWNFILE_UPLOADING
         else:
             status = manager_common.DOWNFILE_FILEOK
-
-        md5 = fileinfo.get('md5')
-        ext = fileinfo.get('ext')
-        size = fileinfo.get('size')
 
         session = endpoint_session()
         with session.begin():
@@ -210,14 +209,15 @@ class ObjtypeFileReuest(BaseContorller):
         body = body or {}
         session = endpoint_session(readonly=True)
         query = model_query(session, ObjtypeFile, filter=ObjtypeFile.md5 == md5)
-        objtype_file = query.one()
-        show_result = file_controller.show(req, objtype_file.md5)
-        if show_result['resultcode'] != manager_common.RESULT_SUCCESS:
-            return resultutils.results(result='get file of %s fail, %s' % (md5, show_result.get('result')))
+        objfile = query.one()
+        show_result = file_controller.show(req, objfile.md5)
+        if not show_result['data']:
+            return resultutils.results(result='get file of %s fail, %s' % (md5, show_result.get('result')),
+                                       resultcode=manager_common.RESULT_ERROR)
         file_info = show_result['data'][0]
-        file_info.setdefault('subtype', objtype_file.subtype)
-        file_info.setdefault('objtype', objtype_file.objtype)
-        file_info.setdefault('version', objtype_file.version)
+        file_info.setdefault('subtype', objfile.subtype)
+        file_info.setdefault('objtype', objfile.objtype)
+        file_info.setdefault('version', objfile.version)
         return resultutils.results(result='get file of %s success' % md5,
                                    data=[file_info, ])
 
@@ -232,7 +232,13 @@ class ObjtypeFileReuest(BaseContorller):
             session.delete(objfile)
             session.flush()
             if resource_id:
-                cdnresource_controller.delete_file(req, resource_id, body=dict(filename=objfile.address))
+                show_result = file_controller.show(req, objfile.md5)
+                if show_result['resultcode'] == manager_common.RESULT_SUCCESS:
+                    file_info = show_result['data'][0]
+                    cdnresource_controller.delete_file(req, resource_id,
+                                                       body=dict(filename=file_info['address']))
+                else:
+                    LOG.error('objfile %s can not be found from file controller')
         return file_controller.delete(req, objfile.md5)
 
     def update(self, req, md5, body=None):
