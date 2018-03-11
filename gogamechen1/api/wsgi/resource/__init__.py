@@ -225,12 +225,15 @@ class ObjtypeFileReuest(BaseContorller):
         body = body or {}
         session = endpoint_session(readonly=True)
         query = model_query(session, ObjtypeFile, filter=ObjtypeFile.md5 == md5)
-        pfile = query.one()
-        package = pfile.package
-        if package.gversion == package.gversion and pfile.ftype == common.SMALL_PACKAGE:
-            raise InvalidArgument('Package file with version %s is quote' % package.gversion)
-        query.delete()
-        return file_controller.delete(req, pfile.md5)
+        resource_id = CONF[common.NAME].objfile_resource
+        objfile = query.one()
+        # query.delete()
+        with session.begin():
+            session.delete(objfile)
+            session.flush()
+            if resource_id:
+                cdnresource_controller.delete_file(req, resource_id, body=dict(filename=objfile.address))
+        return file_controller.delete(req, objfile.md5)
 
     def update(self, req, md5, body=None):
         raise NotImplementedError
@@ -847,10 +850,12 @@ class PackageFileReuest(BaseContorller):
         pfile = query.one()
         if pfile.package_id != package_id:
             raise InvalidArgument('Package File package id not match')
+        package = pfile.package
+        if package.gversion == pfile.gversion and pfile.ftype == common.SMALL_PACKAGE:
+            raise InvalidArgument('Package file with version %s is quote' % package.gversion)
         if pfile.resource_id:
-
             def wapper():
-                if pfile.resource_id and pfile.status == manager_common.DOWNFILE_FILEOK:
+                if pfile.status == manager_common.DOWNFILE_FILEOK:
                     try:
                         cdnresource_controller.unquote(req, pfile.resource_id)
                     except Exception:
