@@ -39,6 +39,7 @@ class GogameAppBackupFile(AppLocalBackupFile):
     def __init__(self, destination, objtype):
         super(GogameAppBackupFile, self).__init__(destination,
                                                   exclude=lambda x: True if x and x.endswith('.log') else False,
+                                                  topdir=False,
                                                   native=True)
         self.objtype = objtype
 

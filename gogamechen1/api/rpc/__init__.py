@@ -832,7 +832,7 @@ class Application(AppEndpointBase):
                 details.append(dict(detail_id=middleware.entity,
                                     resultcode=manager_common.RESULT_ERROR,
                                     result='%s upgrade fail' % prefix))
-                LOG.error(str(middleware))
+                LOG.error('%s.%d %s', (objtype, middleware.entity, str(middleware)))
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           resultcode=resultcode,
                                           ctxt=ctxt,
