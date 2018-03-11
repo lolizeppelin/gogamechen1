@@ -828,9 +828,9 @@ class Application(AppEndpointBase):
         resultcode = manager_common.RESULT_SUCCESS
         for middleware in middlewares:
             if objtype == common.GAMESERVER:
-                prefix = ','.join(map(str, self.konwn_appentitys[entity].get('areas')))
+                prefix = ','.join(map(str, self.konwn_appentitys[middleware.entity].get('areas')))
             else:
-                prefix = '%s entity %d' % (objtype, entity)
+                prefix = '%s entity %d' % (objtype, middleware.entity)
             if middleware.success:
                 details.append(dict(detail_id=middleware.entity,
                                     resultcode=manager_common.RESULT_SUCCESS,
