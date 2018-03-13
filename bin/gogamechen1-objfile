@@ -144,9 +144,9 @@ def create():
         print('\033[1;32;40m')
         print 'Get upload file websocket uri success'
         print 'uri is %s:%d' % (uri.get('ipaddr'), uri.get('port'))
-        print 'try connect websocket after 0.1 seconds'
+        print 'try connect websocket after 1 seconds'
         print('\033[0m')
-        time.sleep(0.1)
+        time.sleep(1)
         ws = websocket.create_connection("ws://%s:%d" % (uri.get('ipaddr'), uri.get('port')),
                                          subprotocols=["binary"])
         print "connect websocket success, send file now"

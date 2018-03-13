@@ -106,7 +106,9 @@ Goperation xiaochen go game rpc agent
 %files agent
 %defattr(-,root,root,-)
 %dir %{python_sitelib}/%{proj_name}/api/rpc
+%dir %{python_sitelib}/%{proj_name}/plugin
 %{python_sitelib}/%{proj_name}/api/rpc/*
+%{python_sitelib}/%{proj_name}/plugin/*
 %{_sysconfdir}/goperation/endpoints/gogamechen1.agent.conf.sample
 
 

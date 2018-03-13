@@ -87,3 +87,13 @@
 
 # data db ro user passwd (string value)
 #datadb_ro_passwd = <None>
+
+
+[gopcdn]
+
+#
+# From gopcdn
+#
+
+# alias impl class (multi import string)
+#aliases = gogamechen1.plugin.alias.Alias

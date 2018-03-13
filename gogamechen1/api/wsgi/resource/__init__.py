@@ -555,6 +555,7 @@ class PackageReuest(BaseContorller):
                 default_extension = jsonutils.loads_as_bytes(package.extension) if package.extension else {}
                 default_extension.update(extension)
                 package.extension = jsonutils.dumps(default_extension)
+            # 玩家版本号, 由安装包决定
             if gversion:
                 if gversion in [pfile.gversion for pfile in package.files
                                 if pfile.ftype == common.SMALL_PACKAGE
@@ -562,6 +563,7 @@ class PackageReuest(BaseContorller):
                     package.gversion = gversion
                 else:
                     raise InvalidArgument('Package version can not be found')
+            # 游戏资源版本号, 又cdn相关版本号决定
             if rversion:
                 # 没有引用过默认version,添加资源引用
                 if not package.rquote_id:
@@ -569,10 +571,15 @@ class PackageReuest(BaseContorller):
                                                             body=dict(version=rversion))
                     quote = qresult['data'][0]
                     package.rquote_id = quote.get('quote_id')
+                    alias = quote.get('alias')
                 # 修改资源引用
                 else:
-                    cdnquote_controller.update(req, quote_id=package.rquote_id, body={'version': rversion})
-                package.rversion = rversion
+                    upresult = cdnquote_controller.update(req, quote_id=package.rquote_id,
+                                                          body={'version': rversion})['data'][0]
+                    alias = upresult.get('version').get('alias')
+                if not alias:
+                    LOG.error('version alias is None, check it')
+                package.rversion = alias
             session.flush()
         eventlet.spawn_n(notify.resource)
         return resultutils.results(result='Update package success')
@@ -627,6 +634,10 @@ class PackageReuest(BaseContorller):
         package = query.one()
         if package.group_id != group_id:
             raise InvalidArgument('Group id not the same')
+        # 设置detail中的endpoint
+        detail = body.pop('detail', None) or {}
+        detail.setdefault(common.NAME, dict(endpoint=common.NAME))
+        body.setdefault('detail', detail)
         result = cdnresource_controller.upgrade(req, resource_id=package.resource_id, body=body)
         asyncinfo = result['data'][0]
         eventlet.spawn_after(asyncinfo['deadline'], notify.resource)

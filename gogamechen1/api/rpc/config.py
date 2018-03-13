@@ -112,3 +112,14 @@ def register_opts():
 
 def list_agent_opts():
     return agent_opts
+
+
+def list_cdn_opts():
+    from gopcdn.plugin.alias.config import alias_opts
+
+    for opt in alias_opts:
+        if opt.name == 'aliases':
+            opt.default = ['%s.plugin.alias.Alias' % common.NAME]
+            break
+
+    return alias_opts
