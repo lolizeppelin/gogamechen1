@@ -579,7 +579,8 @@ class PackageReuest(BaseContorller):
                     alias = upresult.get('version').get('alias')
                 if not alias:
                     LOG.error('version alias is None, check it')
-                package.rversion = alias
+                LOG.info('Package version %s with alias %s' % (rversion, alias))
+                package.rversion = rversion
             session.flush()
         eventlet.spawn_n(notify.resource)
         return resultutils.results(result='Update package success')
@@ -636,7 +637,7 @@ class PackageReuest(BaseContorller):
             raise InvalidArgument('Group id not the same')
         # 设置detail中的endpoint
         detail = body.pop('detail', None) or {}
-        detail.setdefault(common.NAME, dict(endpoint=common.NAME))
+        detail.setdefault('endpoint', common.NAME)
         body.setdefault('detail', detail)
         result = cdnresource_controller.upgrade(req, resource_id=package.resource_id, body=body)
         asyncinfo = result['data'][0]

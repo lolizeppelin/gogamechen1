@@ -181,7 +181,7 @@ def resources():
     print '\033[0m'
 
     resource_heads = ['resource_id', 'etype', 'name']
-    version_heads = ['version_id', 'version', 'time']
+    version_heads = ['version_id', 'version', 'alias', 'time']
     for resource in data:
         versions = resource.get('versions')
         tb = table.PleasantTable(ident=0, columns=resource_heads, counter=False)
@@ -190,7 +190,7 @@ def resources():
         if versions:
             tb = table.PleasantTable(ident=8, columns=version_heads, counter=True)
             for version in versions:
-                tb.add_row([version.get('version_id'), version.get('version'),
+                tb.add_row([version.get('version_id'), version.get('version'), version.get('alias'),
                             timeutils.unix_to_iso(version.get('vtime'))])
             print tb.pformat()
 
