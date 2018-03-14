@@ -33,7 +33,7 @@ one_opts = [
 game_type_opts = [
     cfg.StrOpt('objtype',
                short='o',
-               choices=['gamesvr', 'loginsvr', 'publicsvr'],
+               choices=[common.GAMESERVER, common.GMSERVER, common.CROSSSERVER],
                help='Game objtype objfile for')
 ]
 

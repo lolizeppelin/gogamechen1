@@ -13,8 +13,8 @@
 # Endpoint max lock size (integer value)
 #max_lock = 100
 
-# agent appcaclition affinity bitwise, [gamesvr:1] [publicsvr:2] [loginsvr:4]
-# [publicsvr&loginsvr:6] [gamesvr&publicsvr&loginsvr:7] and so on (integer
+# agent appcaclition affinity bitwise, [gamesvr:1] [publicsvr:2] [gmsvr:4]
+# [publicsvr&gmsvr:6] [gamesvr&publicsvr&gmsvr:7] and so on (integer
 # value)
 # Allowed values: 1, 2, 3, 4, 5, 6, 7
 #agent_affinity = 1
@@ -51,10 +51,10 @@
 #logdb_ro_passwd = <None>
 
 
-[gogamechen1.loginsvr]
+[gogamechen1.gmsvr]
 
 #
-# From gogamechen1.loginsvr
+# From gogamechen1.gmsvr
 #
 
 # data db rw user name (string value)

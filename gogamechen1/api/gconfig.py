@@ -126,7 +126,7 @@ def format_opentime(objtype, cfile, opentime):
         return conf.pop('StartServerTime')
 
 
-def gamesvr_make(logpath, local_ip, ports, entity, areas, databases, opentime, chiefs):
+def conf_type_1(logpath, local_ip, ports, entity, areas, databases, opentime, chiefs):
     conf = OrderedDict()
     conf.setdefault('LogLevel', 'release')
     conf.setdefault('LogPath', logpath)
@@ -142,7 +142,7 @@ def gamesvr_make(logpath, local_ip, ports, entity, areas, databases, opentime, c
     return conf
 
 
-def loginsvr_make(logpath, local_ip, ports, entity, databases):
+def conf_type_2(logpath, local_ip, ports, entity, databases):
     conf = OrderedDict()
     conf.setdefault('LogLevel', 'release')
     conf.setdefault('LogPath', logpath)
@@ -152,7 +152,7 @@ def loginsvr_make(logpath, local_ip, ports, entity, databases):
     return conf
 
 
-def publicsvr_make(logpath, local_ip, ports, entity, databases):
+def conf_type_3(logpath, local_ip, ports, entity, databases):
     conf = OrderedDict()
     conf.setdefault('LogLevel', 'release')
     conf.setdefault('LogPath', logpath)
@@ -160,6 +160,11 @@ def publicsvr_make(logpath, local_ip, ports, entity, databases):
     conf.setdefault('DB', databases[common.DATADB])
     conf.setdefault('DBMaxConn', CROSSSERVER_DBPOOL_SIZE)
     return conf
+
+
+CONF_MAKE = {common.GMSERVER: conf_type_2,
+             common.CROSSSERVER: conf_type_3,
+             common.GAMESERVER: conf_type_1}
 
 
 def make(objtype, logpath,
@@ -174,6 +179,5 @@ def make(objtype, logpath,
         args = (logpath, local_ip, ports, entity, databases)
     else:
         raise RuntimeError('Objtype error')
-    func = '%s_make' % objtype
-    func = eval(func)
+    func = CONF_MAKE[objtype]
     return func(*args)

@@ -11,6 +11,8 @@ from goperation.api.client.config import zone_opt
 from goperation.api.client import ManagerClient
 
 from goperation.api.client.utils import prepare_results
+
+from gogamechen1 import common
 from gogamechen1.api.client import GogameChen1DBClient
 
 CONF = cfg.CONF
@@ -19,7 +21,7 @@ objtype_opt = cfg.StrOpt('objtype',
                          short='o',
                          default='gamesvr',
                          required=True,
-                         choices=['gamesvr', 'loginsvr', 'publicsvr'],
+                         choices=[common.GAMESERVER, common.GMSERVER, common.CROSSSERVER],
                          help='Game objtype objfile for')
 
 subtype_opt = cfg.StrOpt('subtype',

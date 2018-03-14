@@ -15,9 +15,9 @@ agent_opts = [
                required=True,
                default=1,
                help='agent appcaclition affinity bitwise, '
-                    '[gamesvr:1] [publicsvr:2] [loginsvr:4] '
-                    '[publicsvr&loginsvr:6] '
-                    '[gamesvr&publicsvr&loginsvr:7] and so on')
+                    '[gamesvr:1] [publicsvr:2] [gmsvr:4] '
+                    '[publicsvr&gmsvr:6] '
+                    '[gamesvr&publicsvr&gmsvr:7] and so on')
 ]
 
 

@@ -145,7 +145,7 @@ crosspath = r'C:\Users\loliz_000\Desktop\cross.zip'
 
 # file_index()
 # send_file(uuid='6cad91aa-b3e5-4252-a860-6c19e68e037e', objtype='gamesvr')
-# send_file(uuid='f6512b24-82f3-4886-bd08-5a7cb0e48fdb', objtype='loginsvr')
+# send_file(uuid='f6512b24-82f3-4886-bd08-5a7cb0e48fdb', objtype='gmsvr')
 # send_file(uuid='b083e3b2-765b-4d47-9f65-75f23651eda8', objtype='publicsvr')
 
 # group_index()

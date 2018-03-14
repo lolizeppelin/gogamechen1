@@ -17,6 +17,8 @@ from goperation.api.client.utils import wait_finish
 from goperation.api.client.utils import p_asyncrequest
 
 from gopcdn.utils import build_fileinfo
+
+from gogamechen1 import common
 from gogamechen1.api.client import GogameChen1DBClient
 
 CONF = cfg.CONF
@@ -37,7 +39,7 @@ one_opts = [
 game_type_opts = [
     cfg.StrOpt('objtype',
                short='o',
-               choices=['gamesvr', 'loginsvr', 'publicsvr'],
+               choices=[common.GAMESERVER, common.GMSERVER, common.CROSSSERVER],
                help='Game objtype objfile for')
 ]
 

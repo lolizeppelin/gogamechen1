@@ -5,11 +5,15 @@ import zipfile
 import tarfile
 from gogamechen1 import common
 
-gamesvr_regx = re.compile('^bin(/|/libbehaviac.so|/libgointerface.so|/gamesvr)?$|'
-                          '^behaviac(/|/(?!.*?[\.])[\S]+?|/[\S]+?\.xml)?$|'
-                          '^(config|geology)(/|/[\S]+?\.json)?$')
 
 exclude_regx = re.compile('(.*?/)*?conf(/.*)?$|.*?\.log$')
+
+REGEX = {common.GAMESERVER: re.compile('^bin(/|/libbehaviac.so|/libgointerface.so|/gamesvr)?$|'
+                                       '^behaviac(/|/(?!.*?[\.])[\S]+?|/[\S]+?\.xml)?$|'
+                                       '^(config|geology)(/|/[\S]+?\.json)?$'),
+         common.CROSSSERVER: re.compile('^bin(/|/%s)?$' % common.CROSSSERVER),
+         common.GMSERVER: re.compile('^bin(/|/%s)?$' % common.GMSERVER),
+         }
 
 
 def exclude(pathname):
@@ -20,19 +24,9 @@ def exclude(pathname):
     return False
 
 
-def gamesvr_checker(filename):
-    if not re.match(gamesvr_regx, filename):
-        raise ValueError('%s not for gamesvr' % filename)
-
-
-def loginsvr_checker(filename):
-    if filename not in ('bin', 'bin/', 'bin/loginsvr'):
-        raise ValueError('%s not for loginsvr' % filename)
-
-
-def publicsvr_checker(filename):
-    if filename not in ('bin', 'bin/', 'bin/publicsvr'):
-        raise ValueError('%s not for publicsvr' % filename)
+def objtype_checker(objtype, filename):
+    if not re.match(REGEX[objtype], filename):
+        raise ValueError('%s not for %s' % (filename, objtype))
 
 
 def nameiter(filepath):
@@ -52,9 +46,8 @@ def check(objtype, filepath):
     count = 0
     if objtype not in common.ALLTYPES:
         raise ValueError('objtype value error')
-    _checker = eval('%s_checker' % objtype)
     for name in nameiter(filepath):
-        _checker(name)
+        objtype_checker(objtype, name)
         count += 1
         if count >= 100:
             count = 0

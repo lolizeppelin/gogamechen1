@@ -41,7 +41,7 @@ group_opt = cfg.IntOpt('group_id', required=True,
 
 objtype_opt = cfg.StrOpt('objtype',
                          required=True,
-                         short='o', choices=['gamesvr', 'loginsvr', 'publicsvr'],
+                         short='o', choices=[common.GAMESERVER, common.GMSERVER, common.CROSSSERVER],
                          default='gamesvr',
                          help='Game objtype objfile for')
 
