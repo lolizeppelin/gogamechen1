@@ -8,7 +8,7 @@ import webob.exc
 from six.moves import zip
 from collections import OrderedDict
 
-from requests.exceptions import ConnectTimeout
+from requests.exceptions import ConnectionError
 from requests.exceptions import ReadTimeout
 
 from sqlalchemy.orm import joinedload
@@ -92,11 +92,11 @@ def areas_map(group_id):
     session = endpoint_session(readonly=True)
     query = model_query(session, GameArea, filter=GameArea.group_id == group_id)
     maps = {}
-    for _areas in query:
+    for _area in query:
         try:
-            maps[_areas.entity].append(_areas.area_id)
+            maps[_area.entity].append(_area.area_id)
         except KeyError:
-            maps[_areas.entity] = [_areas.area_id, ]
+            maps[_area.entity] = [_area.area_id, ]
     session.close()
     return maps
 
@@ -297,7 +297,7 @@ class AppEntityReuest(BaseContorller):
                        'required': [common.APPFILE],
                        'properties': {
                            common.APPFILE: {'type': 'string', 'format': 'md5',
-                                            'description': '需要下载的文件的md5'},
+                                            'description': '程序文件md5'},
                            'agent_id': {'type': 'integer', 'minimum': 1,
                                         'description': '程序安装的目标机器,不填自动分配'},
                            'zone': {'type': 'string', 'description': '自动分配的安装区域,默认zone为all'},
@@ -382,7 +382,7 @@ class AppEntityReuest(BaseContorller):
     def _agent_chioces(self, req, objtype, **kwargs):
         """返回排序好的可选服务器列表"""
         if kwargs.get('agent_id'):
-            return kwargs.get('agent_id')
+            return [kwargs.get('agent_id'), ]
         zone = kwargs.get('zone', 'all')
         includes = ['metadata.zone=%s' % zone,
                     'metadata.gogamechen1-aff&%d' % common.APPAFFINITYS[objtype],
@@ -399,6 +399,7 @@ class AppEntityReuest(BaseContorller):
             {'left': -500},
             {'process': None}]
         chioces = self.chioces(common.NAME, includes=includes, weighters=weighters)
+        LOG.debug('Auto select agent %d' % chioces[0])
         return chioces
 
     def _db_chioces(self, req, objtype, **kwargs):
@@ -435,7 +436,6 @@ class AppEntityReuest(BaseContorller):
         chioces = self._agent_chioces(req, objtype, **kwargs)
         if not chioces:
             raise InvalidArgument('Auto select agent fail')
-        LOG.debug('Auto select agent %d' % chioces[0])
         return chioces[0]
 
     def databases(self, req, objtype, body=None):
@@ -508,7 +508,18 @@ class AppEntityReuest(BaseContorller):
                    AppEntity.status,
                    AppEntity.objtype]
 
-        th = eventlet.spawn(areas_map, group_id)
+        def _areas():
+            query = model_query(session, GameArea, filter=GameArea.group_id == group_id)
+            maps = {}
+            for _area in query:
+                try:
+                    maps[_area.entity].append({'area_id': _area.area_id, 'areaname': _area.areaname})
+                except KeyError:
+                    maps[_area.entity] = [{'area_id': _area.area_id, 'areaname': _area.areaname}, ]
+            session.close()
+            return maps
+
+        th = eventlet.spawn(_areas)
 
         option = None
         if detail:
@@ -786,7 +797,51 @@ class AppEntityReuest(BaseContorller):
                                               metadata=metadata, ports=ports)])
 
     def update(self, req, group_id, objtype, entity, body=None):
-        pass
+        body = body or {}
+        group_id = int(group_id)
+        entity = int(entity)
+        status = body.get('status', common.OK)
+        if status not in (common.UNACTIVE, common.OK, common.DELETED):
+            raise InvalidArgument('Status not in 0, 1, 2')
+        session = endpoint_session()
+        glock = get_gamelock()
+        query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
+        if objtype == common.GAMESERVER:
+            query = query.options(joinedload(AppEntity.areas, innerjoin=False))
+        _entity = query.one()
+        if status == _entity.status:
+            return resultutils.results(result='%s entity status in same' % objtype)
+        if _entity.status == common.DELETED:
+            return resultutils.results(resultcode=manager_common.RESULT_ERROR,
+                                       result='%s entity has been deleted' % objtype)
+        if _entity.objtype != objtype:
+            raise InvalidArgument('Objtype not match')
+        if _entity.group_id != group_id:
+            raise InvalidArgument('Group id not match')
+        entityinfo = entity_controller.show(req=req, entity=entity,
+                                            endpoint=common.NAME,
+                                            body={'ports': False})['data'][0]
+        agent_id = entityinfo['agent_id']
+        metadata = entityinfo['metadata']
+        if not metadata:
+            raise InvalidArgument('Agent is off line, can not reset entity')
+        rpc = get_client()
+        target = targetutils.target_agent_by_string(metadata.get('agent_type'), metadata.get('host'))
+        target.namespace = common.NAME
+        with glock.arealock(group=group_id, areas=[area.area_id for area in _entity.areas]):
+            with session.begin():
+                _entity.status = status
+                session.flush()
+                finishtime, timeout = rpcfinishtime()
+                rpc_ret = rpc.call(target, ctxt={'finishtime': finishtime, 'agents': [agent_id, ]},
+                                   msg={'method': 'change_status',
+                                        'args': dict(entity=entity, status=status)},
+                                   timeout=timeout)
+                if not rpc_ret:
+                    raise RpcResultError('change entity sttus result is None')
+                if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
+                    raise RpcResultError('change entity status fail %s' % rpc_ret.get('result'))
+        return resultutils.results(result='%s entity update success' % objtype)
 
     def quote_version(self, req, group_id, objtype, entity, body=None):
         """区服包引用指定资源版本"""
@@ -1102,7 +1157,7 @@ class AppEntityReuest(BaseContorller):
             agents = set(emaps.values())
         else:
             if entitys - set(emaps.keys()):
-                raise InvalidArgument('Some entitys not found')
+                raise InvalidArgument('Some entitys not found or status is not active')
             agents = set()
             for entity in emaps:
                 if entity in entitys:
@@ -1161,11 +1216,9 @@ class AppEntityReuest(BaseContorller):
                                                          Msg=message, DelayTime=0 if not message else 30))
             try:
                 requests.post(url, data=jdata, timeout=5)
-            except ConnectTimeout:
-                return resultutils.results(result='Stop request catch ReadTimeout error',
-                                           resultcode=manager_common.RESULT_ERROR)
-            except ReadTimeout:
-                return resultutils.results(result='Stop request catch ReadTimeout error',
+            except (ConnectionError, ReadTimeout) as e:
+                return resultutils.results(result='Stop request catch %s error, %s is closed?' % (e.__class__.__name__,
+                                                                                                  common.GMSERVER),
                                            resultcode=manager_common.RESULT_ERROR)
             delay = 10 if not message else 40
             body.update({'delay': delay})

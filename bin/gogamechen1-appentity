@@ -198,8 +198,6 @@ def list():
     CONF.register_cli_opt(objtype_opt)
     CONF(project='cmd')
     _client = client()
-    if CONF.objtype == common.GAMESERVER:
-        th = eventlet.spawn(maps, _client, CONF.group_id)
     code, result, data = prepare_results(_client.appentitys_index, CONF.group_id, CONF.objtype)
     if code:
         print('\033[1;31;40m')
@@ -215,18 +213,11 @@ def list():
     print 'List %s entitys success' % CONF.objtype
     print 'status DELETED:-2  UNACTIVE:-1  ACTIVE:0',
     print '\033[0m'
-    if CONF.objtype == common.GAMESERVER:
-        areamap = th.wait()
     tb = table.PleasantTable(ident=0, columns=entity_heads, counter=True)
     areas = None
     for appentity in data:
         entity = appentity.get('entity')
-        if CONF.objtype == common.GAMESERVER:
-            if entity in areamap:
-                areas = ','.join(argutils.unmap(areamap[entity]))
-            else:
-                areas = None
-        row = [appentity.get('group_id'), entity, areas,
+        row = [appentity.get('group_id'), entity, appentity.get('areas'),
                appentity.get('agent_id'),
                appentity.get('status'), appentity.get('objtype')
                ]

@@ -851,3 +851,8 @@ class Application(AppEndpointBase):
         if entity not in set(self.entitys):
             LOG.error('entity not found, can not change status')
         self.konwn_appentitys[entity].update({'status': status})
+        objtype = self._objtype(entity)
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          resultcode=manager_common.RESULT_SUCCESS,
+                                          ctxt=ctxt,
+                                          result='change entity %s.%d status success' % (objtype, entity))

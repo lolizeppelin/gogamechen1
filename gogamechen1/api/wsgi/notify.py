@@ -36,4 +36,4 @@ if CONF[common.NAME].notify_entity_url:
     FrontInfo.setdefault('entity', dict(url=CONF[common.NAME].notify_entity_url, method='GET',
                                         timeout=10))
 
-notify = FrontNotify(FrontInfo, delay=1)
+notify = FrontNotify(FrontInfo, delay=5)
