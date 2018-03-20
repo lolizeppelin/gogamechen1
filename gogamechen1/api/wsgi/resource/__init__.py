@@ -166,7 +166,8 @@ class ObjtypeFileReuest(BaseContorller):
         md5 = fileinfo.get('md5')
         ext = fileinfo.get('ext')
         size = fileinfo.get('size')
-
+        if ext.startswith('.'):
+            ext = ext[1:]
         # 没有地址,通过gopcdn上传
         if not address:
             resource_id = CONF[common.NAME].objfile_resource
