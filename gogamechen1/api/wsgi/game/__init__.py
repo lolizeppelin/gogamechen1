@@ -1239,6 +1239,8 @@ class AppEntityReuest(BaseContorller):
         finishtime = body.get('finishtime')
         runtime = finishtime - request_time
         for subtype in objfiles:
+            if subtype not in (common.APPFILE, common.DATADB, common.LOGDB):
+                raise InvalidArgument('json schema error')
             objfile = objfiles[subtype]
             if objfile.get('timeout') + request_time > finishtime:
                 raise InvalidArgument('%s timeout over finishtime' % subtype)

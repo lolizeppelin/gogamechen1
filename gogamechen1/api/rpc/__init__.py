@@ -634,14 +634,9 @@ class Application(AppEndpointBase):
                                 resultcode=manager_common.RESULT_ERROR,
                                 result='start entity %d overtime, result unkonwn' % no_response_entity
                                 ))
-        if all([False if detail.get('resultcode') else True for detail in details]):
-            resultcode = manager_common.RESULT_SUCCESS
-        else:
-            resultcode = manager_common.RESULT_NOT_ALL_SUCCESS
 
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           ctxt=ctxt,
-                                          resultcode=resultcode,
                                           result='Start entity end', details=details)
 
     def rpc_stop_entitys(self, ctxt, entitys, **kwargs):
@@ -703,14 +698,9 @@ class Application(AppEndpointBase):
                                 resultcode=manager_common.RESULT_ERROR,
                                 result='stop entity %d overtime, result unkonwn' % no_response_entity
                                 ))
-        if all([False if detail.get('resultcode') else True for detail in details]):
-            resultcode = manager_common.RESULT_SUCCESS
-        else:
-            resultcode = manager_common.RESULT_NOT_ALL_SUCCESS
 
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           ctxt=ctxt,
-                                          resultcode=resultcode,
                                           result='Stop entitys end', details=details)
 
     def rpc_status_entitys(self, ctxt, entitys, **kwargs):
@@ -778,14 +768,8 @@ class Application(AppEndpointBase):
                                         resultcode=manager_common.RESULT_ERROR,
                                         result='%s entity %d flush config fail' % (objtype, entity)))
 
-        if all([False if detail.get('resultcode') else True for detail in details]):
-            resultcode = manager_common.RESULT_SUCCESS
-        else:
-            resultcode = manager_common.RESULT_NOT_ALL_SUCCESS
-
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           ctxt=ctxt,
-                                          resultcode=resultcode,
                                           result='Flush entitys config end', details=details)
 
     def rpc_upgrade_entitys(self, ctxt, entitys, **kwargs):
@@ -825,7 +809,6 @@ class Application(AppEndpointBase):
             except Exception:
                 LOG.exception('prepare upgrade taskflow error')
                 raise
-        resultcode = manager_common.RESULT_SUCCESS
         for middleware in middlewares:
             if objtype == common.GAMESERVER:
                 prefix = ','.join(map(str, self.konwn_appentitys[middleware.entity].get('areas')))
@@ -836,13 +819,11 @@ class Application(AppEndpointBase):
                                     resultcode=manager_common.RESULT_SUCCESS,
                                     result='%s upgrade success' % prefix))
             else:
-                resultcode = manager_common.RESULT_NOT_ALL_SUCCESS
                 details.append(dict(detail_id=middleware.entity,
                                     resultcode=manager_common.RESULT_ERROR,
                                     result='%s upgrade fail' % prefix))
                 LOG.debug('%s.%d %s', (objtype, middleware.entity, str(middleware)))
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                          resultcode=resultcode,
                                           ctxt=ctxt,
                                           details=details,
                                           result='upgrade %s entitys finish ' % objtype)
