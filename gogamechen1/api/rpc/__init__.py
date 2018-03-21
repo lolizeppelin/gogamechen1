@@ -165,6 +165,14 @@ class Application(AppEndpointBase):
     def _objtype(self, entity):
         return self.konwn_appentitys[entity].get('objtype')
 
+    def _prefix(self, entity, objtype=None):
+        if not objtype:
+            objtype = self._objtype(entity)
+        if objtype == common.GAMESERVER:
+            return ','.join(map(str, self.konwn_appentitys[entity].get('areas')))
+        else:
+            return '%s.%d' % (objtype, entity)
+
     def _objconf(self, entity, objtype=None):
         if not objtype:
             objtype = self._objtype(entity)
@@ -800,33 +808,57 @@ class Application(AppEndpointBase):
                                             resultcode=manager_common.RESULT_ERROR,
                                             result='upgrade not executed, some entity is running'))
                     return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                                      resultcode=manager_common.RESULT_ERROR,
                                                       ctxt=ctxt,
                                                       result='upgrade entity fail, entity %d running' % entity,
                                                       details=details)
             try:
-                middlewares = taskupgrade.upgrade_entitys(self, objtype, objfiles, entitys, timeline)
-            except Exception:
-                LOG.exception('prepare upgrade taskflow error')
-                raise
+                middlewares, e = taskupgrade.upgrade_entitys(self, objtype, objfiles, entitys, timeline)
+            except Exception as e:
+                if hasattr(e, 'message'):
+                    msg = e.message
+                else:
+                    msg = 'prepare upgrade taskflow fail'
+                if LOG.isEnabledFor(logging.DEBUG):
+                    LOG.exception(msg)
+                else:
+                    LOG.error('prepare upgrade fail, %s %s' % (e.__class__.__name__, str(e)))
+                for entity in entitys:
+                    prefix = self._prefix(entity=entity, objtype=objtype)
+                    details.append(dict(detail_id=entity,
+                                        resultcode=manager_common.RESULT_ERROR,
+                                        result='%s not executed, %s' % (prefix, msg)))
+                return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                                  ctxt=ctxt,
+                                                  details=details,
+                                                  result='upgrade %s entitys fail, %s' % (objtype, msg))
         for middleware in middlewares:
-            if objtype == common.GAMESERVER:
-                prefix = ','.join(map(str, self.konwn_appentitys[middleware.entity].get('areas')))
-            else:
-                prefix = '%s entity %d' % (objtype, middleware.entity)
+            prefix = self._prefix(entity=middleware.entity, objtype=objtype)
             if middleware.success:
                 details.append(dict(detail_id=middleware.entity,
                                     resultcode=manager_common.RESULT_SUCCESS,
                                     result='%s upgrade success' % prefix))
+            elif middleware.notexecuted:
+                details.append(dict(detail_id=middleware.entity,
+                                    resultcode=manager_common.RESULT_ERROR,
+                                    result='%s not executed' % prefix))
+                LOG.debug('%s.%d %s', (objtype, middleware.entity, str(middleware)))
             else:
                 details.append(dict(detail_id=middleware.entity,
                                     resultcode=manager_common.RESULT_ERROR,
                                     result='%s upgrade fail' % prefix))
                 LOG.debug('%s.%d %s', (objtype, middleware.entity, str(middleware)))
+        if e:
+            if hasattr(e, 'message'):
+                msg = e.message
+            else:
+                msg = 'Task execute fail by %s' % e.__class__.__name__
+            result = 'upgrade %s entitys finish, %s' % (objtype, msg)
+        else:
+            result = 'upgrade %s entitys finish' % objtype
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           ctxt=ctxt,
                                           details=details,
-                                          result='upgrade %s entitys finish ' % objtype)
+                                          result=result)
 
     def rpc_change_status(self, ctxt, entity, status, **kwargs):
         if entity not in set(self.entitys):

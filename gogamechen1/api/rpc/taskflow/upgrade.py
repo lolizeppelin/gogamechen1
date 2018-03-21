@@ -93,6 +93,7 @@ def upgrade_entitys(appendpoint,
     engine = load(connection, upgrade_flow, store=store,
                   book=book, engine_cls=ParallelActionEngine,
                   max_workers=4)
+    e = None
     try:
         engine.run()
     except Exception as e:
@@ -102,4 +103,4 @@ def upgrade_entitys(appendpoint,
             LOG.error('Task execute fail, %s %s' % (e.__class__.__name__, str(e)))
     finally:
         connection.destroy_logbook(book.uuid)
-    return middlewares
+    return middlewares, e
