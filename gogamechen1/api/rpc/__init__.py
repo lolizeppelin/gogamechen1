@@ -848,11 +848,11 @@ class Application(AppEndpointBase):
                                     result='%s upgrade fail' % prefix))
                 LOG.debug('%s.%d %s', (objtype, middleware.entity, str(middleware)))
         if e:
-            if hasattr(e, 'message'):
+            if hasattr(e, 'message') and e.message:
                 msg = e.message
             else:
                 msg = 'Task execute fail by %s' % e.__class__.__name__
-            result = 'upgrade %s entitys finish, %s' % (objtype, msg)
+            result = 'upgrade %s entitys fail, %s' % (objtype, msg)
         else:
             result = 'upgrade %s entitys finish' % objtype
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
