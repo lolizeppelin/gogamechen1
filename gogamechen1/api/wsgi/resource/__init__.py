@@ -78,6 +78,7 @@ group_controller = GroupReuest()
 
 CONF = cfg.CONF
 
+NOVERSION = object()
 
 def resource_url(resource_id, fileinfo=None):
     resource = resource_cache_map(resource_id)
@@ -324,8 +325,8 @@ class PackageReuest(BaseContorller):
                 'magic': {'type': 'object'},
                 'extension': {'type': 'object'},
                 'desc': {'type': 'string'},
-                'gversion': {'type': 'string'},
-                'rversion': {'type': 'string'},
+                'gversion': {'oneOf': [{'type': 'string'}, {'type': 'null'}]},
+                'rversion': {'oneOf': [{'type': 'string'}, {'type': 'null'}]},
                 'status': {'type': 'integer', 'enum': [common.ENABLE, common.DISABLE]}
             }
     }
@@ -534,11 +535,11 @@ class PackageReuest(BaseContorller):
         extension = body.get('extension')
         status = body.get('status')
         desc = body.get('desc')
-        rversion = body.get('rversion')
-        gversion = body.get('gversion')
+        rversion = body.get('rversion', NOVERSION)
+        gversion = body.get('gversion', NOVERSION)
         session = endpoint_session()
         query = model_query(session, Package, filter=Package.package_id == package_id)
-        if gversion:
+        if (gversion is not NOVERSION) and gversion:
             query.options(joinedload(Package.files, innerjoin=False))
         with session.begin():
             package = query.one()
@@ -557,30 +558,39 @@ class PackageReuest(BaseContorller):
                 default_extension.update(extension)
                 package.extension = jsonutils.dumps(default_extension)
             # 玩家版本号, 由安装包决定
-            if gversion:
-                if gversion in [pfile.gversion for pfile in package.files
-                                if pfile.ftype == common.SMALL_PACKAGE
-                                and pfile.status == manager_common.DOWNFILE_FILEOK]:
-                    package.gversion = gversion
+            if gversion is not NOVERSION:
+                if gversion:
+                    if gversion in [pfile.gversion for pfile in package.files
+                                    if pfile.ftype == common.SMALL_PACKAGE
+                                    and pfile.status == manager_common.DOWNFILE_FILEOK]:
+                        package.gversion = gversion
+                    else:
+                        raise InvalidArgument('Package version can not be found')
                 else:
-                    raise InvalidArgument('Package version can not be found')
-            # 游戏资源版本号, 又cdn相关版本号决定
-            if rversion:
-                # 没有引用过默认version,添加资源引用
-                if not package.rquote_id:
-                    qresult = cdnresource_controller.vquote(req, resource_id=package.resource_id,
-                                                            body=dict(version=rversion))
-                    quote = qresult['data'][0]
-                    package.rquote_id = quote.get('quote_id')
-                    alias = quote.get('alias')
-                # 修改资源引用
+                    package.gversion = None
+            # 游戏资源版本号, 由cdn相关版本号决定
+            if rversion is not NOVERSION:
+                if rversion:
+                    # 没有引用过默认version,添加资源引用
+                    if not package.rversion:
+                        qresult = cdnresource_controller.vquote(req, resource_id=package.resource_id,
+                                                                body=dict(version=rversion))
+                        quote = qresult['data'][0]
+                        package.rquote_id = quote.get('quote_id')
+                        alias = quote.get('alias')
+                    # 有引用,修改资源引用
+                    else:
+                        upresult = cdnquote_controller.update(req, quote_id=package.rquote_id,
+                                                              body={'version': rversion})['data'][0]
+                        alias = upresult.get('version').get('alias')
+                    if not alias:
+                        LOG.error('version alias is None, check it')
+                    LOG.info('Package version %s with alias %s' % (rversion, alias))
                 else:
-                    upresult = cdnquote_controller.update(req, quote_id=package.rquote_id,
-                                                          body={'version': rversion})['data'][0]
-                    alias = upresult.get('version').get('alias')
-                if not alias:
-                    LOG.error('version alias is None, check it')
-                LOG.info('Package version %s with alias %s' % (rversion, alias))
+                    if package.rversion:
+                        delresult = cdnquote_controller.delete(req, quote_id=package.rquote_id)['data'][0]
+                        version_id = delresult.get('version_id')
+                        LOG.info('Package remove defalut version %s, version id %d' % (package.rversion, version_id))
                 package.rversion = rversion
             session.flush()
         eventlet.spawn_n(notify.resource)
