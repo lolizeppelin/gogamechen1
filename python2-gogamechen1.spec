@@ -63,6 +63,8 @@ install -p -D -m 0754 bin/* %{buildroot}%{_bindir}
 %{python_sitelib}/%{proj_name}/api/*.pyc
 %{python_sitelib}/%{proj_name}/api/*.pyo
 %{python_sitelib}/%{proj_name}/api/client
+%dir %{python_sitelib}/%{proj_name}/plugin
+%{python_sitelib}/%{proj_name}/plugin/*
 %{python_sitelib}/%{proj_name}/cmd
 %{python_sitelib}/%{proj_name}-%{version}-py?.?.egg-info
 %{_sbindir}/%{proj_name}-init
@@ -106,9 +108,7 @@ Goperation xiaochen go game rpc agent
 %files agent
 %defattr(-,root,root,-)
 %dir %{python_sitelib}/%{proj_name}/api/rpc
-%dir %{python_sitelib}/%{proj_name}/plugin
 %{python_sitelib}/%{proj_name}/api/rpc/*
-%{python_sitelib}/%{proj_name}/plugin/*
 %{_sysconfdir}/goperation/endpoints/gogamechen1.agent.conf.sample
 
 
