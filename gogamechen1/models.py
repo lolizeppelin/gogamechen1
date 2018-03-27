@@ -95,6 +95,8 @@ class ObjtypeFile(TableBase):
     objtype = sa.Column(VARCHAR(64), nullable=False)
     subtype = sa.Column(VARCHAR(64), nullable=False)
     version = sa.Column(VARCHAR(64), nullable=False)
+    # cdn资源id,为None表示外部资源
+    resource_id = sa.Column(INTEGER(unsigned=True), nullable=True)
 
     __table_args__ = (
         sa.UniqueConstraint('objtype', 'subtype', 'version', name='file_unique'),

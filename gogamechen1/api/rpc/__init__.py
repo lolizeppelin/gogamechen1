@@ -20,6 +20,7 @@ from simpleutil.utils import systemutils
 
 from goperation import threadpool
 from goperation.utils import safe_fork
+from goperation.filemanager.exceptions import NoFileFound
 from goperation.manager.api import get_http
 from goperation.manager import common as manager_common
 from goperation.manager.rpc.agent.application.base import AppEndpointBase
@@ -379,6 +380,13 @@ class Application(AppEndpointBase):
         databases = kwargs.pop('databases')
         appfile = kwargs.pop(common.APPFILE)
         entity = int(entity)
+        try:
+            self.filemanager.find(appfile)
+        except NoFileFound:
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='create %s.%d fail, appfile not find' % (objtype, entity))
         with self.lock(entity):
             if entity in self.entitys:
                 return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
@@ -501,8 +509,14 @@ class Application(AppEndpointBase):
                                                   result='entity is running, can not reset')
             objtype = self.konwn_appentitys[entity].get('objtype')
             if appfile:
-                localfile = self.filemanager.get(appfile, download=False)
-                appfile = localfile
+                try:
+                    localfile = self.filemanager.find(appfile)
+                except NoFileFound:
+                    return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                                      resultcode=manager_common.RESULT_ERROR,
+                                                      ctxt=ctxt,
+                                                      result='reset %s.%d fail, appfile not find' % (objtype, entity))
+                appfile = localfile.path
                 gfile.check(objtype, appfile)
                 apppath = self.apppath(entity)
                 cfile = self._objconf(entity, objtype)

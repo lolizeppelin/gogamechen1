@@ -109,6 +109,7 @@ def gopcdn_upload(req, resource_id, body, fileinfo, notify=None):
 
 @singleton.singleton
 class ObjtypeFileReuest(BaseContorller):
+
     CREATESCHEMA = {
         'type': 'object',
         'required': ['subtype', 'objtype', 'version'],
@@ -138,6 +139,7 @@ class ObjtypeFileReuest(BaseContorller):
 
         session = endpoint_session(readonly=True)
         columns = [ObjtypeFile.md5,
+                   ObjtypeFile.resource_id,
                    ObjtypeFile.objtype,
                    ObjtypeFile.subtype,
                    ObjtypeFile.version]
@@ -169,7 +171,9 @@ class ObjtypeFileReuest(BaseContorller):
         size = fileinfo.get('size')
         if ext.startswith('.'):
             ext = ext[1:]
-        # 没有地址,通过gopcdn上传
+
+        objfile = ObjtypeFile(md5=md5, objtype=objtype, version=version, subtype=subtype)
+        # 没有地址,通过gopcdn上传并存放
         if not address:
             resource_id = CONF[common.NAME].objfile_resource
             if not resource_id:
@@ -178,6 +182,7 @@ class ObjtypeFileReuest(BaseContorller):
             if not resource.get('internal', False):
                 raise InvalidArgument('objtype file resource not a internal resource')
             address = resource_url(resource_id, fileinfo)[0]
+            objfile.resource_id = resource_id
             # 上传结束后通知
             notify = {'success': dict(action='/files/%s' % md5,
                                       method='PUT',
@@ -192,10 +197,11 @@ class ObjtypeFileReuest(BaseContorller):
 
         session = endpoint_session()
         with session.begin():
-            objtype_file = ObjtypeFile(md5=md5, objtype=objtype,
-                                       version=version, subtype=subtype)
-            session.add(objtype_file)
-            session.flush()
+            try:
+                session.add(objfile)
+                session.flush()
+            except DBDuplicateEntry:
+                raise InvalidArgument('Objtype file version duplicate')
             try:
                 file_controller.create(req, body=dict(md5=md5,
                                                       address=address,
@@ -205,7 +211,7 @@ class ObjtypeFileReuest(BaseContorller):
             except DBDuplicateEntry:
                 raise InvalidArgument('File info Duplicate error')
         return resultutils.results(result='creat file for %s success' % objtype,
-                                   data=[dict(md5=objtype_file.md5, uri=uri)])
+                                   data=[dict(md5=objfile.md5, uri=uri)])
 
     def show(self, req, md5, body=None):
         body = body or {}
@@ -220,6 +226,7 @@ class ObjtypeFileReuest(BaseContorller):
         file_info.setdefault('subtype', objfile.subtype)
         file_info.setdefault('objtype', objfile.objtype)
         file_info.setdefault('version', objfile.version)
+        file_info.setdefault('resource_id', objfile.resource_id)
         return resultutils.results(result='get file of %s success' % md5,
                                    data=[file_info, ])
 
@@ -227,9 +234,8 @@ class ObjtypeFileReuest(BaseContorller):
         body = body or {}
         session = endpoint_session(readonly=True)
         query = model_query(session, ObjtypeFile, filter=ObjtypeFile.md5 == md5)
-        resource_id = CONF[common.NAME].objfile_resource
         objfile = query.one()
-        # query.delete()
+        resource_id = objfile.resource_id
         with session.begin():
             session.delete(objfile)
             session.flush()
