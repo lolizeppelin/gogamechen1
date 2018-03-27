@@ -5,8 +5,10 @@ CONF = cfg.CONF
 
 resource_opts = [
     cfg.IntOpt('objfile_resource',
+               default=0,
                help='Gopcdn resource for objfile'),
     cfg.IntOpt('package_resource',
+               default=0,
                help='Gopcdn resource for packages files'),
     cfg.UrlOpt('notify_resource_url',
                help='Game resource change notify url'),
