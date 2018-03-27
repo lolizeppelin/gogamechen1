@@ -9,6 +9,7 @@ import contextlib
 import functools
 import eventlet
 import psutil
+import logging as default_logging
 
 from simpleutil.utils import argutils
 from simpleutil.utils import singleton
@@ -321,6 +322,8 @@ class Application(AppEndpointBase):
         EXEC = os.path.join(pwd, os.path.join('bin', objtype))
         if not os.path.exists(EXEC):
             raise ValueError('Execute targe %s not exist' % EXEC)
+        if not os.access(EXEC, os.X_OK):
+            os.chmod(EXEC, 0744)
         args = [EXEC, ]
         with self.lock(entity):
             if self._entity_process(entity, pids=pids):
@@ -330,13 +333,22 @@ class Application(AppEndpointBase):
                 ppid = os.fork()
                 # fork twice
                 if ppid == 0:
+                    # close all logging handler
+                    for hd in default_logging.root.handlers:
+                        try:
+                            hd.close()
+                        except Exception:
+                            continue
                     os.closerange(3, systemutils.MAXFD)
                     os.chdir(pwd)
                     with open(logfile, 'ab') as f:
                         os.dup2(f.fileno(), sys.stdout.fileno())
                         os.dup2(f.fileno(), sys.stderr.fileno())
                     # 小陈的so放在bin目录中
-                    os.execve(EXEC, args, {'LD_LIBRARY_PATH': os.path.join(pwd, 'bin')})
+                    try:
+                        os.execve(EXEC, args, {'LD_LIBRARY_PATH': os.path.join(pwd, 'bin')})
+                    except OSError:
+                        os._exit(1)
                 else:
                     os._exit(0)
             else:
