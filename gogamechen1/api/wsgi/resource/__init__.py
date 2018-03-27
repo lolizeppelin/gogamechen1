@@ -175,7 +175,7 @@ class ObjtypeFileReuest(BaseContorller):
             if not resource_id:
                 raise InvalidArgument('Both address and resource_id is None')
             resource = resource_cache_map(resource_id)
-            if not resource.get('internal'):
+            if not resource.get('internal', False):
                 raise InvalidArgument('objtype file resource not a internal resource')
             address = resource_url(resource_id, fileinfo)[0]
             # 上传结束后通知
@@ -237,8 +237,10 @@ class ObjtypeFileReuest(BaseContorller):
                 show_result = file_controller.show(req, objfile.md5)
                 if show_result['resultcode'] == manager_common.RESULT_SUCCESS:
                     file_info = show_result['data'][0]
+                    rpath = urlparse.urlparse(file_info['address']).path
+                    filename = os.path.basename(rpath)
                     cdnresource_controller.delete_file(req, resource_id,
-                                                       body=dict(filename=file_info['address']))
+                                                       body=dict(filename=filename))
                 else:
                     LOG.error('objfile %s can not be found from file controller')
         return file_controller.delete(req, objfile.md5)
