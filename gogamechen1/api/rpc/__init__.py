@@ -333,22 +333,15 @@ class Application(AppEndpointBase):
                 ppid = os.fork()
                 # fork twice
                 if ppid == 0:
-                    # close all logging handler
-                    for hd in default_logging.root.handlers:
-                        try:
-                            hd.close()
-                        except Exception:
-                            continue
                     os.closerange(3, systemutils.MAXFD)
                     os.chdir(pwd)
                     with open(logfile, 'ab') as f:
                         os.dup2(f.fileno(), sys.stdout.fileno())
                         os.dup2(f.fileno(), sys.stderr.fileno())
-                    # 小陈的so放在bin目录中
-                    try:
+                        # exec关闭日志文件描述符
+                        systemutils.set_cloexec_flag(f.fileno())
+                        # 小陈的so放在bin目录中
                         os.execve(EXEC, args, {'LD_LIBRARY_PATH': os.path.join(pwd, 'bin')})
-                    except OSError:
-                        os._exit(1)
                 else:
                     os._exit(0)
             else:
