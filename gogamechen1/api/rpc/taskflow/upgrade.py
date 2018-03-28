@@ -50,6 +50,7 @@ def upgrade_entitys(appendpoint,
 
     applications = []
     middlewares = []
+    _updates = {}
     for entity in entitys:
         if objtype != appendpoint._objtype(entity):
             raise ValueError('Entity not the same objtype')
@@ -65,7 +66,11 @@ def upgrade_entitys(appendpoint,
                 rollback = objfile.get('rollback', False)
                 timeout = objfile.get('timeout')
                 dbinfo = appendpoint.local_database_info(entity, subtype)
-                update = DbUpdateFile(md5, revertable, rollback)
+                try:
+                    update = _updates[subtype]
+                except KeyError:
+                    update = DbUpdateFile(md5, revertable, rollback)
+                    _updates[subtype] = update
                 # 数据库备份文件
                 backup = None
                 if objfile.get('backup', False):
@@ -74,6 +79,7 @@ def upgrade_entitys(appendpoint,
                     backup = DbBackUpFile(outfile)
                 _database.append(GogameDatabase(backup=backup, update=update,
                                                 timeout=timeout, **dbinfo))
+        _updates.clear()
         # 更新程序文件任务
         upgradetask = None
         if common.APPFILE in objfiles:
