@@ -148,6 +148,7 @@ class GroupReuest(BaseContorller):
         return resultutils.results(result='create group success',
                                    data=[dict(group_id=_group.group_id,
                                               name=_group.name,
+                                              desc=_group.desc,
                                               lastarea=_group.lastarea)])
 
     def show(self, req, group_id, body=None):
@@ -163,7 +164,8 @@ class GroupReuest(BaseContorller):
         _group = query.one()
         group_info = dict(group_id=_group.group_id,
                           name=_group.name,
-                          lastarea=_group.lastarea)
+                          lastarea=_group.lastarea,
+                          desc=_group.desc)
         if detail:
             _entitys = {}
             for entity in _group.entitys:
@@ -509,14 +511,16 @@ class AppEntityReuest(BaseContorller):
                    AppEntity.objtype]
 
         def _areas():
-            query = model_query(session, GameArea, filter=GameArea.group_id == group_id)
             maps = {}
+            if objtype != common.GAMESERVER:
+                return maps
+            query = model_query(session, GameArea, filter=GameArea.group_id == group_id)
             for _area in query:
                 try:
                     maps[_area.entity].append({'area_id': _area.area_id, 'areaname': _area.areaname})
                 except KeyError:
                     maps[_area.entity] = [{'area_id': _area.area_id, 'areaname': _area.areaname}, ]
-            session.close()
+            # session.close()
             return maps
 
         th = eventlet.spawn(_areas)
