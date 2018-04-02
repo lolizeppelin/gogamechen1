@@ -569,8 +569,7 @@ class PackageReuest(BaseContorller):
             if gversion is not NOVERSION:
                 if gversion:
                     if gversion in [pfile.gversion for pfile in package.files
-                                    if pfile.ftype == common.SMALL_PACKAGE
-                                    and pfile.status == manager_common.DOWNFILE_FILEOK]:
+                                    if pfile.status == manager_common.DOWNFILE_FILEOK]:
                         package.gversion = gversion
                     else:
                         raise InvalidArgument('Package version can not be found')

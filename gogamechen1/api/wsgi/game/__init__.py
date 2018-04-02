@@ -967,7 +967,7 @@ class AppEntityReuest(BaseContorller):
                 if objtype == common.GAMESERVER:
                     # 删除所有资源版本引用
                     if _entity.versions:
-                        for quote in six.itervalues(_entity.versions):
+                        for quote in six.itervalues(jsonutils.loads_as_bytes(_entity.versions)):
                             threadpool.add_thread(cdnquote_controller.delete, req, quote.get('quote_id'))
                     _entity.versions = None
                     session.flush()
