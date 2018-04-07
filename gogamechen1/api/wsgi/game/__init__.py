@@ -977,7 +977,7 @@ class AppEntityReuest(BaseContorller):
                         area = _entity.areas[0]
                         group = _entity.group
                         if area.area_id != group.lastarea:
-                            raise InvalidArgument('%s entity not the last area entity')
+                            raise InvalidArgument('%d entity not the last area entity' % entity)
                         group.lastarea = group.lastarea - 1
                         session.flush()
                         session.delete(area)

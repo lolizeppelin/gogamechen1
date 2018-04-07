@@ -94,7 +94,7 @@ def resource_url(resource_id, fileinfo=None):
 def gopcdn_upload(req, resource_id, body, fileinfo, notify=None):
     if not resource_id:
         raise InvalidArgument('No gopcdn resource is designated')
-    timeout = body.get('timeout', 30)
+    timeout = body.get('timeout') or 30
     impl = body.pop('impl', 'websocket')
     auth = body.pop('auth', None)
     uri_result = cdnresource_controller.add_file(req, resource_id,
@@ -118,6 +118,12 @@ class ObjtypeFileReuest(BaseContorller):
                 'subtype': {'type': 'string'},
                 'objtype': {'type': 'string'},
                 'version': {'type': 'string'},
+                'impl': {'oneOf': [{'type': 'string'}, {'type': 'null'}],
+                         'description': '上传方式,默认为websocket'},
+                'auth': {'oneOf': [{'type': 'string'}, {'type': 'object'}, {'type': 'null'}],
+                         'description': '上传认证相关信息'},
+                'timeout': {'oneOf': [{'type': 'integer', 'minimum': 30}, {'type': 'null'}],
+                            'description': '上传超时时间'},
                 'address': {'oneOf': [{'type': 'string'}, {'type': 'null'}]},
                 'fileinfo': cdncommon.FILEINFOSCHEMA,
             }
@@ -164,10 +170,10 @@ class ObjtypeFileReuest(BaseContorller):
         address = body.get('address')
         fileinfo = body.pop('fileinfo', None)
         if not fileinfo:
-            raise InvalidArgument('Both fileinfo and address is none')
+            raise InvalidArgument('Fileinfo and address is none')
 
         md5 = fileinfo.get('md5')
-        ext = fileinfo.get('ext')
+        ext = fileinfo.get('ext') or os.path.splitext(fileinfo.get('filename'))[0][1:]
         size = fileinfo.get('size')
         if ext.startswith('.'):
             ext = ext[1:]
@@ -743,6 +749,8 @@ class PackageFileReuest(BaseContorller):
                              'maxLength': 64,
                              'pattern': '^[0-9.]+?$',
                              'description': '安装包版本号'},
+                'desc': {'oneOf': [{'type': 'string'},
+                                   {'type': 'null'}]},
                 'timeout': {'oneOf': [{'type': 'integer', 'minimum': 30}, {'type': 'null'}],
                             'description': '上传超时时间'},
                 'impl': {'oneOf': [{'type': 'string'}, {'type': 'null'}],
@@ -753,8 +761,6 @@ class PackageFileReuest(BaseContorller):
                             'description': '文件地址, 这个字段为空才需要主动上传'},
                 'fileinfo': {'oneOf': [cdncommon.FILEINFOSCHEMA, {'type': 'null'}],
                              'description': '通用file信息结构'},
-                'desc': {'oneOf': [{'type': 'string'},
-                                   {'type': 'null'}]},
             }
     }
 
