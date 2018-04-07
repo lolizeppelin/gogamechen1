@@ -173,7 +173,7 @@ class ObjtypeFileReuest(BaseContorller):
             raise InvalidArgument('Fileinfo and address is none')
 
         md5 = fileinfo.get('md5')
-        ext = fileinfo.get('ext') or os.path.splitext(fileinfo.get('filename'))[0][1:]
+        ext = fileinfo.get('ext') or os.path.splitext(fileinfo.get('filename'))[1][1:]
         size = fileinfo.get('size')
         if ext.startswith('.'):
             ext = ext[1:]
