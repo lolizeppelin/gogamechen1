@@ -94,7 +94,7 @@ class ObjtypeFile(TableBase):
     md5 = sa.Column(CHAR(36), nullable=False, primary_key=True)
     objtype = sa.Column(VARCHAR(64), nullable=False)
     subtype = sa.Column(VARCHAR(64), nullable=False)
-    version = sa.Column(VARCHAR(64), nullable=False)
+    version = sa.Column(VARCHAR(128), nullable=False)
     # cdn资源id,为None表示外部资源
     resource_id = sa.Column(INTEGER(unsigned=True), nullable=True)
 
