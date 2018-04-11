@@ -530,7 +530,8 @@ class PackageReuest(BaseContorller):
                                               extension=jsonutils.loads_as_bytes(package.extension)
                                               if package.extension else None,
                                               desc=package.desc,
-                                              files=[dict(ftype=pfile.ftype,
+                                              files=[dict(pfile_id=pfile.pfile_id,
+                                                          ftype=pfile.ftype,
                                                           address=pfile.address,
                                                           uptime=pfile.uptime,
                                                           status=pfile.status,
