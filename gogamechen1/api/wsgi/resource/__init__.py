@@ -894,8 +894,8 @@ class PackageFileReuest(BaseContorller):
         if pfile.package_id != package_id:
             raise InvalidArgument('Package File package id not match')
         package = pfile.package
-        if package.gversion == pfile.gversion and pfile.ftype == common.SMALL_PACKAGE:
-            raise InvalidArgument('Package file with version %s is quote' % package.gversion)
+        if package.gversion == pfile.pfile_id:
+            raise InvalidArgument('Package file with in quote')
         if pfile.resource_id:
             def wapper():
                 if pfile.status == manager_common.DOWNFILE_FILEOK:
