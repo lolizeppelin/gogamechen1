@@ -339,7 +339,7 @@ class PackageReuest(BaseContorller):
                 'magic': {'type': 'object'},
                 'extension': {'type': 'object'},
                 'desc': {'type': 'string'},
-                'gversion': {'oneOf': [{'type': 'string'}, {'type': 'null'}]},
+                'gversion': {'oneOf': [{'type': 'integer'}, {'type': 'null'}]},
                 'rversion': {'oneOf': [{'type': 'string'}, {'type': 'null'}]},
                 'status': {'type': 'integer', 'enum': [common.ENABLE, common.DISABLE]}
             }
@@ -575,7 +575,7 @@ class PackageReuest(BaseContorller):
             # 玩家版本号, 由安装包决定
             if gversion is not NOVERSION:
                 if gversion:
-                    if gversion in [pfile.gversion for pfile in package.files
+                    if gversion in [pfile.pfile_id for pfile in package.files
                                     if pfile.status == manager_common.DOWNFILE_FILEOK]:
                         package.gversion = gversion
                     else:

@@ -67,8 +67,9 @@ class Package(TableBase):
     rquote_id = sa.Column(INTEGER(unsigned=True), nullable=True)
     # 包名,一般情况下唯一
     package_name = sa.Column(VARCHAR(64), nullable=False)
-    # 安装包版本号,  对应PackageFile中的gversion
-    gversion = sa.Column(VARCHAR(64), nullable=True)
+    # 安装包版本号,  对应PackageFile中的pfile_id
+    # gversion = sa.Column(VARCHAR(64), nullable=True)
+    gversion = sa.Column(INTEGER(unsigned=True), nullable=True)
     # 游戏服务器组id
     group_id = sa.Column(sa.ForeignKey('groups.group_id', ondelete="RESTRICT", onupdate='RESTRICT'),
                          nullable=False)
