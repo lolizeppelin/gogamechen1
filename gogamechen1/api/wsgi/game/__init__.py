@@ -272,19 +272,12 @@ class GroupReuest(BaseContorller):
         return areas
 
     def areas(self, req, group_id, body=None):
+        body = body or {}
         group_id = int(group_id)
         return resultutils.results(result='list group areas success',
                                    data=[dict(
                                        chiefs=self._chiefs([group_id], cross=body.get('cross', False)),
                                        areas=self._areas(group_id))])
-
-    def gpareas(self, req, body=None):
-        body = body or {}
-        try:
-            group_id = int(body.get('group_id'))
-        except (ValueError, TypeError):
-            raise InvalidArgument('No group id found')
-        return self.areas(req, group_id)
 
     def packages(self, req, group_id, body=None):
         body = body or {}
@@ -772,17 +765,6 @@ class AppEntityReuest(BaseContorller):
             eventlet.spawn_n(notify.entity, group_id, objtype, entity)
             return resultutils.results(result='create %s entity success' % objtype,
                                        data=[_result, ])
-
-    def entity(self, req, body=None):
-        """js字符串模板太烂, 提供一个非restful接口"""
-        body = body or {}
-        try:
-            group_id = body.get('group_id')
-            entity = body.get('entity')
-        except (TypeError, ValueError):
-            raise InvalidArgument('Entity or group id value error')
-        objtype = body.get('objtype')
-        return self.show(req, group_id, objtype, entity)
 
     def show(self, req, group_id, objtype, entity, body=None):
         body = body or {}
