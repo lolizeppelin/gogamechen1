@@ -57,11 +57,12 @@ class Routers(router.RoutersBase):
 
         resource_name = 'pfile'
         collection_name = resource_name + 's'
-        package_controller = controller_return_response(resource.PackageFileReuest(),
-                                                        resource.FAULT_MAP)
+        pfile_controller = controller_return_response(resource.PackageFileReuest(),
+                                                      resource.FAULT_MAP)
+
         collection = mapper.collection(collection_name=collection_name,
                                        resource_name=resource_name,
-                                       controller=package_controller,
+                                       controller=pfile_controller,
                                        path_prefix='/%s/package/{package_id}' % common.NAME,
                                        member_prefix='/{pfile_id}',
                                        collection_actions=COLLECTION_ACTIONS,
@@ -72,6 +73,11 @@ class Routers(router.RoutersBase):
         collection_name = resource_name + 's'
         group_controller = controller_return_response(game.GroupReuest(),
                                                       game.FAULT_MAP)
+
+        self._add_resource(mapper, group_controller,
+                           path='/%s/group/areas' % common.NAME,
+                           get_action='gpareas')
+
         collection = mapper.collection(collection_name=collection_name,
                                        resource_name=resource_name,
                                        controller=group_controller,
@@ -93,6 +99,10 @@ class Routers(router.RoutersBase):
 
         game_controller = controller_return_response(game.AppEntityReuest(),
                                                      game.FAULT_MAP)
+
+        self._add_resource(mapper, game_controller,
+                           path='/%s/entity/show' % common.NAME,
+                           get_action='entity')
 
         self._add_resource(mapper, game_controller,
                            path='/%s/entity/{entity}' % common.NAME,

@@ -276,6 +276,14 @@ class GroupReuest(BaseContorller):
         return resultutils.results(result='list group areas success',
                                    data=self._areas(group_id))
 
+    def gpareas(self, req, body=None):
+        body = body or {}
+        try:
+            group_id = int(body.get('group_id'))
+        except (ValueError, TypeError):
+            raise InvalidArgument('No group id found')
+        return self.areas(req, group_id)
+
     def packages(self, req, group_id, body=None):
         body = body or {}
         group_id = int(group_id)
@@ -744,6 +752,8 @@ class AppEntityReuest(BaseContorller):
                 # 插入数据库绑定信息
                 if rpc_result.get('databases'):
                     self._bondto(session, entity, rpc_result.get('databases'))
+                else:
+                    LOG.error('New entity database miss')
 
             _result = dict(entity=entity, objtype=objtype, agent_id=agent_id,
                            databases=rpc_result.get('databases'))
@@ -760,6 +770,17 @@ class AppEntityReuest(BaseContorller):
             eventlet.spawn_n(notify.entity, group_id, objtype, entity)
             return resultutils.results(result='create %s entity success' % objtype,
                                        data=[_result, ])
+
+    def entity(self, req, body=None):
+        """js字符串模板太烂, 提供一个非restful接口"""
+        body = body or {}
+        try:
+            group_id = body.get('group_id')
+            entity = body.get('entity')
+        except (TypeError, ValueError):
+            raise InvalidArgument('Entity or group id value error')
+        objtype = body.get('objtype')
+        return self.show(req, group_id, objtype, entity)
 
     def show(self, req, group_id, objtype, entity, body=None):
         body = body or {}
