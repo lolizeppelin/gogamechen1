@@ -275,7 +275,7 @@ class GroupReuest(BaseContorller):
         group_id = int(group_id)
         return resultutils.results(result='list group areas success',
                                    data=[dict(
-                                       chiefs=self._chiefs([group_id], cross=False),
+                                       chiefs=self._chiefs([group_id], cross=body.get('cross', False)),
                                        areas=self._areas(group_id))])
 
     def gpareas(self, req, body=None):
