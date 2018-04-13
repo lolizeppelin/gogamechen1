@@ -14,8 +14,7 @@
 #max_lock = 100
 
 # agent appcaclition affinity bitwise, [gamesvr:1] [publicsvr:2] [gmsvr:4]
-# [publicsvr&gmsvr:6] [gamesvr&publicsvr&gmsvr:7] and so on (integer
-# value)
+# [publicsvr&gmsvr:6] [gamesvr&publicsvr&gmsvr:7] and so on (integer value)
 # Allowed values: 1, 2, 3, 4, 5, 6, 7
 #agent_affinity = 1
 

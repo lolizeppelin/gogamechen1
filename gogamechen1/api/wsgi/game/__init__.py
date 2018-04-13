@@ -63,8 +63,6 @@ from gogamechen1.models import AppEntity
 from gogamechen1.models import GameArea
 from gogamechen1.models import AreaDatabase
 
-from gogamechen1.api.wsgi.notify import notify
-
 
 LOG = logging.getLogger(__name__)
 
@@ -144,7 +142,6 @@ class GroupReuest(BaseContorller):
             session.flush()
         except DBDuplicateEntry:
             raise InvalidArgument('Group name duplicate')
-        eventlet.spawn_n(notify.areas, _group.group_id)
         return resultutils.results(result='create group success',
                                    data=[dict(group_id=_group.group_id,
                                               name=_group.name,
@@ -195,7 +192,6 @@ class GroupReuest(BaseContorller):
             raise InvalidArgument('Group has entitys, can not be delete')
         session.delete(_group)
         session.flush()
-        eventlet.spawn_n(notify.areas, group_id)
         return resultutils.results(result='delete group success',
                                    data=[deleted])
 
@@ -761,8 +757,6 @@ class AppEntityReuest(BaseContorller):
                                   status=common.UNACTIVE,
                                   opentime=opentime,
                                   group_id=group_id, areas=[next_area, ])
-            eventlet.spawn_n(notify.areas, group_id)
-            eventlet.spawn_n(notify.entity, group_id, objtype, entity)
             return resultutils.results(result='create %s entity success' % objtype,
                                        data=[_result, ])
 
@@ -1097,8 +1091,6 @@ class AppEntityReuest(BaseContorller):
 
                     threadpool.add_thread(_rollback)
                     raise e
-        eventlet.spawn_n(notify.entity, group_id, objtype, entity, True)
-        eventlet.spawn_n(notify.areas, group_id)
         return resultutils.results(result='delete %s:%d success' % (objtype, entity),
                                    data=[dict(entity=entity, objtype=objtype,
                                               ports=ports, metadata=metadata)])

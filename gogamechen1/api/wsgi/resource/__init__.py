@@ -54,8 +54,6 @@ from gogamechen1.api.wsgi.game import GroupReuest
 from gogamechen1.api.wsgi.caches import resource_cache_map
 from gogamechen1.api.wsgi.caches import map_resources
 
-from gogamechen1.api.wsgi.notify import notify
-
 LOG = logging.getLogger(__name__)
 
 FAULT_MAP = {InvalidArgument: webob.exc.HTTPClientError,
@@ -483,7 +481,6 @@ class PackageReuest(BaseContorller):
                               desc=desc)
             session.add(package)
             session.flush()
-        eventlet.spawn_n(notify.resource)
         return resultutils.results(result='Add a new package success',
                                    data=[dict(package_id=package.package_id,
                                               group_id=package.group_id,
@@ -607,7 +604,6 @@ class PackageReuest(BaseContorller):
                         LOG.info('Package remove defalut version %s, version id %d' % (package.rversion, version_id))
                 package.rversion = rversion
             session.flush()
-        eventlet.spawn_n(notify.resource)
         return resultutils.results(result='Update package success')
 
     def delete(self, req, group_id, package_id, body=None):
@@ -647,7 +643,6 @@ class PackageReuest(BaseContorller):
             cdnresource_controller.unquote(req, package.resource_id)
             session.delete(package)
             session.flush()
-        eventlet.spawn_n(notify.resource)
         return resultutils.results(result='Delete package success')
 
     def upgrade(self, req, group_id, package_id, body=None):
@@ -665,8 +660,6 @@ class PackageReuest(BaseContorller):
         detail.setdefault('endpoint', common.NAME)
         body.setdefault('detail', detail)
         result = cdnresource_controller.upgrade(req, resource_id=package.resource_id, body=body)
-        asyncinfo = result['data'][0]
-        eventlet.spawn_after(asyncinfo['deadline'], notify.resource)
         return result
 
     def add_remark(self, req, group_id, package_id, body=None):
@@ -810,7 +803,6 @@ class PackageFileReuest(BaseContorller):
                                     address=address, desc=desc)
                 session.add(pfile)
                 session.flush()
-            eventlet.spawn_n(notify.resource)
         else:
             resource_id = body.get('resource_id') or CONF[common.NAME].package_resource
             if not resource_id:
@@ -880,7 +872,6 @@ class PackageFileReuest(BaseContorller):
         with session.begin():
             data = {'status': status}
             query.update(data)
-        eventlet.spawn_n(notify.resource)
         return resultutils.results(result='update package file  for %d success' % package_id,
                                    data=[dict(pfile_id=pfile_id)])
 
@@ -909,7 +900,6 @@ class PackageFileReuest(BaseContorller):
                                                                body=dict(filename=pfile.filename))
                         except Exception:
                             LOG.error('Remove file %s from %d fail' % (pfile.resource_id, pfile.filename))
-                    notify.resource()
             eventlet.spawn_n(wapper)
 
         session.delete(pfile)

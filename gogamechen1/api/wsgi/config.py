@@ -10,12 +10,6 @@ resource_opts = [
     cfg.IntOpt('package_resource',
                default=0,
                help='Gopcdn resource for packages files'),
-    cfg.UrlOpt('notify_resource_url',
-               help='Game resource change notify url'),
-    cfg.UrlOpt('notify_areas_url',
-               help='Game areas change notify url'),
-    cfg.UrlOpt('notify_entity_url',
-               help='Game entity change notify url'),
 ]
 
 
