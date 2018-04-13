@@ -20,8 +20,6 @@ class ResourceTTLCache(cachetools.TTLCache):
         link = self._TTLCache__links[key]
         return link.expire
 
-
-# CDNRESOURCE = {}
 CDNRESOURCE = ResourceTTLCache(maxsize=1000, ttl=cdncommon.CACHETIME)
 
 
@@ -32,17 +30,17 @@ def map_resources(resource_ids):
     need = set(resource_ids)
     provides = set(CDNRESOURCE.keys())
     notmiss = need & provides
-    # 有资源在缓存字典中
+    # 有资源在进程缓存字典中
     if notmiss:
-        cache_base = {}
+        caches_time_dict = {}
         # 本地最旧缓存时间点
         time_point = int(time.time())
         for resource_id in notmiss:
-            # 本地缓存时间点
+            # 获取单个资源本地缓存时间点
             cache_on = int(CDNRESOURCE.expiretime(resource_id))
             if cache_on < time_point:
                 time_point = cache_on
-            cache_base[resource_id] = cache_on
+            caches_time_dict[resource_id] = cache_on
         cache = get_cache()
         scores = cache.zrangebyscore(name=cdncommon.CACHESETNAME,
                                      min=str(time_point), max='+inf',
@@ -54,10 +52,11 @@ def map_resources(resource_ids):
                 # redis中缓存时间点超过本地缓存时间点
                 # 弹出本地缓存
                 try:
-                    if cache_on > cache_base[resource_id]:
+                    if cache_on > caches_time_dict[resource_id]:
                         CDNRESOURCE.pop(resource_id, None)
                 except KeyError:
                     continue
+        caches_time_dict.clear()
     # 没有本地缓存的资源数量
     missed = need - set(CDNRESOURCE.keys())
     if missed:
