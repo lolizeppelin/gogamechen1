@@ -79,7 +79,7 @@ CONF = cfg.CONF
 NOVERSION = object()
 
 def resource_url(resource_id, fileinfo=None):
-    resource = resource_cache_map(resource_id)
+    resource = resource_cache_map(resource_id, flush=False)
     etype = resource.get('etype')
     name = resource.get('name')
     paths = [etype, name]
@@ -363,7 +363,7 @@ class PackageReuest(BaseContorller):
         data = []
         for package in packages:
             group = groups_maps[package.group_id]
-            resource = resource_cache_map(resource_id=package.resource_id)
+            resource = resource_cache_map(resource_id=package.resource_id, flush=False)
             info = dict(dict(package_id=package.package_id,
                              package_name=package.package_name,
                              gversion=package.gversion,
@@ -413,7 +413,7 @@ class PackageReuest(BaseContorller):
 
         data = []
         for resource_id in _resources:
-            resource = resource_cache_map(resource_id=resource_id)
+            resource = resource_cache_map(resource_id=resource_id, flush=False)
             data.append(dict(resource_id=resource_id,
                              packages=[p.package_id for p in maps[resource_id]],
                              groups=[p.group_id for p in maps[resource_id]],
@@ -421,7 +421,7 @@ class PackageReuest(BaseContorller):
                              name=resource.get('name'),
                              versions=resource.get('versions')))
 
-        return resultutils.results(result='list packages success', data=data)
+        return resultutils.results(result='list packages resource success', data=data)
 
     def index(self, req, group_id, body=None):
         body = body or {}
