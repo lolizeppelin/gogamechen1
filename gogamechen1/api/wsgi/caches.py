@@ -9,10 +9,6 @@ from goperation.manager.api import get_cache
 from gopcdn import common as cdncommon
 from gopcdn.api.wsgi.resource import CdnResourceReuest
 
-from simpleutil.log import log as logging
-
-LOG = logging.getLogger(__name__)
-
 cdnresource_controller = CdnResourceReuest()
 
 
@@ -35,29 +31,21 @@ def map_resources(resource_ids):
     provides = set(CDNRESOURCE.keys())
     notmiss = need & provides
 
-    LOG.error('缓存调试日志~~~~~~~~~~~~~~~~~~~~~~')
-    LOG.error(need)
-    LOG.error(provides)
     # 有资源在进程缓存字典中
     if notmiss:
         caches_time_dict = {}
         # 本地最旧缓存时间点
         time_point = int(time.time())
-        LOG.error('a~~~~~~')
         for resource_id in notmiss:
             # 获取单个资源本地缓存时间点
-            cache_on = int(CDNRESOURCE.expiretime(resource_id))
-            LOG.error(cache_on)
-            LOG.error('a~~~~~~')
+            cache_on = int(CDNRESOURCE.expiretime(resource_id)) - cdncommon.CACHETIME
             if cache_on < time_point:
                 time_point = cache_on
             caches_time_dict[resource_id] = cache_on
-        LOG.error(time_point)
         cache = get_cache()
         scores = cache.zrangebyscore(name=cdncommon.CACHESETNAME,
-                                     min=str(time_point), max='+inf',
+                                     min=str(time_point - 3), max='+inf',
                                      withscores=True, score_cast_func=int)
-        LOG.error(scores)
         if scores:
             for data in scores:
                 resource_id = int(data[0])
