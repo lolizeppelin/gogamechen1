@@ -14,7 +14,7 @@ cdnresource_controller = CdnResourceReuest()
 
 class ResourceTTLCache(cachetools.TTLCache):
     def __init__(self, maxsize, ttl):
-        cachetools.TTLCache.__init__(self, maxsize, ttl)
+        cachetools.TTLCache.__init__(self, maxsize, ttl, timer=time.time)
 
     def expiretime(self, key):
         link = self._TTLCache__links[key]
@@ -32,35 +32,36 @@ def map_resources(resource_ids):
     need = set(resource_ids)
     provides = set(CDNRESOURCE.keys())
     notmiss = need & provides
-
+    # 有资源在缓存字典中
     if notmiss:
         cache_base = {}
-        earliest = int(time.time())
+        # 本地最旧缓存时间点
+        time_point = int(time.time())
         for resource_id in notmiss:
-            update_at = int(time.time()) - CDNRESOURCE.expiretime(resource_id)
-            if update_at < earliest:
-                earliest = update_at
-            cache_base[resource_id] = update_at
-
+            # 本地缓存时间点
+            cache_on = int(CDNRESOURCE.expiretime(resource_id))
+            if cache_on < time_point:
+                time_point = cache_on
+            cache_base[resource_id] = cache_on
         cache = get_cache()
         scores = cache.zrangebyscore(name=cdncommon.CACHESETNAME,
-                                     min=str(earliest), max='+inf',
+                                     min=str(time_point), max='+inf',
                                      withscores=True, score_cast_func=int)
         if scores:
             for data in scores:
                 resource_id = int(data[0])
-                update_at = int(data[1])
-                # may pop by other green thread
-                # if resource_id in notmiss:
+                cache_on = int(data[1])
+                # redis中缓存时间点超过本地缓存时间点
+                # 弹出本地缓存
                 try:
-                    if update_at > cache_base[resource_id]:
+                    if cache_on > cache_base[resource_id]:
                         CDNRESOURCE.pop(resource_id, None)
                 except KeyError:
                     continue
-
+    # 没有本地缓存的资源数量
     missed = need - set(CDNRESOURCE.keys())
-
     if missed:
+        # 重新从数据库读取
         with goperation.tlock('gogamechen1-cdnresource'):
             resources = cdnresource_controller.list(resource_ids=missed,
                                                     versions=True, domains=True, metadatas=True)
