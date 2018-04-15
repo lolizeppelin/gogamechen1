@@ -25,6 +25,12 @@
 # From gogamechen1.gamesvr
 #
 
+# databse rw user source privilege limit (string value)
+#source = <None>
+
+# databse ro user source privilege limit (string value)
+#rosource = <None>
+
 # data db rw user name (string value)
 #datadb_user = gogamedb-rw
 
@@ -56,6 +62,12 @@
 # From gogamechen1.gmsvr
 #
 
+# databse rw user source privilege limit (string value)
+#source = <None>
+
+# databse ro user source privilege limit (string value)
+#rosource = <None>
+
 # data db rw user name (string value)
 #datadb_user = gogmdb-rw
 
@@ -74,6 +86,12 @@
 #
 # From gogamechen1.publicsvr
 #
+
+# databse rw user source privilege limit (string value)
+#source = <None>
+
+# databse ro user source privilege limit (string value)
+#rosource = <None>
 
 # data db rw user name (string value)
 #datadb_user = gocross-rw

@@ -20,6 +20,15 @@ agent_opts = [
                     '[gamesvr&publicsvr&gmsvr:7] and so on')
 ]
 
+sources_opts = [
+    cfg.StrOpt('source',
+               default=None,
+               help='databse rw user source privilege limit'),
+    cfg.StrOpt('rosource',
+               default=None,
+               help='databse ro user source privilege limit'),
+]
+
 
 datadb_opts = [
     cfg.StrOpt('datadb_user',
@@ -70,11 +79,12 @@ crossserver_group = cfg.OptGroup(name='%s.%s' % (common.NAME, common.CROSSSERVER
 
 
 def list_game_opts():
+    _sources_opts = copy.deepcopy(sources_opts)
     _datadb_opts = copy.deepcopy(datadb_opts)
     _logdb_opts = copy.deepcopy(logdb_opts)
     cfg.set_defaults(_datadb_opts, datadb_user='gogamedb-rw', datadb_ro_user='gogamedb-ro')
     cfg.set_defaults(_logdb_opts, logdb_user='gogamelog-rw', logdb_ro_user='gogamelog-ro')
-    return _datadb_opts + _logdb_opts
+    return _sources_opts + _datadb_opts + _logdb_opts
 
 
 def game_register_opts(group):
@@ -83,9 +93,10 @@ def game_register_opts(group):
 
 
 def list_gm_opts():
+    _sources_opts = copy.deepcopy(sources_opts)
     _datadb_opts = copy.deepcopy(datadb_opts)
     cfg.set_defaults(_datadb_opts, datadb_user='gogmdb-rw', datadb_ro_user='gogmdb-ro')
-    return _datadb_opts
+    return _sources_opts + _datadb_opts
 
 
 def gm_register_opts(group):
@@ -94,9 +105,10 @@ def gm_register_opts(group):
 
 
 def list_cross_opts():
+    _sources_opts = copy.deepcopy(sources_opts)
     _datadb_opts = copy.deepcopy(datadb_opts)
     cfg.set_defaults(_datadb_opts, datadb_user='gocross-rw', datadb_ro_user='gocross-ro')
-    return _datadb_opts
+    return _sources_opts + _datadb_opts
 
 
 def cross_register_opts(group):

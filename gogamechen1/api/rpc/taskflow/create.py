@@ -33,15 +33,18 @@ class GogameDatabaseCreateTask(MysqlCreate):
         # 创建并绑定数据库
         auth = dict(user=self.database.user, passwd=self.database.passwd,
                     ro_user=self.database.ro_user, ro_passwd=self.database.ro_passwd,
-                    source=self.database.source)
+                    source=self.database.source, rosource=self.database.rosource)
         # 亲和性数值
         affinity = common.DBAFFINITYS[self.middleware.objtype][self.database.subtype]
+        # 创建数据库schema
         dbresult = appendpoint.client.schemas_create(self.database.database_id,
                                                      body={'schema': self.database.schema,
                                                            'affinity': affinity,
                                                            'auth': auth,
                                                            'bond': {'entity': self.middleware.entity,
-                                                                    'endpoint': common.NAME}})['data'][0]
+                                                                    'endpoint': common.NAME,
+                                                                    'desc': 'PROCESS',
+                                                                    }})['data'][0]
         # 设置返回结果
         self.middleware.databases.setdefault(self.database.subtype,
                                              dict(schema=self.database.schema,
@@ -117,8 +120,9 @@ def create_entity(appendpoint, entity, objtype, databases, appfile, timeout):
                     passwd=conf.get('%s_%s' % (subtype, 'passwd')),
                     ro_user=conf.get('%s_%s' % (subtype, 'ro_user')) + postfix,
                     ro_passwd=conf.get('%s_%s' % (subtype, 'ro_passwd')),
-                    source='%s/%s' % (appendpoint.manager.ipnetwork.network,
-                                      appendpoint.manager.ipnetwork.netmask))
+                    # source='%s/%s' % (appendpoint.manager.ipnetwork.network, appendpoint.manager.ipnetwork.netmask),
+                    source=conf.source or '%',
+                    rosource=conf.rosource or '%')
         LOG.debug('Create schema %s in %d with auth %s' % (schema, database_id, str(auth)))
         _database.append(GogameDatabase(create=True, backup=None, update=None,
                                         database_id=database_id, schema=schema,

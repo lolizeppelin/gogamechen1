@@ -962,7 +962,7 @@ class AppEntityReuest(BaseContorller):
                                    msg={'method': 'stoped',
                                         'args': dict(entity=entity)})
                 if not rpc_ret:
-                    raise RpcResultError('reset entity result is None')
+                    raise RpcResultError('check entity stoped result is None')
                 if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
                     raise RpcResultError('reset entity fail %s' % rpc_ret.get('result'))
                 _entity.status = common.DELETED
