@@ -152,6 +152,8 @@ def create_entity(appendpoint, entity, objtype, databases, appfile, timeout):
         else:
             LOG.error('Task execute fail, %s %s' % (e.__class__.__name__, str(e)))
     finally:
+        if middleware.waiter:
+            middleware.waiter.stop()
         connection.destroy_logbook(book.uuid)
         for dberror in middleware.dberrors:
             LOG.error(str(dberror))

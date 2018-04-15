@@ -20,6 +20,7 @@ class GogameDatabase(Database):
         super(GogameDatabase, self).__init__(**kwargs)
         self.database_id = kwargs.get('database_id')
         self.source = kwargs.get('source')
+        self.rosource = kwargs.get('rosource')
         self.subtype = kwargs.get('subtype')
         self.ro_user = kwargs.get('ro_user')
         self.ro_passwd = kwargs.get('ro_passwd')
