@@ -59,9 +59,8 @@ class GogameDatabaseCreateTask(MysqlCreate):
                                                   character_set=self.database.character_set,
                                                   collation_type=self.database.collation_type))
 
-    def revert(self, *args, **kwargs):
-        result = kwargs.get('result') if 'result' in kwargs else args[0]
-        super(GogameDatabaseCreateTask, self).revert(result, **kwargs)
+    def revert(self, result, *args, **kwargs):
+        super(GogameDatabaseCreateTask, self).revert(result, *args, **kwargs)
         if isinstance(result, failure.Failure):
             LOG.error('Create schema %s on %d fail' % (self.database.schema,
                                                        self.database.database_id))
