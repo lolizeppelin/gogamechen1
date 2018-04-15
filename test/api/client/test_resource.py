@@ -23,7 +23,9 @@ config.configure('test', [a, b])
 wsgi_url = '172.31.0.110'
 wsgi_port = 7999
 
-httpclient = ManagerClient(wsgi_url, wsgi_port, timeout=30)
+from requests import session
+
+httpclient = ManagerClient(wsgi_url, wsgi_port, timeout=30, session=session())
 
 client = GogameChen1DBClient(httpclient)
 
@@ -163,6 +165,10 @@ apkpath = r'C:\Users\loliz_000\Desktop\online.1.0.341.3046749070.apk'
 
 # pfile_create(package_id=1, apkpath=apkpath)
 package_all()
+
+import time
+
+time.sleep(50)
 
 # print resource_upgrade(group_id=1, package_id=1)
 # print client.async_show(request_id='d0479126-693e-49b4-b5a0-30b85b945c68', body={'details': True})

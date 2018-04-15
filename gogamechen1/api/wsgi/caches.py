@@ -17,6 +17,7 @@ class ResourceTTLCache(cachetools.TTLCache):
         cachetools.TTLCache.__init__(self, maxsize, ttl, timer=time.time)
 
     def expiretime(self, key):
+        """这个接口返回未来将在这个时间点过期"""
         link = self._TTLCache__links[key]
         return link.expire
 

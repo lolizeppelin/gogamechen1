@@ -384,7 +384,7 @@ class AppEntityReuest(BaseContorller):
         """返回排序好的可选服务器列表"""
         if kwargs.get('agent_id'):
             return [kwargs.get('agent_id'), ]
-        zone = kwargs.get('zone', 'all')
+        zone = kwargs.get('zone') or 'all'
         includes = ['metadata.zone=%s' % zone,
                     'metadata.gogamechen1-aff&%d' % common.APPAFFINITYS[objtype],
                     'metadata.agent_type=application',
@@ -405,7 +405,7 @@ class AppEntityReuest(BaseContorller):
 
     def _db_chioces(self, req, objtype, **kwargs):
         """返回排序好的可选数据库"""
-        zone = kwargs.get('zone', 'all')
+        zone = kwargs.get('zone') or 'all'
         # 指定亲和性
         body = dict(affinitys=common.DBAFFINITYS[objtype].values(),
                     dbtype='mysql', zone=zone)
@@ -418,7 +418,7 @@ class AppEntityReuest(BaseContorller):
     def _dbselect(self, req, objtype, **kwargs):
         """数据库自动选择"""
         _databases = kwargs.pop('databases', {})
-        if self._validate_databases(objtype, _databases):
+        if _databases and self._validate_databases(objtype, _databases):
             return _databases
         chioces = self._db_chioces(req, objtype, **kwargs)
         if not chioces:
@@ -714,8 +714,12 @@ class AppEntityReuest(BaseContorller):
 
             with session.begin():
                 body.setdefault('finishtime', rpcfinishtime()[0] + 5)
-                _entity = entity_controller.create(req=req, agent_id=agent_id,
-                                                   endpoint=common.NAME, body=body)['data'][0]
+                try:
+                    _entity = entity_controller.create(req=req, agent_id=agent_id,
+                                                       endpoint=common.NAME, body=body)['data'][0]
+                except RpcResultError as e:
+                    LOG.error('Create entity rpc call fail: %s' % e.message)
+                    raise InvalidArgument(e.message)
                 entity = _entity.get('entity')
                 rpc_result = _entity.get('notify')
                 LOG.info('Entity controller create rpc result %s' % str(rpc_result))

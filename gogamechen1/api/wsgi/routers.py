@@ -27,7 +27,7 @@ class Routers(router.RoutersBase):
                                        member_prefix='/{md5}',
                                        collection_actions=COLLECTION_ACTIONS,
                                        member_actions=MEMBER_ACTIONS)
-        collection.member.link('send', method='POST')
+        collection.member.link('send', method='PUT')
 
         resource_name = 'package'
         collection_name = resource_name + 's'
