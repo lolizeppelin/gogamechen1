@@ -414,6 +414,7 @@ class Application(AppEndpointBase):
                         if middleware.waiter is not None:
                             try:
                                 middleware.waiter.stop()
+                                middleware.waiter.wait()
                             except Exception as e:
                                 LOG.error('Stop waiter catch error %s' % e.__class__.__name__)
                             finally:
