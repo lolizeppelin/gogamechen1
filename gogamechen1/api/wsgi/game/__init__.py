@@ -1187,9 +1187,14 @@ class AppEntityReuest(BaseContorller):
         return self._async_bluck_rpc('start', group_id, objtype, entity, body)
 
     def stop(self, req, group_id, objtype, entity, body=None):
+        """
+        kill 强制关闭
+        notify 通过gm服务器通知区服关闭
+        """
         body = body or {}
         kill = body.get('kill', False)
-        if objtype == common.GAMESERVER and not kill:
+        notify = body.pop('notify', False)
+        if objtype == common.GAMESERVER and notify and not kill:
             session = endpoint_session(readonly=True)
             entitys = set()
             gm = None
@@ -1215,22 +1220,25 @@ class AppEntityReuest(BaseContorller):
             entityinfo = entity_controller.show(req=req, entity=gm.entity,
                                                 endpoint=common.NAME,
                                                 body={'ports': True})['data'][0]
-            message = body.get('message') or ''
+            message = body.pop('message', '') or ''
+            delay = body.pop('delay', 10) or 10
             port = entityinfo.get('ports')[0]
-            ipaddr = entityinfo.get('metadata').get('local_ip')
+            metadata = entityinfo.get('metadata')
+            if not metadata:
+                return resultutils.results(result='%s.%d is off line, can not stop by %s' %
+                                                  (gm.objtype, gm.entity, gm.objtype),
+                                           resultcode=manager_common.RESULT_ERROR)
+            ipaddr = metadata.get('local_ip')
             url = 'http://%s:%d/closegameserver' % (ipaddr, port)
             jdata = jsonutils.dumps_as_bytes(OrderedDict(RealSvrIds=list(entitys),
-                                                         Msg=message, DelayTime=0 if not message else 30))
+                                                         Msg=message, DelayTime=delay))
             try:
                 requests.post(url, data=jdata, timeout=5)
             except (ConnectionError, ReadTimeout) as e:
                 return resultutils.results(result='Stop request catch %s error, %s is closed?' % (e.__class__.__name__,
                                                                                                   common.GMSERVER),
                                            resultcode=manager_common.RESULT_ERROR)
-            delay = 10 if not message else 40
             body.update({'delay': delay})
-            finishtime, timeout = rpcfinishtime(body.get('request_time'))
-            body.update({'finishtime': finishtime + delay})
         return self._async_bluck_rpc('stop', group_id, objtype, entity, body)
 
     def status(self, req, group_id, objtype, entity, body=None):
