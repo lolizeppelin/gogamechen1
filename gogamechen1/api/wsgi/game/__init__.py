@@ -260,6 +260,7 @@ class GroupReuest(BaseContorller):
                 info = dict(area_id=area.area_id,
                             areaname=area.areaname,
                             entity=appentity.entity,
+                            opentime=appentity.opentime,
                             versions=jsonutils.loads_as_bytes(appentity.versions) if appentity.versions else None,
                             external_ips=emaps[appentity.entity]['metadata']['external_ips'],
                             dnsnames=emaps[appentity.entity]['metadata'].get('dnsnames'),
@@ -755,6 +756,7 @@ class AppEntityReuest(BaseContorller):
             if objtype == common.GAMESERVER:
                 _result.setdefault('area_id', next_area)
                 _result.setdefault('cross_id', cross_id)
+                _result.setdefault('opentime', opentime)
 
             threadpool.add_thread(entity_controller.post_create_entity,
                                   _entity.get('entity'), common.NAME, objtype=objtype,
