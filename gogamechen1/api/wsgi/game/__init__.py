@@ -3,6 +3,8 @@ import six
 import time
 import requests
 import inspect
+import functools
+import contextlib
 import eventlet
 import webob.exc
 from six.moves import zip
@@ -84,7 +86,6 @@ cdnquote_controller = CdnQuoteRequest()
 cdnresource_controller = CdnResourceReuest()
 
 CONF = cfg.CONF
-
 
 def areas_map(group_id):
     session = endpoint_session(readonly=True)
@@ -837,7 +838,11 @@ class AppEntityReuest(BaseContorller):
         rpc = get_client()
         target = targetutils.target_agent_by_string(metadata.get('agent_type'), metadata.get('host'))
         target.namespace = common.NAME
-        with glock.arealock(group=group_id, areas=[area.area_id for area in _entity.areas]):
+        if objtype == common.GAMESERVER:
+            lock = functools.partial(glock.arealock, group=group_id, areas=[area.area_id for area in _entity.areas])
+        else:
+            lock = functools.partial(glock.grouplock, group=group_id)
+        with lock():
             with session.begin():
                 _entity.status = status
                 session.flush()

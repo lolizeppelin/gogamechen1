@@ -52,7 +52,6 @@ class GoGameLock(object):
             try:
                 while int(time.time()*1000) < overtime:
                     with client.pipeline() as pipe:
-                        # pipe.multi()
                         for _id in areas:
                             pipe.sismember(key, str(_id))
                         results = pipe.execute()
@@ -71,9 +70,9 @@ class GoGameLock(object):
                     raise AllocLockTimeout('Lock areas timeout')
             except ResponseError as e:
                 if not e.message.startswith('WRONGTYPE'):
+                    if int(time.time() * 1000) > overtime:
+                        raise AllocLockTimeout('Lock areas timeout')
                     raise
-                if int(time.time()*1000) > overtime:
-                    raise AllocLockTimeout('Lock areas timeout')
             finally:
                 if wpipe:
                     wpipe.reset()
