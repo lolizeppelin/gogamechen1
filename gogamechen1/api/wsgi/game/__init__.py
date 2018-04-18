@@ -765,7 +765,7 @@ class AppEntityReuest(BaseContorller):
                 _result.setdefault('opentime', opentime)
 
             threadpool.add_thread(entity_controller.post_create_entity,
-                                  _entity.get('entity'), common.NAME, objtype=objtype,
+                                  entity, common.NAME, objtype=objtype,
                                   status=common.UNACTIVE,
                                   opentime=opentime,
                                   group_id=group_id, areas=[next_area, ])
