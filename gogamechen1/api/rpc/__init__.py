@@ -812,7 +812,7 @@ class Application(AppEndpointBase):
                                               resultcode=manager_common.RESULT_ERROR,
                                               ctxt=ctxt,
                                               result='upgrade entity fail, no entitys found')
-        timeline = kwargs.get('timeline')
+        timeline = int(kwargs.get('timeline', 0))
         objfiles = kwargs.get('objfiles')
         objtype = kwargs.get('objtype')
         # 校验objtype是否一致

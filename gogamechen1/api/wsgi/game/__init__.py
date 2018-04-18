@@ -361,6 +361,7 @@ class AppEntityReuest(BaseContorller):
                'properties': {
                    'objfiles': OBJFILES,
                    'request_time': {'type': 'integer', 'description': '异步请求时间'},
+                   'timeline': {'type': 'integer', 'description': '异步请求时间'},
                    'finishtime': {'type': 'integer', 'description': '异步请求完成时间'}}
                }
 
@@ -1262,6 +1263,7 @@ class AppEntityReuest(BaseContorller):
             raise InvalidArgument('Not objfile found for upgrade')
         request_time = body.get('request_time')
         finishtime = body.get('finishtime')
+        timeline = body.get('timeline') or request_time
         runtime = finishtime - request_time
         for subtype in objfiles:
             if subtype not in (common.APPFILE, common.DATADB, common.LOGDB):
@@ -1269,7 +1271,7 @@ class AppEntityReuest(BaseContorller):
             objfile = objfiles[subtype]
             if objfile.get('timeout') + request_time > finishtime:
                 raise InvalidArgument('%s timeout over finishtime' % subtype)
-        body.update({'timeline': request_time,
+        body.update({'timeline': timeline,
                      'deadline': finishtime + 3 + (runtime * 2)})
         body.setdefault('objtype', objtype)
         return self._async_bluck_rpc('upgrade', group_id, objtype, entity, body)
