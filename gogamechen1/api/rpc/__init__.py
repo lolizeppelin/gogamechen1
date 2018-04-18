@@ -72,15 +72,19 @@ def count_timeout(ctxt, kwargs):
 
 
 class CreateResult(resultutils.AgentRpcResult):
-
-    def __init__(self, agent_id, ctxt=None,
-                 resultcode=0, result=None, databases=None):
+    def __init__(self, agent_id, ctxt,
+                 resultcode, result,
+                 connection, ports, databases):
         super(CreateResult, self).__init__(agent_id, ctxt, resultcode, result)
+        self.connection = connection
+        self.ports = ports
         self.databases = databases
 
     def to_dict(self):
         ret_dict = super(CreateResult, self).to_dict()
         ret_dict.setdefault('databases', self.databases)
+        ret_dict.setdefault('ports', self.ports)
+        ret_dict.setdefault('connection', self.connection)
         return ret_dict
 
 
@@ -486,9 +490,10 @@ class Application(AppEndpointBase):
         resultcode = manager_common.RESULT_SUCCESS
         result = 'create %s success' % objtype
 
-        return CreateResult(agent_id=self.manager.agent_id,
-                            ctxt=ctxt, resultcode=resultcode, result=result,
-                            databases=middleware.databases)
+        return CreateResult(agent_id=self.manager.agent_id, ctxt=ctxt,
+                            resultcode=resultcode, result=result,
+                            connection=self.manager.local_ip,
+                            ports=ports, databases=middleware.databases)
 
     def rpc_post_create_entity(self, ctxt, entity, **kwargs):
         LOG.info('Get post create command with %s' % str(kwargs))

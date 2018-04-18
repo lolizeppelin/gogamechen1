@@ -694,9 +694,9 @@ class AppEntityReuest(BaseContorller):
                     chiefs = dict()
                     # 战场与GM服务器信息
                     for chief in (cross, gm):
-                        metadata = maps.get(chief.entity).get('metadata')
+                        chiefmetadata = maps.get(chief.entity).get('metadata')
                         ports = maps.get(chief.entity).get('ports')
-                        if not metadata:
+                        if not chiefmetadata:
                             raise InvalidArgument('%s.%d is offline' % (chief.objtype, chief.entity))
                         need = common.POSTS_COUNT[chief.objtype]
                         if need and len(ports) != need:
@@ -706,7 +706,7 @@ class AppEntityReuest(BaseContorller):
                         chiefs.setdefault(chief.objtype,
                                           dict(entity=chief.entity,
                                                ports=ports,
-                                               local_ip=metadata.get('local_ip')))
+                                               local_ip=chiefmetadata.get('local_ip')))
                     cross_id = cross.entity
             # 完整的rpc数据包
             body = dict(objtype=objtype,
@@ -717,13 +717,14 @@ class AppEntityReuest(BaseContorller):
             with session.begin():
                 body.setdefault('finishtime', rpcfinishtime()[0] + 5)
                 try:
-                    _entity = entity_controller.create(req=req, agent_id=agent_id,
-                                                       endpoint=common.NAME, body=body)['data'][0]
+                    create_result = entity_controller.create(req=req, agent_id=agent_id,
+                                                             endpoint=common.NAME, body=body)['data'][0]
                 except RpcResultError as e:
                     LOG.error('Create entity rpc call fail: %s' % e.message)
                     raise InvalidArgument(e.message)
-                entity = _entity.get('entity')
-                rpc_result = _entity.get('notify')
+                entity = create_result.get('entity')
+                rpc_result = create_result.get('notify')
+                metadata = create_result.get('metadata')
                 LOG.info('Entity controller create rpc result %s' % str(rpc_result))
                 # 插入实体信息
                 appentity = AppEntity(entity=entity,
@@ -752,7 +753,11 @@ class AppEntityReuest(BaseContorller):
                 else:
                     LOG.error('New entity database miss')
 
-            _result = dict(entity=entity, objtype=objtype, agent_id=agent_id,
+            _result = dict(entity=entity,
+                           objtype=objtype,
+                           agent_id=agent_id,
+                           connection=rpc_result.get('connection'),
+                           ports=rpc_result.get('ports'),
                            databases=rpc_result.get('databases'))
             if objtype == common.GAMESERVER:
                 _result.setdefault('area_id', next_area)
