@@ -358,7 +358,7 @@ class PackageReuest(BaseContorller):
         chiefs = group_controller._chiefs(list(group_ids), cross=False)
         chiefs_maps = {}
         for chief in chiefs:
-            chiefs_maps.setdefault(chiefs.get('group_id'), chief)
+            chiefs_maps.setdefault(chief.get('group_id'), chief)
         th.wait()
         data = []
         for package in packages:
