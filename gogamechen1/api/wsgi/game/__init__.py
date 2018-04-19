@@ -1030,6 +1030,7 @@ class AppEntityReuest(BaseContorller):
             target.namespace = common.NAME
             rpc = get_client()
             finishtime, timeout = rpcfinishtime()
+            LOG.warning('Clean entity %s.%d with action %s' % (objtype, entity, action));
             with session.begin():
                 rpc_ret = rpc.call(target, ctxt={'finishtime': finishtime},
                                    msg={'method': 'stoped', 'args': dict(entity=entity)})
