@@ -799,6 +799,8 @@ class PackageFileReuest(BaseContorller):
                                     filter=Package.package_id == package_id):
             raise InvalidArgument('Package not exist')
         if address:
+            if model_count_with_key(session, PackageFile, filter=PackageFile.address == address):
+                raise InvalidArgument('Package file address duplicate')
             with session.begin():
                 pfile = PackageFile(package_id=package_id, ftype=ftype,
                                     uptime=uptime, gversion=gversion,
