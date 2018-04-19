@@ -355,14 +355,14 @@ class PackageReuest(BaseContorller):
             group_ids.add(package.group_id)
         # 异步更新resources缓存
         th = eventlet.spawn(map_resources, resource_ids=resource_ids)
-        groups = group_controller._chiefs(list(group_ids), cross=False)
-        groups_maps = {}
-        for group in groups:
-            groups_maps.setdefault(group.get('group_id'), group)
+        chiefs = group_controller._chiefs(list(group_ids), cross=False)
+        chiefs_maps = {}
+        for chief in chiefs:
+            chiefs_maps.setdefault(chiefs.get('group_id'), chief)
         th.wait()
         data = []
         for package in packages:
-            group = groups_maps[package.group_id]
+            chief = chiefs_maps[package.group_id]
             resource = resource_cache_map(resource_id=package.resource_id, flush=False)
             info = dict(dict(package_id=package.package_id,
                              package_name=package.package_name,
@@ -379,11 +379,11 @@ class PackageReuest(BaseContorller):
                                            urls=resource_url(package.resource_id),
                                            resource_id=package.resource_id,
                                            ),
-                             login=dict(local_ip=group.get('local_ip'),
-                                        ports=group.get('ports'),
-                                        objtype=group.get('objtype'),
-                                        dnsnames=group.get('dnsnames'),
-                                        external_ips=group.get('external_ips'),
+                             login=dict(local_ip=chief.get('local_ip'),
+                                        ports=chief.get('ports'),
+                                        objtype=chief.get('objtype'),
+                                        dnsnames=chief.get('dnsnames'),
+                                        external_ips=chief.get('external_ips'),
                                         ),
                              files=[dict(pfile_id=pfile.pfile_id,
                                          ftype=pfile.ftype,
@@ -464,8 +464,10 @@ class PackageReuest(BaseContorller):
             if model_count_with_key(session, Package.package_id,
                                     filter=Package.package_name == package_name):
                 raise InvalidArgument('Package name Duplicate')
-            # 确认group
-            group_controller.show(req, group_id)
+            # 确认group以及gmsvr
+            if not group_controller._chiefs(group_ids=[group_id], cross=False):
+                return resultutils.results(result='Can not find entity of %s' % common.GMSERVER,
+                                           resultcode=manager_common.RESULT_ERROR)
             # 确认cdn资源
             resource = resource_cache_map(resource_id)
             if resource.get('internal'):
