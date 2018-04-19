@@ -64,6 +64,7 @@ from gogamechen1.models import Group
 from gogamechen1.models import AppEntity
 from gogamechen1.models import GameArea
 from gogamechen1.models import AreaDatabase
+from gogamechen1.models import Package
 
 
 LOG = logging.getLogger(__name__)
@@ -966,6 +967,8 @@ class AppEntityReuest(BaseContorller):
             if objtype == common.GMSERVER:
                 if model_count_with_key(session, AppEntity, filter=AppEntity.group_id == group_id) > 1:
                     raise InvalidArgument('You must delete other objtype entity before delete gm')
+                if model_count_with_key(session, Package, filter=Package.group_id == group_id) > 1:
+                    raise InvalidArgument('You must delete other Package before delete gm')
             elif objtype == common.CROSSSERVER:
                 if model_count_with_key(session, AppEntity, filter=AppEntity.cross_id == _entity.entity):
                     raise InvalidArgument('Cross server are reflected')
