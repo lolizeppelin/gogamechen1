@@ -445,6 +445,14 @@ class PackageReuest(BaseContorller):
                                            order=order,
                                            filter=Package.group_id == group_id,
                                            page_num=page_num)
+        for column in results['data']:
+            magic = column.get('magic')
+            if magic:
+                column['magic'] = jsonutils.loads_as_bytes(magic)
+
+            extension = column.get('extension')
+            if extension:
+                column['extension'] = jsonutils.loads_as_bytes(extension)
         return results
 
     def create(self, req, group_id, body=None):
