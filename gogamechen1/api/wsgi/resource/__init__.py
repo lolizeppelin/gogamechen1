@@ -555,10 +555,10 @@ class PackageReuest(BaseContorller):
         jsonutils.schema_validate(body, self.UPDATESCHEMA)
         status = body.get('status')
         desc = body.get('desc')
-        extension = body.get('extension', DEFAULTVALUE)
         rversion = body.get('rversion', DEFAULTVALUE)
-        gversion = body.get('gversion')
+        gversion = body.get('gversion', DEFAULTVALUE)
         magic = body.get('magic')
+        extension = body.get('extension')
         session = endpoint_session()
         query = model_query(session, Package, filter=Package.package_id == package_id)
         if (gversion is not DEFAULTVALUE) and gversion:
