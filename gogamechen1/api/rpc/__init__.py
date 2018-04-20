@@ -9,7 +9,6 @@ import contextlib
 import functools
 import eventlet
 import psutil
-import logging as default_logging
 
 from simpleutil.utils import argutils
 from simpleutil.utils import singleton
