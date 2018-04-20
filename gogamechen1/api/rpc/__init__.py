@@ -105,8 +105,7 @@ def AsyncActionResult(action, stores):
 
         return dict(detail_id=_entity,
                     resultcode=code,
-                    result='%d|%s|%s|%s' % (_entity, areas, pid, msg))
-
+                    result='%s|%s|%s' % (areas, pid, msg))
     return result
 
 
