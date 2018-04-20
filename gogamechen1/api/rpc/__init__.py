@@ -88,6 +88,28 @@ class CreateResult(resultutils.AgentRpcResult):
         return ret_dict
 
 
+def AsyncActionResult(action, stores):
+    def result(_entity, code, msg=None):
+        entity = stores[_entity]
+        if not entity.get('areas'):
+            areas = 'N/A'
+        else:
+            areas = ','.join(entity.get('areas'))
+        if not entity.get('pid'):
+            pid = 'N/A'
+        else:
+            pid = str(entity.get('pid'))
+        msg = msg or '%s entity %d %s' % (action, _entity,
+                                          'success' if code == manager_common.RESULT_SUCCESS
+                                          else 'fail')
+
+        return dict(detail_id=_entity,
+                    resultcode=code,
+                    result='%d|%s|%s|%s' % (_entity, areas, pid, msg))
+
+    return result
+
+
 @singleton.singleton
 class Application(AppEndpointBase):
 
@@ -132,9 +154,11 @@ class Application(AppEndpointBase):
                 if _entity in self.konwn_appentitys:
                     raise RuntimeError('App Entity %d Duplicate' % _entity)
                 LOG.info('Entity %d type %s, group %d' % (_entity, objtype, group_id))
-                self.konwn_appentitys.setdefault(_entity, dict(objtype=objtype, group_id=group_id,
+                self.konwn_appentitys.setdefault(_entity, dict(objtype=objtype,
+                                                               group_id=group_id,
                                                                status=status,
-                                                               areas=areas, opentime=opentime,
+                                                               areas=areas,
+                                                               opentime=opentime,
                                                                pid=None))
         # find entity pid
         for entity in self.entitys:
@@ -605,167 +629,6 @@ class Application(AppEndpointBase):
                                           ctxt=ctxt,
                                           result='change entity opentime success')
 
-    def rpc_start_entitys(self, ctxt, entitys, **kwargs):
-        timeout = count_timeout(ctxt, kwargs)
-        overtime = timeout + time.time()
-        entitys = argutils.map_to_int(entitys) & set(self.entitys)
-        if not entitys:
-            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                              resultcode=manager_common.RESULT_ERROR,
-                                              ctxt=ctxt,
-                                              result='start entitys fail, no entitys found')
-        details = []
-        # 启动前进程快照
-        proc_snapshot_before = utils.find_process()
-
-        def safe_wapper(target_id):
-            try:
-                self.start_entity(target_id, pids=proc_snapshot_before)
-                details.append(dict(detail_id=target_id,
-                                    resultcode=manager_common.RESULT_SUCCESS,
-                                    result='start entity %d success' % target_id
-                                    ))
-            except RpcTargetLockException as e:
-                details.append(dict(detail_id=target_id,
-                                    resultcode=manager_common.RESULT_ERROR,
-                                    result='start entity %d fail, %s' % (target_id, e.message)
-                                    ))
-            except Exception:
-                details.append(dict(detail_id=target_id,
-                                    resultcode=manager_common.RESULT_ERROR,
-                                    result='start entity %d fail' % target_id
-                                    ))
-                LOG.exception('Start entity %d fail' % target_id)
-
-        for entity in entitys:
-            status = self.konwn_appentitys[entity].get('status')
-            if status == common.OK:
-                eventlet.spawn_n(safe_wapper, entity)
-            else:
-                details.append(dict(detail_id=entity,
-                                    resultcode=manager_common.RESULT_ERROR,
-                                    result='start entity %d fail, status %s' % str(status)))
-        while len(details) < len(entitys):
-            eventlet.sleep(0.5)
-            if int(time.time()) > overtime:
-                break
-
-        responsed_entitys = set()
-        # 启动后进程快照
-        proc_snapshot_after = utils.find_process()
-        # 确认启动成功
-        for detail in details:
-            entity = detail.get('detail_id')
-            # 确认entity进程
-            if not self._entity_process(entity, proc_snapshot_after):
-                detail['resultcode'] = manager_common.RESULT_ERROR
-                detail['result'] = 'process not exist after start entity %d' % entity
-            responsed_entitys.add(entity)
-
-        for no_response_entity in (entitys - responsed_entitys):
-            details.append(dict(detail_id=no_response_entity,
-                                resultcode=manager_common.RESULT_ERROR,
-                                result='start entity %d overtime, result unkonwn' % no_response_entity
-                                ))
-
-        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                          ctxt=ctxt,
-                                          result='Start entity end', details=details)
-
-    def rpc_stop_entitys(self, ctxt, entitys, **kwargs):
-        timeout = count_timeout(ctxt, kwargs)
-        overtime = timeout + time.time()
-        entitys = argutils.map_to_int(entitys) & set(self.entitys)
-        if not entitys:
-            # stop process with signal.SIGINT
-            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                              resultcode=manager_common.RESULT_ERROR,
-                                              ctxt=ctxt,
-                                              result='stop entitys fail, no entitys found')
-        delay = kwargs.get('delay')
-        if delay:
-            eventlet.sleep(min(delay, 60))
-        details = []
-        # 停止前进程快照
-        proc_snapshot_before = utils.find_process()
-
-        def safe_wapper(target_id):
-            try:
-                self.stop_entity(target_id, pids=proc_snapshot_before, kill=kwargs.get('kill'))
-                details.append(dict(detail_id=target_id,
-                                    resultcode=manager_common.RESULT_SUCCESS,
-                                    result='stop entity %d success' % target_id
-                                    ))
-            except RpcTargetLockException as e:
-                details.append(dict(detail_id=target_id,
-                                    resultcode=manager_common.RESULT_ERROR,
-                                    result='stop entity %d fail, %s' % (target_id, e.message)
-                                    ))
-            except Exception:
-                details.append(dict(detail_id=target_id,
-                                    resultcode=manager_common.RESULT_ERROR,
-                                    result='stop entity %d fail' % target_id
-                                    ))
-                LOG.exception('stop entity %d fail' % target_id)
-
-        for entity in entitys:
-            eventlet.spawn_n(safe_wapper, entity)
-
-        while len(details) < len(entitys):
-            eventlet.sleep(0.5)
-            if int(time.time()) > overtime:
-                break
-
-        responsed_entitys = set()
-        # 停止后进程快照
-        proc_snapshot_after = utils.find_process()
-        for detail in details:
-            entity = detail.get('detail_id')
-            if self._entity_process(entity, pids=proc_snapshot_after):
-                detail['resultcode'] = manager_common.RESULT_ERROR
-                detail['result'] = 'stop called, but process exist'
-            responsed_entitys.add(entity)
-
-        for no_response_entity in (entitys - responsed_entitys):
-            details.append(dict(detail_id=no_response_entity,
-                                resultcode=manager_common.RESULT_ERROR,
-                                result='stop entity %d overtime, result unkonwn' % no_response_entity
-                                ))
-
-        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                          ctxt=ctxt,
-                                          result='Stop entitys end', details=details)
-
-    def rpc_status_entitys(self, ctxt, entitys, **kwargs):
-        entitys = argutils.map_to_int(entitys) & set(self.entitys)
-        if not entitys:
-            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                              resultcode=manager_common.RESULT_ERROR,
-                                              ctxt=ctxt,
-                                              result='status entitys fail, no entitys found')
-        proc_snapshot = utils.find_process()
-        details = []
-        for entity in entitys:
-            objtype = self._objtype(entity)
-            if objtype == common.GAMESERVER:
-                prefix = ','.join(map(str, self.konwn_appentitys[entity].get('areas')))
-            else:
-                prefix = '%s entity %d' % (objtype, entity)
-            p = self._entity_process(entity, proc_snapshot)
-            if p:
-                details.append(dict(detail_id=entity,
-                                    resultcode=manager_common.RESULT_SUCCESS,
-                                    result='%s running' % prefix))
-            else:
-                details.append(dict(detail_id=entity,
-                                    resultcode=manager_common.RESULT_SUCCESS,
-                                    result='%s not running' % prefix))
-
-        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                          ctxt=ctxt,
-                                          resultcode=manager_common.RESULT_SUCCESS,
-                                          result='Get entity status success', details=details)
-
     def rpc_flushconfig_entitys(self, ctxt, entitys, **kwargs):
         entitys = argutils.map_to_int(entitys) & set(self.entitys)
         if not entitys:
@@ -805,6 +668,158 @@ class Application(AppEndpointBase):
                                           ctxt=ctxt,
                                           result='Flush entitys config end', details=details)
 
+    def rpc_change_status(self, ctxt, entity, status, **kwargs):
+        if entity not in set(self.entitys):
+            LOG.error('entity not found, can not change status')
+        self.konwn_appentitys[entity].update({'status': status})
+        objtype = self._objtype(entity)
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          resultcode=manager_common.RESULT_SUCCESS,
+                                          ctxt=ctxt,
+                                          result='change entity %s.%d status success' % (objtype, entity))
+
+    def rpc_start_entitys(self, ctxt, entitys, **kwargs):
+        timeout = count_timeout(ctxt, kwargs)
+        overtime = timeout + time.time()
+        entitys = argutils.map_to_int(entitys) & set(self.entitys)
+        if not entitys:
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='start entitys fail, no entitys found')
+        details = []
+        # 启动前进程快照
+        proc_snapshot_before = utils.find_process()
+        formater = AsyncActionResult('start', self.konwn_appentitys)
+
+        def safe_wapper(entity):
+            try:
+                self.start_entity(entity, pids=proc_snapshot_before)
+                details.append(formater(entity, manager_common.RESULT_SUCCESS))
+            except RpcTargetLockException as e:
+                details.append(formater(entity, manager_common.RESULT_ERROR,
+                                        'start entity %d fail, %s' % (entity, e.message)))
+            except Exception as e:
+                details.append(formater(entity, manager_common.RESULT_ERROR,
+                                        'start entity %d fail: %s' % (entity, e.__class__.__name__)))
+                LOG.exception('Start entity %d fail' % entity)
+
+        for entity in entitys:
+            status = self.konwn_appentitys[entity].get('status')
+            if status == common.OK:
+                eventlet.spawn_n(safe_wapper, entity)
+            else:
+                details.append(formater(entity, manager_common.RESULT_ERROR,
+                                        'start entity %d fail, status %s' % str(status)))
+        while len(details) < len(entitys):
+            eventlet.sleep(0.5)
+            if int(time.time()) > overtime:
+                break
+
+        responsed_entitys = set()
+        # 启动后进程快照
+        proc_snapshot_after = utils.find_process()
+        # 确认启动成功
+        for detail in details:
+            entity = detail.get('detail_id')
+            # 确认entity进程
+            if not self._entity_process(entity, proc_snapshot_after):
+                detail.update(formater(entity, manager_common.RESULT_ERROR,
+                                       'start entity %d fail, process not exist after start'))
+            else:
+                # 写入PID
+                results = detail['result'].split('|')
+                results[2] = str(self.konwn_appentitys[entity]['pid'])
+                detail['result'] = '|'.join(results)
+            responsed_entitys.add(entity)
+
+        for no_response_entity in (entitys - responsed_entitys):
+            details.append(formater(no_response_entity, manager_common.RESULT_ERROR,
+                                    'start entity %d overtime, result unkonwn'))
+
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          ctxt=ctxt,
+                                          result='Start entity end', details=details)
+
+    def rpc_stop_entitys(self, ctxt, entitys, **kwargs):
+        timeout = count_timeout(ctxt, kwargs)
+        overtime = timeout + time.time()
+        entitys = argutils.map_to_int(entitys) & set(self.entitys)
+        if not entitys:
+            # stop process with signal.SIGINT
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='stop entitys fail, no entitys found')
+        delay = kwargs.get('delay')
+        if delay:
+            eventlet.sleep(min(delay, 60))
+        details = []
+        # 停止前进程快照
+        proc_snapshot_before = utils.find_process()
+        formater = AsyncActionResult('stop', self.konwn_appentitys)
+
+        def safe_wapper(entity):
+            try:
+                self.stop_entity(entity, pids=proc_snapshot_before, kill=kwargs.get('kill'))
+                details.append(formater(entity, manager_common.RESULT_SUCCESS))
+            except RpcTargetLockException as e:
+                details.append(formater(entity, manager_common.RESULT_ERROR,
+                                        'stop entity %d fail, %s' % (entity, e.message)))
+            except Exception as e:
+                details.append(formater(entity, manager_common.RESULT_ERROR,
+                                        'stop entity %d fail: %s' % (entity, e.__class__.__name__)))
+                LOG.exception('stop entity %d fail' % entity)
+
+        for entity in entitys:
+            eventlet.spawn_n(safe_wapper, entity)
+
+        while len(details) < len(entitys):
+            eventlet.sleep(0.5)
+            if int(time.time()) > overtime:
+                break
+
+        responsed_entitys = set()
+        # 停止后进程快照
+        proc_snapshot_after = utils.find_process()
+        for detail in details:
+            entity = detail.get('detail_id')
+            # 确认entity进程
+            if not self._entity_process(entity, proc_snapshot_after):
+                results = detail['result'].split('|')
+                results[2] = 'N/A'
+                detail['result'] = '|'.join(results)
+            else:
+                detail.update(formater(entity, manager_common.RESULT_ERROR,
+                                       'stop entity %d fail, process still exist'))
+            responsed_entitys.add(entity)
+
+        for no_response_entity in (entitys - responsed_entitys):
+            details.append(formater(no_response_entity, manager_common.RESULT_ERROR,
+                                    'stop entity %d overtime, result unkonwn'))
+
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          ctxt=ctxt,
+                                          result='Stop entitys end', details=details)
+
+    def rpc_status_entitys(self, ctxt, entitys, **kwargs):
+        entitys = argutils.map_to_int(entitys) & set(self.entitys)
+        if not entitys:
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='status entitys fail, no entitys found')
+        details = []
+        proc_snapshot = utils.find_process()
+        formater = AsyncActionResult('status', self.konwn_appentitys)
+        for entity in entitys:
+            self._entity_process(entity, proc_snapshot)
+            details.append(formater(entity, manager_common.RESULT_SUCCESS))
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          ctxt=ctxt,
+                                          resultcode=manager_common.RESULT_SUCCESS,
+                                          result='Get entity status success', details=details)
+
     def rpc_upgrade_entitys(self, ctxt, entitys, **kwargs):
         entitys = argutils.map_to_int(entitys) & set(self.entitys)
         if not entitys:
@@ -823,15 +838,14 @@ class Application(AppEndpointBase):
                                                   ctxt=ctxt,
                                                   result='upgrade entity %d not %s' % (entity, objtype))
         details = []
+        formater = AsyncActionResult('status', self.konwn_appentitys)
         with self.locks(entitys):
             # 启动前进程快照
             proc_snapshot_before = utils.find_process()
             for entity in entitys:
                 if self._entity_process(entity, proc_snapshot_before):
-                    for entity in entitys:
-                        details.append(dict(detail_id=entity,
-                                            resultcode=manager_common.RESULT_ERROR,
-                                            result='upgrade not executed, some entity is running'))
+                    details.append(formater(entity, manager_common.RESULT_ERROR,
+                                            'upgrade entityS not executed, some entity is running'))
                     return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                                       ctxt=ctxt,
                                                       result='upgrade entity fail, entity %d running' % entity,
@@ -848,29 +862,22 @@ class Application(AppEndpointBase):
                 else:
                     LOG.error('prepare upgrade fail, %s %s' % (e.__class__.__name__, str(e)))
                 for entity in entitys:
-                    prefix = self._prefix(entity=entity, objtype=objtype)
-                    details.append(dict(detail_id=entity,
-                                        resultcode=manager_common.RESULT_ERROR,
-                                        result='%s not executed, %s' % (prefix, msg)))
+                    details.append(formater(entity, manager_common.RESULT_ERROR,
+                                            'entity %d not executed' % entity))
                 return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                                   ctxt=ctxt,
                                                   details=details,
                                                   result='upgrade %s entitys fail, %s' % (objtype, msg))
+
         for middleware in middlewares:
-            prefix = self._prefix(entity=middleware.entity, objtype=objtype)
             if middleware.success:
-                details.append(dict(detail_id=middleware.entity,
-                                    resultcode=manager_common.RESULT_SUCCESS,
-                                    result='%s upgrade success' % prefix))
+                details.append(formater(middleware.entity, manager_common.RESULT_SUCCESS))
             elif middleware.notexecuted:
-                details.append(dict(detail_id=middleware.entity,
-                                    resultcode=manager_common.RESULT_ERROR,
-                                    result='%s not executed' % prefix))
-                LOG.debug('%s.%d %s', (objtype, middleware.entity, str(middleware)))
+                details.append(formater(middleware.entity, manager_common.RESULT_ERROR,
+                                        'upgrade entity %d not executed'))
             else:
-                details.append(dict(detail_id=middleware.entity,
-                                    resultcode=manager_common.RESULT_ERROR,
-                                    result='%s upgrade fail' % prefix))
+                details.append(formater(middleware.entity, manager_common.RESULT_ERROR,
+                                        'upgrade entity %d fail, check agent log for more'))
                 LOG.debug('%s.%d %s', (objtype, middleware.entity, str(middleware)))
         if e:
             if hasattr(e, 'message') and e.message:
@@ -884,13 +891,3 @@ class Application(AppEndpointBase):
                                           ctxt=ctxt,
                                           details=details,
                                           result=result)
-
-    def rpc_change_status(self, ctxt, entity, status, **kwargs):
-        if entity not in set(self.entitys):
-            LOG.error('entity not found, can not change status')
-        self.konwn_appentitys[entity].update({'status': status})
-        objtype = self._objtype(entity)
-        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                          resultcode=manager_common.RESULT_SUCCESS,
-                                          ctxt=ctxt,
-                                          result='change entity %s.%d status success' % (objtype, entity))
