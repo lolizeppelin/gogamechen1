@@ -76,7 +76,7 @@ group_controller = GroupReuest()
 
 CONF = cfg.CONF
 
-NOVERSION = object()
+DEFAULTVALUE = object()
 
 def resource_url(resource_id, fileinfo=None):
     resource = resource_cache_map(resource_id, flush=False)
@@ -545,15 +545,15 @@ class PackageReuest(BaseContorller):
         group_id = int(group_id)
         package_id = int(package_id)
         jsonutils.schema_validate(body, self.UPDATESCHEMA)
-        magic = body.get('magic')
-        extension = body.get('extension')
         status = body.get('status')
         desc = body.get('desc')
-        rversion = body.get('rversion', NOVERSION)
-        gversion = body.get('gversion', NOVERSION)
+        extension = body.get('extension', DEFAULTVALUE)
+        rversion = body.get('rversion', DEFAULTVALUE)
+        gversion = body.get('gversion')
+        magic = body.get('magic')
         session = endpoint_session()
         query = model_query(session, Package, filter=Package.package_id == package_id)
-        if (gversion is not NOVERSION) and gversion:
+        if (gversion is not DEFAULTVALUE) and gversion:
             query.options(joinedload(Package.files, innerjoin=False))
         with session.begin():
             package = query.one()
@@ -563,16 +563,22 @@ class PackageReuest(BaseContorller):
                 package.status = status
             if desc:
                 package.desc = desc
-            if magic:
-                default_magic = jsonutils.loads_as_bytes(package.magic) if package.magic else {}
-                default_magic.update(magic)
-                package.magic = jsonutils.dumps(default_magic)
-            if extension:
-                default_extension = jsonutils.loads_as_bytes(package.extension) if package.extension else {}
-                default_extension.update(extension)
-                package.extension = jsonutils.dumps(default_extension)
+            if magic is not None:
+                if not magic:
+                    package.magic = None
+                else:
+                    default_magic = jsonutils.loads_as_bytes(package.magic) if package.magic else {}
+                    default_magic.update(magic)
+                    package.magic = jsonutils.dumps(default_magic)
+            if extension is not None:
+                if not extension:
+                    package.extension = None
+                else:
+                    default_extension = jsonutils.loads_as_bytes(package.extension) if package.extension else {}
+                    default_extension.update(extension)
+                    package.extension = jsonutils.dumps(default_extension)
             # 玩家版本号, 由安装包决定
-            if gversion is not NOVERSION:
+            if gversion is not DEFAULTVALUE:
                 if gversion:
                     if gversion in [pfile.pfile_id for pfile in package.files
                                     if pfile.status == manager_common.DOWNFILE_FILEOK]:
@@ -582,7 +588,7 @@ class PackageReuest(BaseContorller):
                 else:
                     package.gversion = None
             # 游戏资源版本号, 由cdn相关版本号决定
-            if rversion is not NOVERSION:
+            if rversion is not DEFAULTVALUE:
                 if rversion:
                     # 没有引用过默认version,添加资源引用
                     if not package.rversion:

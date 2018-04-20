@@ -779,6 +779,7 @@ class AppEntityReuest(BaseContorller):
         group_id = int(group_id)
         entity = int(entity)
         session = endpoint_session(readonly=True)
+        format = body.get('format') or 'list'
         query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
         query = query.options(joinedload(AppEntity.databases, innerjoin=False))
         _entity = query.one()
@@ -787,6 +788,23 @@ class AppEntityReuest(BaseContorller):
         if _entity.group_id != group_id:
             raise InvalidArgument('Entity group %d not match  %d' % (_entity.group_id, group_id))
         metadata, ports = self._entityinfo(req, entity)
+        if format == 'list':
+            databases = []
+        else:
+            databases = {}
+        for database in _entity.databases:
+            dbinfo = dict(quote_id=database.quote_id,
+                          database_id=database.database_id,
+                          host=database.host,
+                          port=database.port,
+                          ro_user=database.ro_user,
+                          ro_passwd=database.ro_passwd,
+                          subtype=database.subtype,
+                          schema='%s_%s_%s_%d' % (common.NAME, objtype, database.subtype, entity))
+            if format == 'list':
+                databases.append(dbinfo)
+            else:
+                databases[database.subtype] = dbinfo
         return resultutils.results(result='show %s areas success' % objtype,
                                    data=[dict(entity=_entity.entity,
                                               agent_id=_entity.agent_id,
@@ -798,19 +816,7 @@ class AppEntityReuest(BaseContorller):
                                               areas=[dict(area_id=area.area_id,
                                                           areaname=area.areaname.encode('utf-8'),
                                                           ) for area in _entity.areas],
-                                              databases=[dict(quote_id=database.quote_id,
-                                                              database_id=database.database_id,
-                                                              host=database.host,
-                                                              port=database.port,
-                                                              ro_user=database.ro_user,
-                                                              ro_passwd=database.ro_passwd,
-                                                              subtype=database.subtype,
-                                                              schema='%s_%s_%s_%d' % (common.NAME,
-                                                                                      objtype,
-                                                                                      database.subtype,
-                                                                                      entity)
-                                                              )
-                                                         for database in _entity.databases],
+                                              databases=databases,
                                               metadata=metadata, ports=ports)])
 
     def update(self, req, group_id, objtype, entity, body=None):
