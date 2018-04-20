@@ -510,6 +510,7 @@ class AppEntityReuest(BaseContorller):
                    AppEntity.group_id,
                    AppEntity.agent_id,
                    AppEntity.opentime,
+                   AppEntity.versions,
                    AppEntity.status,
                    AppEntity.objtype]
 
@@ -573,6 +574,9 @@ class AppEntityReuest(BaseContorller):
                 local_ip = external_ips = None
             column['local_ip'] = local_ip
             column['external_ips'] = external_ips
+            versions = column.get('versions')
+            if versions:
+                column['versions'] = jsonutils.loads_as_bytes(versions)
 
         return results
 
