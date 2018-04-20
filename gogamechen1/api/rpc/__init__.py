@@ -629,45 +629,6 @@ class Application(AppEndpointBase):
                                           ctxt=ctxt,
                                           result='change entity opentime success')
 
-    def rpc_flushconfig_entitys(self, ctxt, entitys, **kwargs):
-        entitys = argutils.map_to_int(entitys) & set(self.entitys)
-        if not entitys:
-            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                              resultcode=manager_common.RESULT_ERROR,
-                                              ctxt=ctxt,
-                                              result='upgrade entity fail, no entitys found')
-        details = []
-        # 启动前进程快照
-        proc_snapshot_before = utils.find_process()
-        with self.locks(entitys):
-            for entity in entitys:
-                if self._entity_process(entity, proc_snapshot_before):
-                    for entity in entitys:
-                        details.append(dict(detail_id=entity,
-                                            resultcode=manager_common.RESULT_SUCCESS,
-                                            result='upgrade not executed, some entity is running'))
-                    return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                                      resultcode=manager_common.RESULT_ERROR,
-                                                      ctxt=ctxt,
-                                                      result='flushconfig entity fail, entity %d running' % entity,
-                                                      details=details)
-            for entity in entitys:
-                objtype = self._objtype(entity)
-                try:
-                    self.flush_config(entity, opentime=kwargs.get('opentime'),
-                                      chiefs=kwargs.get('chiefs'))
-                    details.append(dict(detail_id=entity,
-                                        resultcode=manager_common.RESULT_SUCCESS,
-                                        result='%s entity %d flush config success' % (objtype, entity)))
-                except Exception:
-                    details.append(dict(detail_id=entity,
-                                        resultcode=manager_common.RESULT_ERROR,
-                                        result='%s entity %d flush config fail' % (objtype, entity)))
-
-        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                          ctxt=ctxt,
-                                          result='Flush entitys config end', details=details)
-
     def rpc_change_status(self, ctxt, entity, status, **kwargs):
         if entity not in set(self.entitys):
             LOG.error('entity not found, can not change status')
@@ -692,17 +653,17 @@ class Application(AppEndpointBase):
         proc_snapshot_before = utils.find_process()
         formater = AsyncActionResult('start', self.konwn_appentitys)
 
-        def safe_wapper(entity):
+        def safe_wapper(__entity):
             try:
-                self.start_entity(entity, pids=proc_snapshot_before)
-                details.append(formater(entity, manager_common.RESULT_SUCCESS))
+                self.start_entity(__entity, pids=proc_snapshot_before)
+                details.append(formater(__entity, manager_common.RESULT_SUCCESS))
             except RpcTargetLockException as e:
-                details.append(formater(entity, manager_common.RESULT_ERROR,
-                                        'start entity %d fail, %s' % (entity, e.message)))
+                details.append(formater(__entity, manager_common.RESULT_ERROR,
+                                        'start entity %d fail, %s' % (__entity, e.message)))
             except Exception as e:
                 details.append(formater(entity, manager_common.RESULT_ERROR,
-                                        'start entity %d fail: %s' % (entity, e.__class__.__name__)))
-                LOG.exception('Start entity %d fail' % entity)
+                                        'start entity %d fail: %s' % (__entity, e.__class__.__name__)))
+                LOG.exception('Start entity %d fail' % __entity)
 
         for entity in entitys:
             status = self.konwn_appentitys[entity].get('status')
@@ -759,17 +720,17 @@ class Application(AppEndpointBase):
         proc_snapshot_before = utils.find_process()
         formater = AsyncActionResult('stop', self.konwn_appentitys)
 
-        def safe_wapper(entity):
+        def safe_wapper(__entity):
             try:
-                self.stop_entity(entity, pids=proc_snapshot_before, kill=kwargs.get('kill'))
-                details.append(formater(entity, manager_common.RESULT_SUCCESS))
+                self.stop_entity(__entity, pids=proc_snapshot_before, kill=kwargs.get('kill'))
+                details.append(formater(__entity, manager_common.RESULT_SUCCESS))
             except RpcTargetLockException as e:
-                details.append(formater(entity, manager_common.RESULT_ERROR,
-                                        'stop entity %d fail, %s' % (entity, e.message)))
+                details.append(formater(__entity, manager_common.RESULT_ERROR,
+                                        'stop entity %d fail, %s' % (__entity, e.message)))
             except Exception as e:
-                details.append(formater(entity, manager_common.RESULT_ERROR,
-                                        'stop entity %d fail: %s' % (entity, e.__class__.__name__)))
-                LOG.exception('stop entity %d fail' % entity)
+                details.append(formater(__entity, manager_common.RESULT_ERROR,
+                                        'stop entity %d fail: %s' % (__entity, e.__class__.__name__)))
+                LOG.exception('stop entity %d fail' % __entity)
 
         for entity in entitys:
             eventlet.spawn_n(safe_wapper, entity)
@@ -838,14 +799,15 @@ class Application(AppEndpointBase):
                                                   ctxt=ctxt,
                                                   result='upgrade entity %d not %s' % (entity, objtype))
         details = []
-        formater = AsyncActionResult('status', self.konwn_appentitys)
+        formater = AsyncActionResult('upgrade', self.konwn_appentitys)
         with self.locks(entitys):
             # 启动前进程快照
             proc_snapshot_before = utils.find_process()
             for entity in entitys:
                 if self._entity_process(entity, proc_snapshot_before):
-                    details.append(formater(entity, manager_common.RESULT_ERROR,
-                                            'upgrade entityS not executed, some entity is running'))
+                    for __entity in entitys:
+                        details.append(formater(__entity, manager_common.RESULT_ERROR,
+                                                'upgrade entitys not executed, some entity is running'))
                     return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                                       ctxt=ctxt,
                                                       result='upgrade entity fail, entity %d running' % entity,
@@ -863,7 +825,7 @@ class Application(AppEndpointBase):
                     LOG.error('prepare upgrade fail, %s %s' % (e.__class__.__name__, str(e)))
                 for entity in entitys:
                     details.append(formater(entity, manager_common.RESULT_ERROR,
-                                            'entity %d not executed' % entity))
+                                            'upgrade entity %d not executed' % entity))
                 return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                                   ctxt=ctxt,
                                                   details=details,
@@ -891,3 +853,39 @@ class Application(AppEndpointBase):
                                           ctxt=ctxt,
                                           details=details,
                                           result=result)
+
+    def rpc_flushconfig_entitys(self, ctxt, entitys, **kwargs):
+        entitys = argutils.map_to_int(entitys) & set(self.entitys)
+        if not entitys:
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='upgrade entity fail, no entitys found')
+        details = []
+        formater = AsyncActionResult('flushconfig', self.konwn_appentitys)
+        # 启动前进程快照
+        proc_snapshot_before = utils.find_process()
+        with self.locks(entitys):
+            for entity in entitys:
+                if self._entity_process(entity, proc_snapshot_before):
+                    for __entity in entitys:
+                        details.append(formater(__entity, manager_common.RESULT_ERROR,
+                                                'flushconfig entity not executed, some entity is running'))
+                    return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                                      resultcode=manager_common.RESULT_ERROR,
+                                                      ctxt=ctxt,
+                                                      result='flushconfig entity fail, entity %d running' % entity,
+                                                      details=details)
+            for entity in entitys:
+                objtype = self._objtype(entity)
+                try:
+                    self.flush_config(entity, opentime=kwargs.get('opentime'),
+                                      chiefs=kwargs.get('chiefs'))
+                    details.append(formater(entity, manager_common.RESULT_SUCCESS))
+                except Exception as e:
+                    details.append(formater(entity, manager_common.RESULT_ERROR,
+                                            'flushconfig entity %d fail: %s' % (entity, e.__class__.__name__)))
+
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          ctxt=ctxt,
+                                          result='Flush entitys config end', details=details)
