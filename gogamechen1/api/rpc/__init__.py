@@ -94,7 +94,7 @@ def AsyncActionResult(action, stores):
         if not entity.get('areas'):
             areas = 'N/A'
         else:
-            areas = ','.join(entity.get('areas'))
+            areas = ','.join(map(str, entity.get('areas')))
         if not entity.get('pid'):
             pid = 'N/A'
         else:
