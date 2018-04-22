@@ -272,7 +272,10 @@ class GroupReuest(BaseContorller):
 
     def areas(self, req, group_id, body=None):
         body = body or {}
-        group_id = int(group_id)
+        try:
+            group_id = int(group_id)
+        except (TypeError, ValueError):
+            raise InvalidArgument('Group id value error')
         return resultutils.results(result='list group areas success',
                                    data=[dict(
                                        chiefs=self._chiefs([group_id], cross=body.get('cross', False)),
