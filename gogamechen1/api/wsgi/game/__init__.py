@@ -94,9 +94,9 @@ def areas_map(group_id):
     maps = {}
     for _area in query:
         try:
-            maps[_area.entity].append(_area.area_id)
+            maps[_area.entity].append(dict(area_id=_area.area_id, show_id=_area.show_id, areaname=_area.areaname))
         except KeyError:
-            maps[_area.entity] = [_area.area_id, ]
+            maps[_area.entity] = [dict(area_id=_area.area_id, show_id=_area.show_id, areaname=_area.areaname), ]
     session.close()
     return maps
 
@@ -129,8 +129,7 @@ class GroupReuest(BaseContorller):
             areas = column.get('areas', [])
             column['areas'] = []
             for area in areas:
-                column['areas'].append(dict(area_id=area.area_id, areaname=area.areaname))
-
+                column['areas'].append(dict(area_id=area.area_id, show_id=area.show_id, areaname=area.areaname))
         return results
 
     def create(self, req, body=None):
@@ -171,7 +170,9 @@ class GroupReuest(BaseContorller):
                 objtype = entity.objtype
                 entityinfo = dict(entity=entity.entity, status=entity.status)
                 if objtype == common.GAMESERVER:
-                    entityinfo.setdefault('areas', [dict(area_id=area.area_id, areaname=area.areaname)
+                    entityinfo.setdefault('areas', [dict(area_id=area.area_id,
+                                                         show_id=area.show_id,
+                                                         areaname=area.areaname)
                                                     for area in entity.areas])
                 try:
                     _entitys[objtype].append(entityinfo)
@@ -261,6 +262,7 @@ class GroupReuest(BaseContorller):
         for appentity in appentitys:
             for area in appentity.areas:
                 info = dict(area_id=area.area_id,
+                            show_id=area.show_id,
                             areaname=area.areaname,
                             entity=appentity.entity,
                             opentime=appentity.opentime,
@@ -492,7 +494,9 @@ class AppEntityReuest(BaseContorller):
                                               group_id=_entity.group_id,
                                               status=_entity.status,
                                               opentime=_entity.opentime,
-                                              areas=[dict(area_id=area.area_id, areaname=area.areaname)
+                                              areas=[dict(area_id=area.area_id,
+                                                          show_id=area.show_id,
+                                                          areaname=area.areaname)
                                                      for area in _entity.areas],
                                               objtype=_entity.objtype) for _entity in query])
 
@@ -526,9 +530,13 @@ class AppEntityReuest(BaseContorller):
             query = model_query(session, GameArea, filter=GameArea.group_id == group_id)
             for _area in query:
                 try:
-                    maps[_area.entity].append({'area_id': _area.area_id, 'areaname': _area.areaname})
+                    maps[_area.entity].append(dict(area_id=_area.area_id,
+                                                   show_id=_area.show_id,
+                                                   areaname=_area.areaname))
                 except KeyError:
-                    maps[_area.entity] = [{'area_id': _area.area_id, 'areaname': _area.areaname}, ]
+                    maps[_area.entity] = [dict(area_id=_area.area_id,
+                                               show_id=_area.show_id,
+                                               areaname=_area.areaname), ]
             # session.close()
             return maps
 
@@ -615,9 +623,9 @@ class AppEntityReuest(BaseContorller):
         joins = joins.joinedload(AppEntity.databases, innerjoin=False)
         query = query.options(joins)
         _group = query.one()
-        next_area = _group.lastarea + 1
+        next_show_area = _group.lastarea + 1
         glock = get_gamelock()
-        with glock.arealock(group_id, next_area):
+        with glock.grouplock(group_id):
             typemap = {}
             for _entity in _group.entitys:
                 # 跳过未激活的实体
@@ -632,10 +640,7 @@ class AppEntityReuest(BaseContorller):
             # 相同类型的实例列表
             same_type_entitys = typemap.get(objtype, [])
             if objtype == common.GMSERVER:
-                # GM服务不允许相同实例
-                # if same_type_entitys:
-                #     return resultutils.results('create entity fail, %s duplicate in group' % objtype,
-                #                                resultcode=manager_common.RESULT_ERROR)
+                # GM服务不允许相同实例,必须clean掉所有同组GM服务器
                 for _entity in _group.entitys:
                     if _entity.objtype == common.GMSERVER:
                         return resultutils.results(result='create entity fail, %s duplicate in group' % objtype,
@@ -654,9 +659,8 @@ class AppEntityReuest(BaseContorller):
 
                     if model_count_with_key(session, GameArea,
                                             filter=and_(GameArea.group_id == group_id,
-                                                        or_(GameArea.area_id == next_area,
-                                                            GameArea.areaname == areaname))):
-                        return resultutils.results(result='Create entity fail, area id or name exist',
+                                                        GameArea.areaname == areaname)):
+                        return resultutils.results(result='Create entity fail, name exist',
                                                    resultcode=manager_common.RESULT_ERROR)
                     cross = None
                     # 游戏服务器需要在同组中找到cross实例
@@ -748,7 +752,7 @@ class AppEntityReuest(BaseContorller):
                 if objtype == common.GAMESERVER:
                     # 插入area数据
                     query = model_query(session, Group, filter=Group.group_id == group_id)
-                    gamearea = GameArea(area_id=_group.lastarea + 1,
+                    gamearea = GameArea(show_id=next_show_area,
                                         areaname=areaname.decode('utf-8')
                                         if isinstance(areaname, six.binary_type)
                                         else areaname,
@@ -757,7 +761,7 @@ class AppEntityReuest(BaseContorller):
                     session.add(gamearea)
                     session.flush()
                     # 更新 group lastarea属性
-                    query.update({'lastarea': next_area})
+                    query.update({'lastarea': next_show_area})
                 # 插入数据库绑定信息
                 if rpc_result.get('databases'):
                     self._bondto(session, entity, rpc_result.get('databases'))
@@ -770,8 +774,10 @@ class AppEntityReuest(BaseContorller):
                            connection=rpc_result.get('connection'),
                            ports=rpc_result.get('ports'),
                            databases=rpc_result.get('databases'))
+            areas = []
             if objtype == common.GAMESERVER:
-                _result.setdefault('areas', [dict(area_id=next_area, areaname=areaname)])
+                areas = [dict(area_id=gamearea.area_id, show_id=gamearea.show_id, areaname=areaname)]
+                _result.setdefault('areas', areas)
                 _result.setdefault('cross_id', cross_id)
                 _result.setdefault('opentime', opentime)
 
@@ -779,7 +785,7 @@ class AppEntityReuest(BaseContorller):
                                   entity, common.NAME, objtype=objtype,
                                   status=common.UNACTIVE,
                                   opentime=opentime,
-                                  group_id=group_id, areas=[dict(area_id=next_area, areaname=areaname)])
+                                  group_id=group_id, areas=areas)
             return resultutils.results(result='create %s entity success' % objtype,
                                        data=[_result, ])
 
@@ -823,6 +829,7 @@ class AppEntityReuest(BaseContorller):
                                               versions=jsonutils.loads_as_bytes(_entity.versions)
                                               if _entity.versions else None,
                                               areas=[dict(area_id=area.area_id,
+                                                          show_id=area.show_id,
                                                           areaname=area.areaname.encode('utf-8'),
                                                           ) for area in _entity.areas],
                                               databases=databases,
@@ -956,6 +963,7 @@ class AppEntityReuest(BaseContorller):
     def delete(self, req, group_id, objtype, entity, body=None):
         """标记删除entity"""
         body = body or {}
+        force = body.get('force', False)
         group_id = int(group_id)
         entity = int(entity)
         session = endpoint_session()
@@ -1010,9 +1018,10 @@ class AppEntityReuest(BaseContorller):
                             raise InvalidArgument('%s areas more then one' % objtype)
                         area = _entity.areas[0]
                         group = _entity.group
-                        if area.area_id != group.lastarea:
-                            raise InvalidArgument('%d entity not the last area entity' % entity)
-                        group.lastarea = group.lastarea - 1
+                        if not force:
+                            if area.show_id != group.lastarea:
+                                raise InvalidArgument('%d entity not the last area entity' % entity)
+                            group.lastarea = group.lastarea - 1
                         session.flush()
                         session.delete(area)
                         session.flush()
@@ -1166,6 +1175,19 @@ class AppEntityReuest(BaseContorller):
             if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
                 raise RpcResultError('change entity opentime fail %s' % rpc_ret.get('result'))
         return resultutils.results(result='change entity %d opentime success' % entity)
+
+    def areas(self, req, group_id, objtype, entity, body=None):
+        """修改区服areas接口"""
+        body = body or {}
+        try:
+            group_id = int(group_id)
+            entity = int(entity)
+            area_id = int(body.get('area_id'))
+        except (TypeError, ValueError):
+            raise InvalidArgument('group or area or entity id error')
+        if objtype != common.GAMESERVER:
+            raise InvalidArgument('Api just for %s' % common.GAMESERVER)
+        raise InvalidArgument('Api is not OK')
 
     def _async_bluck_rpc(self, action, group_id, objtype, entity, body):
         caller = inspect.stack()[0][3]

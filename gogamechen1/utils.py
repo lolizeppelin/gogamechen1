@@ -3,7 +3,7 @@ import psutil
 
 from gogamechen1 import common
 
-regx = re.compile('^[a-z][a-z0-9]+$', re.IGNORECASE)
+regx = re.compile('^[a-z][a-z0-9-]+?[a-z0-9-]$', re.IGNORECASE)
 
 
 def find_process(procnames=None):
