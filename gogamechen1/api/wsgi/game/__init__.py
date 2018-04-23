@@ -492,7 +492,8 @@ class AppEntityReuest(BaseContorller):
                                               group_id=_entity.group_id,
                                               status=_entity.status,
                                               opentime=_entity.opentime,
-                                              areas=[area.area_id for area in _entity.areas],
+                                              areas=[dict(area_id=area.area_id, areaname=area.areaname)
+                                                     for area in _entity.areas],
                                               objtype=_entity.objtype) for _entity in query])
 
     def agents(self, req, objtype, body=None):
@@ -778,7 +779,7 @@ class AppEntityReuest(BaseContorller):
                                   entity, common.NAME, objtype=objtype,
                                   status=common.UNACTIVE,
                                   opentime=opentime,
-                                  group_id=group_id, areas=[next_area, ])
+                                  group_id=group_id, areas=[dict(area_id=next_area, areaname=areaname)])
             return resultutils.results(result='create %s entity success' % objtype,
                                        data=[_result, ])
 
