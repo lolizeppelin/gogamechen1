@@ -154,7 +154,7 @@ class Application(AppEndpointBase):
                     raise RuntimeError('App Entity %d Duplicate' % _entity)
                 LOG.info('Entity %d type %s, group %d' % (_entity, objtype, group_id))
                 self.konwn_appentitys.setdefault(_entity, dict(objtype=objtype,
-                                                               group_id=group_id,
+                                                               # group_id=group_id,
                                                                status=status,
                                                                areas=areas,
                                                                opentime=opentime,
@@ -515,7 +515,7 @@ class Application(AppEndpointBase):
         LOG.info('Get post create command with %s' % str(kwargs))
         try:
             self.konwn_appentitys.setdefault(entity, dict(objtype=kwargs.pop('objtype'),
-                                                          group_id=kwargs.pop('group_id'),
+                                                          # group_id=kwargs.pop('group_id'),
                                                           status=kwargs.pop('status'),
                                                           areas=kwargs.pop('areas'),
                                                           opentime=kwargs.pop('opentime'),
