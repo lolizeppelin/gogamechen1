@@ -770,7 +770,7 @@ class AppEntityReuest(BaseContorller):
                            ports=rpc_result.get('ports'),
                            databases=rpc_result.get('databases'))
             if objtype == common.GAMESERVER:
-                _result.setdefault('area_id', next_area)
+                _result.setdefault('areas', [dict(area_id=next_area, areaname=areaname)])
                 _result.setdefault('cross_id', cross_id)
                 _result.setdefault('opentime', opentime)
 
