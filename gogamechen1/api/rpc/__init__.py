@@ -93,7 +93,7 @@ def AsyncActionResult(action, stores):
         if not entity.get('areas'):
             areas = 'N/A'
         else:
-            areas = ['%d:%s' % (area.area_id, area.areaname) for area in entity.get('areas')]
+            areas = ['%d:%s' % (area.get('area_id'), area.get('areaname')) for area in entity.get('areas')]
             areas = ','.join(areas)
         if not entity.get('pid'):
             pid = 'N/A'
@@ -294,7 +294,7 @@ class Application(AppEndpointBase):
             opentime = gconfig.format_opentime(objtype, cfile, opentime) if not opentime else opentime
             confobj = gconfig.make(objtype, self.logpath(entity),
                                    self.manager.local_ip, ports,
-                                   entity, [area.area_id for area in areas],
+                                   entity, [area.get('area_id') for area in areas],
                                    databases, opentime, chiefs)
         except Exception:
             LOG.exception('flush config fail')
