@@ -93,7 +93,8 @@ def AsyncActionResult(action, stores):
         if not entity.get('areas'):
             areas = 'N/A'
         else:
-            areas = ','.join(map(str, entity.get('areas')))
+            areas = ['%d:%s' % (area.area_id, area.areaname) for area in entity.get('areas')]
+            areas = ','.join(areas)
         if not entity.get('pid'):
             pid = 'N/A'
         else:
@@ -193,13 +194,6 @@ class Application(AppEndpointBase):
     def _objtype(self, entity):
         return self.konwn_appentitys[entity].get('objtype')
 
-    def _prefix(self, entity, objtype=None):
-        if not objtype:
-            objtype = self._objtype(entity)
-        if objtype == common.GAMESERVER:
-            return ','.join(map(str, self.konwn_appentitys[entity].get('areas')))
-        else:
-            return '%s.%d' % (objtype, entity)
 
     def _objconf(self, entity, objtype=None):
         if not objtype:
@@ -300,7 +294,7 @@ class Application(AppEndpointBase):
             opentime = gconfig.format_opentime(objtype, cfile, opentime) if not opentime else opentime
             confobj = gconfig.make(objtype, self.logpath(entity),
                                    self.manager.local_ip, ports,
-                                   entity, areas,
+                                   entity, [area.area_id for area in areas],
                                    databases, opentime, chiefs)
         except Exception:
             LOG.exception('flush config fail')

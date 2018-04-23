@@ -129,7 +129,7 @@ class GroupReuest(BaseContorller):
             areas = column.get('areas', [])
             column['areas'] = []
             for area in areas:
-                column['areas'].append(area.area_id)
+                column['areas'].append(dict(area.area_id, areaname=area.areaname))
 
         return results
 
@@ -171,7 +171,8 @@ class GroupReuest(BaseContorller):
                 objtype = entity.objtype
                 entityinfo = dict(entity=entity.entity, status=entity.status)
                 if objtype == common.GAMESERVER:
-                    entityinfo.setdefault('areas', [area.area_id for area in entity.areas])
+                    entityinfo.setdefault('areas', [dict(area.area_id, areaname=area.areaname)
+                                                    for area in entity.areas])
                 try:
                     _entitys[objtype].append(entityinfo)
                 except KeyError:
