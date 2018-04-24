@@ -618,6 +618,7 @@ class PackageReuest(BaseContorller):
                         delresult = cdnquote_controller.delete(req, quote_id=package.rquote_id)['data'][0]
                         version_id = delresult.get('version_id')
                         LOG.info('Package remove defalut version %s, version id %d' % (package.rversion, version_id))
+                        package.rquote_id = None
                 package.rversion = rversion
             session.flush()
         return resultutils.results(result='Update package success')
