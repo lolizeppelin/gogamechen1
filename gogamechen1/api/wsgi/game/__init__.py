@@ -743,7 +743,6 @@ class AppEntityReuest(BaseContorller):
                     raise InvalidArgument(e.message)
                 entity = create_result.get('entity')
                 rpc_result = create_result.get('notify')
-                metadata = create_result.get('metadata')
                 LOG.info('Entity controller create rpc result %s' % str(rpc_result))
                 # 插入实体信息
                 appentity = AppEntity(entity=entity,
