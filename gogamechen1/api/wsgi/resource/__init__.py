@@ -249,8 +249,11 @@ class ObjtypeFileReuest(BaseContorller):
                     file_info = show_result['data'][0]
                     rpath = urlparse.urlparse(file_info['address']).path
                     filename = os.path.basename(rpath)
-                    cdnresource_controller.delete_file(req, resource_id,
-                                                       body=dict(filename=filename))
+                    try:
+                        cdnresource_controller.delete_file(req, resource_id,
+                                                           body=dict(filename=filename))
+                    except NoResultFound:
+                        LOG.error('Delete file from resource fail, resource disappeard')
                 else:
                     LOG.error('objfile %s can not be found from file controller')
         return file_controller.delete(req, objfile.md5)

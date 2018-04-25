@@ -247,7 +247,7 @@ class GroupReuest(BaseContorller):
         return resultutils.results(result='get group chiefs success',
                                    data=self._chiefs(group_ids, cross))
 
-    def _areas(self, group_id):
+    def _areas(self, group_id, need_ok=False):
         session = endpoint_session(readonly=True)
         query = model_query(session, AppEntity,
                             filter=and_(AppEntity.group_id == group_id,
@@ -260,12 +260,15 @@ class GroupReuest(BaseContorller):
         emaps = entity_controller.shows(common.NAME, entitys, ports=True, metadata=True)
         areas = []
         for appentity in appentitys:
+            if need_ok and appentity.status != common.OK:
+                continue
             for area in appentity.areas:
                 info = dict(area_id=area.area_id,
                             show_id=area.show_id,
                             areaname=area.areaname,
                             entity=appentity.entity,
                             opentime=appentity.opentime,
+                            status=appentity.status,
                             versions=jsonutils.loads_as_bytes(appentity.versions) if appentity.versions else None,
                             external_ips=emaps[appentity.entity]['metadata']['external_ips'],
                             dnsnames=emaps[appentity.entity]['metadata'].get('dnsnames'),
@@ -275,6 +278,7 @@ class GroupReuest(BaseContorller):
 
     def areas(self, req, group_id, body=None):
         body = body or {}
+        need_ok = body.get('need_ok', False)
         try:
             group_id = int(group_id)
         except (TypeError, ValueError):
@@ -282,7 +286,7 @@ class GroupReuest(BaseContorller):
         return resultutils.results(result='list group areas success',
                                    data=[dict(
                                        chiefs=self._chiefs([group_id], cross=body.get('cross', False)),
-                                       areas=self._areas(group_id))])
+                                       areas=self._areas(group_id, need_ok))])
 
     def packages(self, req, group_id, body=None):
         body = body or {}
