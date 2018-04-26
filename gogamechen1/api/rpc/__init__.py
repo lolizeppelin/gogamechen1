@@ -295,7 +295,7 @@ class Application(AppEndpointBase):
             opentime = gconfig.format_opentime(objtype, cfile, opentime) if not opentime else opentime
             confobj = gconfig.make(objtype, self.logpath(entity),
                                    self.manager.local_ip, ports,
-                                   entity, [area.get('area_id') for area in areas],
+                                   entity, areas,
                                    databases, opentime, chiefs)
         except Exception:
             LOG.exception('flush config fail')
