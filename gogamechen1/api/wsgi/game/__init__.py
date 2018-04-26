@@ -43,6 +43,7 @@ from goperation.manager.exceptions import CacheStoneError
 from goperation.manager.utils import resultutils
 from goperation.manager.utils import targetutils
 from goperation.manager.wsgi.contorller import BaseContorller
+from goperation.manager.wsgi.port.controller import PortReuest
 from goperation.manager.wsgi.entity.controller import EntityReuest
 from goperation.manager.wsgi.exceptions import RpcPrepareError
 from goperation.manager.wsgi.exceptions import RpcResultError
@@ -80,6 +81,7 @@ FAULT_MAP = {InvalidArgument: webob.exc.HTTPClientError,
              MultipleResultsFound: webob.exc.HTTPInternalServerError,
              }
 
+port_controller = PortReuest()
 entity_controller = EntityReuest()
 schema_controller = SchemaReuest()
 database_controller = DatabaseReuest()
@@ -777,6 +779,7 @@ class AppEntityReuest(BaseContorller):
                            connection=rpc_result.get('connection'),
                            ports=rpc_result.get('ports'),
                            databases=rpc_result.get('databases'))
+
             areas = []
             if objtype == common.GAMESERVER:
                 areas = [dict(area_id=gamearea.area_id, show_id=gamearea.show_id, areaname=areaname)]
@@ -784,6 +787,10 @@ class AppEntityReuest(BaseContorller):
                 _result.setdefault('cross_id', cross_id)
                 _result.setdefault('opentime', opentime)
 
+            # 添加端口
+            threadpool.add_thread(port_controller.unsafe_create,
+                                  agent_id, common.NAME, entity, rpc_result.get('ports'))
+            # agent 后续通知
             threadpool.add_thread(entity_controller.post_create_entity,
                                   entity, common.NAME, objtype=objtype,
                                   status=common.UNACTIVE,

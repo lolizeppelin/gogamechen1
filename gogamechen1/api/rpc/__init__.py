@@ -444,16 +444,27 @@ class Application(AppEndpointBase):
                         raise RpcEntityError(endpoint=common.NAME, entity=entity,
                                              reason=str(middleware))
 
-                    def _ports_notify():
-                        """notify port bond"""
-                        eventlet.sleep(0)
-                        with self.lock(entity, timeout=15):
-                            try:
-                                self.client.ports_add(agent_id=self.manager.agent_id,
-                                                      endpoint=common.NAME, entity=entity, ports=ports)
-                            except Exception:
-                                LOG.error('Bond ports for %d fail')
-                                self._free_ports(entity)
+                    # def _ports_notify():
+                    #     """notify port bond  作废接口"""
+                    #     eventlet.sleep(0)
+                    #     with self.lock(entity, timeout=15):
+                    #         try:
+                    #             self.client.ports_add(agent_id=self.manager.agent_id,
+                    #                                   endpoint=common.NAME, entity=entity, ports=ports)
+                    #         except Exception:
+                    #             LOG.error('Bond ports for %d fail')
+                    #             self._free_ports(entity)
+                    #
+                    # def database_notity():
+                    #     """作废接口"""
+                    #     LOG.debug('Try bond database for %s.%d' % (objtype, entity))
+                    #     try:
+                    #         self.client.bondto(entity, middleware.databases)
+                    #     except Exception:
+                    #         LOG.error('Notify bond database info fail')
+                    #         LOG.error('Fail for %d %s' % (entity, str(databases)))
+                    #         raise
+                    #     LOG.info('Try bond database success, flush config')
 
                     def _extract_wait():
                         middleware.waiter.wait()
@@ -486,18 +497,10 @@ class Application(AppEndpointBase):
                         opentime = self.konwn_appentitys[entity].get('opentime')
                         self.flush_config(entity, middleware.databases, opentime, chiefs)
 
-                    # def database_notity():
-                    #     LOG.debug('Try bond database for %s.%d' % (objtype, entity))
-                    #     try:
-                    #         self.client.bondto(entity, middleware.databases)
-                    #     except Exception:
-                    #         LOG.error('Notify bond database info fail')
-                    #         LOG.error('Fail for %d %s' % (entity, str(databases)))
-                    #         raise
-                    #     LOG.info('Try bond database success, flush config')
-
-                    # 端口占用申请
-                    threadpool.add_thread(_ports_notify)
+                    # 数据库绑定申请,现由前端完成
+                    # threadpool.add_thread(database_notity)
+                    # 端口占用申请,现由前端完成
+                    # threadpool.add_thread(_ports_notify)
                     # 等待解压完成
                     threadpool.add_thread(_extract_wait)
                     # 生成配置文件
