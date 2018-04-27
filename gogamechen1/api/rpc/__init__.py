@@ -686,7 +686,7 @@ class Application(AppEndpointBase):
             else:
                 # 写入PID
                 results = detail['result'].split('|')
-                results[2] = str(self.konwn_appentitys[entity]['pid'])
+                results[1] = str(self.konwn_appentitys[entity]['pid'])
                 detail['result'] = '|'.join(results)
             responsed_entitys.add(entity)
 
@@ -744,7 +744,7 @@ class Application(AppEndpointBase):
             # 确认entity进程
             if not self._entity_process(entity, proc_snapshot_after):
                 results = detail['result'].split('|')
-                results[2] = 'N/A'
+                results[1] = 'N/A'
                 detail['result'] = '|'.join(results)
             else:
                 detail.update(formater(entity, manager_common.RESULT_ERROR,

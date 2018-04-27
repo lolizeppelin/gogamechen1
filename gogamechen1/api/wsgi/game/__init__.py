@@ -1097,7 +1097,7 @@ class AppEntityReuest(BaseContorller):
                                                                  body={'quotes': True})['data'][0]
                             quotes = {}
                             for _quote in schema_info['quotes']:
-                                quotes[_quote.quote_id] = _quote.desc
+                                quotes[_quote.get('quote_id')] = _quote.get('desc')
                             if _database.quote_id not in quotes.keys():
                                 # if set(quotes) != set([_database.quote_id]):
                                 result = 'delete %s:%d fail' % (objtype, entity)
@@ -1109,6 +1109,12 @@ class AppEntityReuest(BaseContorller):
                                 if quotes[quote_id] in ignores:
                                     quotes.pop(quote_id, None)
                             if quotes:
+                                if LOG.isEnabedFor(logging.DEBUG):
+                                    LOG.debug('quotes not match for %d: %s' % (schema_info['schema_id'],
+                                                                               schema))
+                                    for quote_id in quotes.keys():
+                                        LOG.debug('quote %d: %s exist' % (quote_id, quotes[quote_id]))
+                                    LOG.debug('Can not delete schema before delete quotes')
                                 return resultutils.results(result='Quotes not match',
                                                            resultcode=manager_common.RESULT_ERROR)
                             LOG.info('Databae quotes check success for %s' % schema)
