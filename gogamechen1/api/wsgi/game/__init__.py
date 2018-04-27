@@ -1046,10 +1046,13 @@ class AppEntityReuest(BaseContorller):
         """彻底删除entity"""
         body = body or {}
         action = body.pop('clean', 'unquote')
-        force = body.pop('force', False)
+        force = False
         ignores = body.pop('ignores', [])
-        if action not in ('delete', 'unquote'):
+        if action not in ('delete', 'unquote', 'force'):
             raise InvalidArgument('clean option value error')
+        if action == 'force':
+            action = 'delete'
+            force = True
         group_id = int(group_id)
         entity = int(entity)
         session = endpoint_session()
@@ -1086,18 +1089,29 @@ class AppEntityReuest(BaseContorller):
                 # esure database delete
                 if action == 'delete':
                     LOG.warning('Clean option is delete, can not rollback when fail')
-                    for _database in _entity.databases:
-                        schema = '%s_%s_%s_%d' % (common.NAME, objtype, _database.subtype, entity)
-                        quotes = schema_controller.show(req=req, database_id=_database.database_id,
-                                                        schema=schema,
-                                                        body={'quotes': True})['data'][0]['quotes']
-                        if _database.quote_id not in quotes:
-                            # if set(quotes) != set([_database.quote_id]):
-                            result = 'delete %s:%d fail' % (objtype, entity)
-                            reason = ': database [%d].%s quote: %s' % (_database.database_id, schema, str(quotes))
-                            return resultutils.results(result=(result + reason),
-                                                       resultcode=manager_common.RESULT_ERROR)
-                        LOG.info('Delete quotes check success for %s' % schema)
+                    if not force:
+                        for _database in _entity.databases:
+                            schema = '%s_%s_%s_%d' % (common.NAME, objtype, _database.subtype, entity)
+                            schema_info = schema_controller.show(req=req, database_id=_database.database_id,
+                                                                 schema=schema,
+                                                                 body={'quotes': True})['data'][0]
+                            quotes = {}
+                            for _quote in schema_info['quotes']:
+                                quotes[_quote.quote_id] = _quote.desc
+                            if _database.quote_id not in quotes.keys():
+                                # if set(quotes) != set([_database.quote_id]):
+                                result = 'delete %s:%d fail' % (objtype, entity)
+                                reason = ': database [%d].%s quote: %s' % (_database.database_id, schema, str(quotes))
+                                return resultutils.results(result=(result + reason),
+                                                           resultcode=manager_common.RESULT_ERROR)
+                            quotes.pop(_database.quote_id)
+                            for quote_id in quotes.keys():
+                                if quotes[quote_id] in ignores:
+                                    quotes.pop(quote_id, None)
+                            if quotes:
+                                return resultutils.results(result='Quotes not match',
+                                                           resultcode=manager_common.RESULT_ERROR)
+                            LOG.info('Databae quotes check success for %s' % schema)
                 # clean database
                 rollbacks = []
                 for _database in _entity.databases:
