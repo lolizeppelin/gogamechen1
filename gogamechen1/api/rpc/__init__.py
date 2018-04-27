@@ -748,7 +748,7 @@ class Application(AppEndpointBase):
                 detail['result'] = '|'.join(results)
             else:
                 detail.update(formater(entity, manager_common.RESULT_ERROR,
-                                       'stop entity %d fail, process still exist'))
+                                       'stop entity %d fail, process still exist' % entity))
             responsed_entitys.add(entity)
 
         for no_response_entity in (entitys - responsed_entitys):
