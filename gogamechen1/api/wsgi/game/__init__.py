@@ -1046,6 +1046,7 @@ class AppEntityReuest(BaseContorller):
         """彻底删除entity"""
         body = body or {}
         action = body.pop('clean', 'unquote')
+        force = body.pop('force', False)
         if action not in ('delete', 'unquote'):
             raise InvalidArgument('clean option value error')
         group_id = int(group_id)
@@ -1088,7 +1089,8 @@ class AppEntityReuest(BaseContorller):
                         schema = '%s_%s_%s_%d' % (common.NAME, objtype, _database.subtype, entity)
                         quotes = schema_controller.show(req=req, database_id=_database.database_id,
                                                         schema=schema,
-                                                        body={'quotes': True})['data'][0]['quotes']
+                                                        body={'quotes': True,
+                                                              'force': force})['data'][0]['quotes']
                         if _database.quote_id not in quotes:
                             # if set(quotes) != set([_database.quote_id]):
                             result = 'delete %s:%d fail' % (objtype, entity)
