@@ -4,7 +4,7 @@ import time
 import requests
 import inspect
 import functools
-import contextlib
+# import contextlib
 import eventlet
 import webob.exc
 from six.moves import zip
@@ -49,7 +49,7 @@ from goperation.manager.wsgi.exceptions import RpcPrepareError
 from goperation.manager.wsgi.exceptions import RpcResultError
 
 from gopdb import common as dbcommon
-from gopdb.api.wsgi.exceptions import GopdbError
+from gopdb.api.exceptions import GopdbError
 from gopdb.api.wsgi.controller import SchemaReuest
 from gopdb.api.wsgi.controller import DatabaseReuest
 
