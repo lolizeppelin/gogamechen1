@@ -416,7 +416,6 @@ class AppEntityReuest(BaseContorller):
             {'left': -500},
             {'process': None}]
         chioces = self.chioces(common.NAME, includes=includes, weighters=weighters)
-        LOG.debug('Auto select agent %d' % chioces[0])
         return chioces
 
     def _db_chioces(self, req, objtype, **kwargs):
@@ -453,6 +452,7 @@ class AppEntityReuest(BaseContorller):
         chioces = self._agent_chioces(req, objtype, **kwargs)
         if not chioces:
             raise InvalidArgument('Auto select agent fail')
+        LOG.debug('Auto select agent %d' % chioces[0])
         return chioces[0]
 
     def databases(self, req, objtype, body=None):
