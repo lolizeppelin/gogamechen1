@@ -195,7 +195,6 @@ class Application(AppEndpointBase):
     def _objtype(self, entity):
         return self.konwn_appentitys[entity].get('objtype')
 
-
     def _objconf(self, entity, objtype=None):
         if not objtype:
             objtype = self._objtype(entity)
