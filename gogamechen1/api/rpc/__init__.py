@@ -468,6 +468,7 @@ class Application(AppEndpointBase):
                     def _extract_wait():
                         middleware.waiter.wait()
                         middleware.waiter = None
+                        self.manager.change_performance()
 
                     def _config_wait():
                         overtime = int(time.time()) + timeout
@@ -508,7 +509,6 @@ class Application(AppEndpointBase):
 
         resultcode = manager_common.RESULT_SUCCESS
         result = 'create %s success' % objtype
-
         return CreateResult(agent_id=self.manager.agent_id, ctxt=ctxt,
                             resultcode=resultcode, result=result,
                             connection=self.manager.local_ip,
@@ -605,6 +605,7 @@ class Application(AppEndpointBase):
                 resultcode = manager_common.RESULT_ERROR
                 result = 'delete %d fail with %s:%s' % (entity, e.__class__.__name__,
                                                         str(e.message) if hasattr(e, 'message') else 'unknown err msg')
+        self.manager.change_performance()
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           ctxt=ctxt,
                                           resultcode=resultcode,
