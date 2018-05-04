@@ -378,6 +378,18 @@ class AppEntityReuest(BaseContorller):
                    'finishtime': {'type': 'integer', 'description': '异步请求完成时间'}}
                }
 
+    FLUSH = {'type': 'object',
+             'properties': {
+                 common.GMSERVER: {'type': 'integer', 'minimum': 0,
+                                   'description': 'GM服务器位置更新, 区服专用参数'},
+                 common.CROSSSERVER: {'type': 'integer', 'minimum': 0,
+                                      'description': '战场服务器位置更新, 区服专用参数'},
+                 'opentime': {'type': 'integer', 'minimum': 0,
+                              'description': '游戏服开服时间, 区服专用参数'},
+                 'force': {'type': 'boolean',
+                           'description': '忽略运行状态'}}
+             }
+
     @staticmethod
     def _validate_databases(objtype, databases):
         NEEDED = common.DBAFFINITYS[objtype].keys()
@@ -1352,28 +1364,48 @@ class AppEntityReuest(BaseContorller):
 
     def flushconfig(self, req, group_id, objtype, entity, body=None):
         body = body or {}
-        body.pop('opentime', None)
-        body.pop('chiefs', None)
+        jsonutils.schema_validate(body, self.FLUSH)
         if objtype == common.GAMESERVER:
-            gm = body.pop(common.GMSERVER, False)
-            if gm:
+            gm = body.pop(common.GMSERVER, 0)
+            cross = body.pop(common.CROSSSERVER, 0)
+            entitys = []
+            if gm: entitys.append(gm)
+            if cross: entitys.append(cross)
+            entitys = list(set(entitys))
+            if entitys:
                 chiefs = {}
                 session = endpoint_session()
                 query = model_query(session, AppEntity,
                                     filter=and_(AppEntity.group_id == group_id,
-                                                AppEntity.objtype == common.GMSERVER))
-                gm = query.one()
-                # query = model_query(session, (AppEntity.cross_id, func.count(AppEntity.cross_id)),
-                #                     filter=and_(AppEntity.group_id == group_id,
-                #                                 AppEntity.objtype == common.GMSERVER))
-                # query.group_by(AppEntity.cross_id).order_by(func.count(AppEntity.cross_id))
+                                                AppEntity.entity.in_(entitys)))
+                gmsvr = crosssvr = None
+                for appserver in query:
+                    if appserver.group_id != group_id:
+                        raise InvalidArgument('Entity group value error')
+                    if appserver.objtype == common.GMSERVER:
+                        if appserver.entity != gm:
+                            raise InvalidArgument('Find %s but entity is %d' % (common.GMSERVER, gm))
+                        gmsvr = appserver
+                    elif appserver.objtype == common.CROSSSERVER:
+                        if appserver.entity != cross:
+                            raise InvalidArgument('Find %s but entity is %d' % (common.CROSSSERVER, cross))
+                        crosssvr = appserver
+                if gm and not gmsvr: raise InvalidArgument('%s.%d can not be found' % (common.GMSERVER, gm))
+                if cross and not crosssvr: raise InvalidArgument('%s.%d can not be found' % (common.CROSSSERVER, cross))
                 # 获取实体相关服务器信息(端口/ip)
-                maps = entity_controller.shows(endpoint=common.NAME, entitys=[gm.entity])
-                chiefs.setdefault(common.GMSERVER,
-                                  dict(entity=gm.entity,
-                                       ports=maps.get(gm.entity).get('ports'),
-                                       local_ip=maps.get(gm.entity).get('metadata').get('local_ip')
-                                       ))
+                maps = entity_controller.shows(endpoint=common.NAME, entitys=entitys)
+                if gmsvr:
+                    chiefs.setdefault(common.GMSERVER,
+                                      dict(entity=gmsvr.entity,
+                                           ports=maps.get(gmsvr.entity).get('ports'),
+                                           local_ip=maps.get(gmsvr.entity).get('metadata').get('local_ip')
+                                           ))
+                if crosssvr:
+                    chiefs.setdefault(common.CROSSSERVER,
+                                      dict(entity=crosssvr.entity,
+                                           ports=maps.get(crosssvr.entity).get('ports'),
+                                           local_ip=maps.get(crosssvr.entity).get('metadata').get('local_ip')
+                                           ))
                 body.update({'chiefs': chiefs})
         return self._async_bluck_rpc('flushconfig', group_id, objtype, entity, body)
 

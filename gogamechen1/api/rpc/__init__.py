@@ -852,6 +852,7 @@ class Application(AppEndpointBase):
 
     def rpc_flushconfig_entitys(self, ctxt, entitys, **kwargs):
         entitys = argutils.map_to_int(entitys) & set(self.entitys)
+        force = kwargs.pop('force', False)
         if not entitys:
             return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                               resultcode=manager_common.RESULT_ERROR,
@@ -863,7 +864,7 @@ class Application(AppEndpointBase):
         proc_snapshot_before = utils.find_process()
         with self.locks(entitys):
             for entity in entitys:
-                if self._entity_process(entity, proc_snapshot_before):
+                if not force and self._entity_process(entity, proc_snapshot_before):
                     for __entity in entitys:
                         details.append(formater(__entity, manager_common.RESULT_ERROR,
                                                 'flushconfig entity not executed, some entity is running'))
@@ -873,7 +874,6 @@ class Application(AppEndpointBase):
                                                       result='flushconfig entity fail, entity %d running' % entity,
                                                       details=details)
             for entity in entitys:
-                objtype = self._objtype(entity)
                 try:
                     self.flush_config(entity, opentime=kwargs.get('opentime'),
                                       chiefs=kwargs.get('chiefs'))
