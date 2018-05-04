@@ -1369,8 +1369,10 @@ class AppEntityReuest(BaseContorller):
             gm = body.pop(common.GMSERVER, 0)
             cross = body.pop(common.CROSSSERVER, 0)
             entitys = []
-            if gm: entitys.append(gm)
-            if cross: entitys.append(cross)
+            if gm:
+                entitys.append(gm)
+            if cross:
+                entitys.append(cross)
             entitys = list(set(entitys))
             if entitys:
                 chiefs = {}
@@ -1390,8 +1392,10 @@ class AppEntityReuest(BaseContorller):
                         if appserver.entity != cross:
                             raise InvalidArgument('Find %s but entity is %d' % (common.CROSSSERVER, cross))
                         crosssvr = appserver
-                if gm and not gmsvr: raise InvalidArgument('%s.%d can not be found' % (common.GMSERVER, gm))
-                if cross and not crosssvr: raise InvalidArgument('%s.%d can not be found' % (common.CROSSSERVER, cross))
+                if gm and not gmsvr:
+                    raise InvalidArgument('%s.%d can not be found' % (common.GMSERVER, gm))
+                if cross and not crosssvr:
+                    raise InvalidArgument('%s.%d can not be found' % (common.CROSSSERVER, cross))
                 # 获取实体相关服务器信息(端口/ip)
                 maps = entity_controller.shows(endpoint=common.NAME, entitys=entitys)
                 if gmsvr:
