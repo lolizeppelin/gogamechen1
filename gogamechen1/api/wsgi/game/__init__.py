@@ -219,6 +219,7 @@ class GroupReuest(BaseContorller):
         areaname = body.get('areaname')
         if not areaname and not show_id:
             raise InvalidArgument('No value change')
+        rpc = get_client()
         session = endpoint_session()
         query = model_query(session, GameArea, filter=GameArea.area_id == area_id)
         with session.begin():
@@ -227,6 +228,13 @@ class GroupReuest(BaseContorller):
                 raise InvalidArgument('No area found')
             if area.group_id != group_id:
                 raise InvalidArgument('Area group not %d' % group_id)
+            entityinfo = entity_controller.show(req=req, entity=area.entity,
+                                                endpoint=common.NAME,
+                                                body={'ports': False})['data'][0]
+            agent_id = entityinfo['agent_id']
+            metadata = entityinfo['metadata']
+            if not metadata:
+                raise InvalidArgument('Agent is off line, can not reset entity')
             if areaname:
                 if model_count_with_key(session, GameArea,
                                         filter=and_(GameArea.group_id == group_id,
@@ -235,6 +243,20 @@ class GroupReuest(BaseContorller):
                 area.areaname = areaname
             if show_id:
                 area.show_id = show_id
+            target = targetutils.target_agent_by_string(metadata.get('agent_type'), metadata.get('host'))
+            target.namespace = common.NAME
+            finishtime, timeout = rpcfinishtime()
+            rpc_ret = rpc.call(target, ctxt={'finishtime': finishtime, 'agents': [agent_id, ]},
+                               msg={'method': 'change_entity_area',
+                                    'args': dict(entity=area.entity,
+                                                 area_id=area.area_id,
+                                                 show_id=area.show_id,
+                                                 areaname=area.areaname)},
+                               timeout=timeout)
+            if not rpc_ret:
+                raise RpcResultError('change entity area result is None')
+            if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
+                raise RpcResultError('change entity area fail %s' % rpc_ret.get('result'))
             session.flush()
         return resultutils.results(result='change group areas success')
 

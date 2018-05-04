@@ -521,7 +521,7 @@ class Application(AppEndpointBase):
                                                           # group_id=kwargs.pop('group_id'),
                                                           status=kwargs.pop('status'),
                                                           areas=kwargs.pop('areas'),
-                                                          opentime=kwargs.pop('opentime'),
+                                                          opentime=kwargs.pop('opentime', None),
                                                           pid=None))
         except KeyError:
             LOG.error('Fail setdefault for entity by KeyError')
@@ -624,6 +624,29 @@ class Application(AppEndpointBase):
                                           resultcode=manager_common.RESULT_SUCCESS,
                                           ctxt=ctxt,
                                           result='change entity opentime success')
+
+    def rpc_change_entity_area(self, ctxt, entity, area_id, show_id, areaname, **kwargs):
+        entity = int(entity)
+        timeout = count_timeout(ctxt, kwargs)
+        while self.frozen:
+            if timeout < 1:
+                raise RpcTargetLockException(self.namespace, str(entity), 'endpoint locked')
+            eventlet.sleep(1)
+            timeout -= 1
+        timeout = min(1, timeout)
+        with self.lock(entity, timeout):
+            if entity not in set(self.entitys):
+                return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                                  resultcode=manager_common.RESULT_ERROR,
+                                                  ctxt=ctxt, result='change entity area fail, entity not exist')
+            areas = self.konwn_appentitys[entity].get('areas')
+            for area in areas:
+                if area.get('area_id') == area_id:
+                    area['show_id'] = show_id
+                    area['areaname'] = areaname
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          ctxt=ctxt,
+                                          result='change entity area info success')
 
     def rpc_change_status(self, ctxt, entity, status, **kwargs):
         if entity not in set(self.entitys):
