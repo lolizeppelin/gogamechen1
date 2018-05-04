@@ -125,6 +125,14 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
+    def group_area(self, group_id, body=None):
+        resp, results = self.get(action=self.group_path_ex % (str(group_id), 'area'), body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='change gogamechen1 group area fail:%d' % results['resultcode'],
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
     def group_maps(self, group_id, body=None):
         resp, results = self.get(action=self.group_path_ex % (str(group_id), 'maps'), body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:

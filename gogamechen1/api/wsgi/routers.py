@@ -85,6 +85,7 @@ class Routers(router.RoutersBase):
         collection.member.link('chiefs', method='GET')
         collection.member.link('areas', method='GET')
         collection.member.link('packages', method='GET')
+        collection.member.link('area', method='PUT')
         # collection.member.link('stop', method='POST')
         # collection.member.link('status', method='GET')
         # collection.member.link('upgrade', method='POST')
@@ -101,8 +102,8 @@ class Routers(router.RoutersBase):
                            post_action='bondto')
 
         self._add_resource(mapper, game_controller,
-                   path='/%s/entitys' % common.NAME,
-                   get_action='entitys')
+                           path='/%s/entitys' % common.NAME,
+                           get_action='entitys')
 
         self._add_resource(mapper, game_controller,
                            path='/%s/{objtype}/databases' % common.NAME,

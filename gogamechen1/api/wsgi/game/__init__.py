@@ -105,6 +105,13 @@ def areas_map(group_id):
 
 @singleton.singleton
 class GroupReuest(BaseContorller):
+    AREA = {'type': 'object',
+            'required': ['area_id'],
+            'properties': {
+                'area_id': {'type': 'integer', 'minimum': 1, 'description': '游戏区服ID'},
+                'show_id': {'type': 'integer', 'minimum': 1, 'description': '游戏区服显示ID'},
+                'areaname': {'type': 'string', 'description': '游戏区服显示名称'}}
+            }
 
     def index(self, req, body=None):
         body = body or {}
@@ -200,6 +207,36 @@ class GroupReuest(BaseContorller):
         session.flush()
         return resultutils.results(result='delete group success',
                                    data=[deleted])
+
+    def area(self, req, group_id, body=None):
+        body = body or {}
+        try:
+            group_id = int(group_id)
+        except (TypeError, ValueError):
+            raise InvalidArgument('Group id value error')
+        area_id = body.get('area_id')
+        show_id = body.get('show_id')
+        areaname = body.get('areaname')
+        if not areaname and not show_id:
+            raise InvalidArgument('No value change')
+        session = endpoint_session()
+        query = model_query(session, GameArea, filter=GameArea.area_id == area_id)
+        with session.begin():
+            area = query.one_or_none()
+            if not area:
+                raise InvalidArgument('No area found')
+            if area.group_id != group_id:
+                raise InvalidArgument('Area group not %d' % group_id)
+            if areaname:
+                if model_count_with_key(session, GameArea,
+                                        filter=and_(GameArea.group_id == group_id,
+                                                    GameArea.areaname == areaname)):
+                    raise InvalidArgument('Area name duplicate in group %d' % group_id)
+                area.areaname = areaname
+            if show_id:
+                area.show_id = show_id
+            session.flush()
+        return resultutils.results(result='change group areas success')
 
     def maps(self, req, group_id, body=None):
         body = body or {}
@@ -542,21 +579,21 @@ class AppEntityReuest(BaseContorller):
                    AppEntity.objtype]
 
         def _areas():
-            maps = {}
+            _maps = {}
             if objtype != common.GAMESERVER:
-                return maps
+                return _maps
             query = model_query(session, GameArea, filter=GameArea.group_id == group_id)
             for _area in query:
                 try:
-                    maps[_area.entity].append(dict(area_id=_area.area_id,
-                                                   show_id=_area.show_id,
-                                                   areaname=_area.areaname))
+                    _maps[_area.entity].append(dict(area_id=_area.area_id,
+                                                    show_id=_area.show_id,
+                                                    areaname=_area.areaname))
                 except KeyError:
-                    maps[_area.entity] = [dict(area_id=_area.area_id,
-                                               show_id=_area.show_id,
-                                               areaname=_area.areaname), ]
+                    _maps[_area.entity] = [dict(area_id=_area.area_id,
+                                                show_id=_area.show_id,
+                                                areaname=_area.areaname), ]
             # session.close()
-            return maps
+            return _maps
 
         th = eventlet.spawn(_areas)
 
