@@ -12,7 +12,6 @@ REGEXPASS = re.compile('^%s$' % common.REGEXPASS)
 agent_opts = [
     cfg.IntOpt('agent_affinity',
                choices=[1, 2, 3, 4, 5, 6, 7],
-               required=True,
                default=1,
                help='agent appcaclition affinity bitwise, '
                     '[gamesvr:1] [publicsvr:2] [gmsvr:4] '
@@ -35,7 +34,6 @@ datadb_opts = [
                # regex=REGEXUSER,
                help='data db rw user name'),
     cfg.StrOpt('datadb_passwd',
-               required=True,
                # regex=REGEXPASS,
                secret=True,
                help='data db rw user passwd'),
@@ -44,7 +42,6 @@ datadb_opts = [
                help='data db ro user name'),
     cfg.StrOpt('datadb_ro_passwd',
                # regex=REGEXPASS,
-               required=True,
                secret=True,
                help='data db ro user passwd'),
 ]
@@ -56,7 +53,6 @@ logdb_opts = [
                help='logdb db rw user name'),
     cfg.StrOpt('logdb_passwd',
                # regex=REGEXPASS,
-               required=True,
                secret=True,
                help='logdb db rw user passwd'),
     cfg.StrOpt('logdb_ro_user',
@@ -64,7 +60,6 @@ logdb_opts = [
                help='logdb db ro user name'),
     cfg.StrOpt('logdb_ro_passwd',
                # regex=REGEXPASS,
-               required=True,
                secret=True,
                help='logdb db ro user passwd'),
 ]
