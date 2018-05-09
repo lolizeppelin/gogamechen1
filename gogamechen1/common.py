@@ -12,9 +12,11 @@ DATADB = 'datadb'
 LOGDB = 'logdb'
 APPFILE = 'appfile'
 
+DELETED = -2
 UNACTIVE = -1
 OK = 0
-DELETED = -2
+MERGEING = 1
+MERGEED = 2
 
 POSTS_COUNT = {
     GAMESERVER: 2,

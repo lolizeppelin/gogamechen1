@@ -934,6 +934,9 @@ class AppEntityReuest(BaseContorller):
         if _entity.status == common.DELETED:
             return resultutils.results(resultcode=manager_common.RESULT_ERROR,
                                        result='%s entity has been deleted' % objtype)
+        if _entity.status == common.MERGEING:
+            return resultutils.results(resultcode=manager_common.RESULT_ERROR,
+                                       result='%s entity ' % objtype)
         if _entity.objtype != objtype:
             raise InvalidArgument('Objtype not match')
         if _entity.group_id != group_id:
@@ -1180,7 +1183,7 @@ class AppEntityReuest(BaseContorller):
                                 if quotes[quote_id] in ignores:
                                     quotes.pop(quote_id, None)
                             if quotes:
-                                if LOG.isEnabedFor(logging.DEBUG):
+                                if LOG.isEnabledFor(logging.DEBUG):
                                     LOG.debug('quotes not match for %d: %s' % (schema_info['schema_id'],
                                                                                schema))
                                     for quote_id in quotes.keys():
@@ -1280,18 +1283,8 @@ class AppEntityReuest(BaseContorller):
                 raise RpcResultError('change entity opentime fail %s' % rpc_ret.get('result'))
         return resultutils.results(result='change entity %d opentime success' % entity)
 
-    def areas(self, req, group_id, objtype, entity, body=None):
-        """修改区服areas接口"""
-        body = body or {}
-        try:
-            group_id = int(group_id)
-            entity = int(entity)
-            area_id = int(body.get('area_id'))
-        except (TypeError, ValueError):
-            raise InvalidArgument('group or area or entity id error')
-        if objtype != common.GAMESERVER:
-            raise InvalidArgument('Api just for %s' % common.GAMESERVER)
-        raise InvalidArgument('Api is not OK')
+    def swallow(self, req, group_id, objtype, entity, body=None):
+        raise NotImplementedError
 
     def _async_bluck_rpc(self, action, group_id, objtype, entity, body):
         caller = inspect.stack()[0][3]

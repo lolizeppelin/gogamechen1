@@ -181,3 +181,10 @@ class Group(TableBase):
         sa.UniqueConstraint('name', name='group_unique'),
         InnoDBTableBase.__table_args__
     )
+
+
+class MergeHistory(TableBase):
+    entity = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
+    status = sa.Column(TINYINT(64), nullable=False, default=common.MERGEING)
+    areas = sa.Column(BLOB, nullable=False)
+    databases = sa.Column(BLOB, nullable=False)
