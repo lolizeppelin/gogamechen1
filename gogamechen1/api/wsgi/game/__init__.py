@@ -1000,9 +1000,10 @@ class AppEntityReuest(BaseContorller):
             str_key = str(package_id)
             if str_key in versions:
                 quote = versions.get(str_key)
-                body = {'version': rversion}
-                quote.update(body)
-                cdnquote_controller.update(req, quote.get('quote_id'), body=body)
+                if quote.get('version') != rversion:
+                    body = {'version': rversion}
+                    quote.update(body)
+                    cdnquote_controller.update(req, quote.get('quote_id'), body=body)
             else:
                 qresult = cdnresource_controller.vquote(req, resource_id,
                                                         body={'version': rversion,
