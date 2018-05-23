@@ -1,0 +1,285 @@
+# -*- coding:utf-8 -*-
+import time
+
+from sqlalchemy.orm import joinedload
+from sqlalchemy.sql import and_
+
+from simpleutil.common.exceptions import InvalidArgument
+from simpleutil.log import log as logging
+from simpleutil.utils import jsonutils
+from simpleutil.utils import argutils
+from simpleutil.utils import uuidutils
+from simpleutil.config import cfg
+
+from simpleservice.ormdb.api import model_query
+
+from goperation import threadpool
+from goperation.manager.api import rpcfinishtime
+from goperation.manager.utils import resultutils
+from goperation.manager.wsgi.port.controller import PortReuest
+from goperation.manager.wsgi.entity.controller import EntityReuest
+from goperation.manager.wsgi.exceptions import RpcResultError
+
+from gopdb.api.wsgi.controller import SchemaReuest
+from gopdb.api.wsgi.controller import DatabaseReuest
+
+from gopcdn.api.wsgi.resource import CdnQuoteRequest
+from gopcdn.api.wsgi.resource import CdnResourceReuest
+
+from gogamechen1 import common
+from gogamechen1.api import get_gamelock
+from gogamechen1.api import endpoint_session
+
+from gogamechen1.models import AppEntity
+from gogamechen1.models import MergeTask
+from gogamechen1.models import MergeEntity
+
+from .base import AppEntityReuestBase
+
+LOG = logging.getLogger(__name__)
+
+port_controller = PortReuest()
+entity_controller = EntityReuest()
+schema_controller = SchemaReuest()
+database_controller = DatabaseReuest()
+cdnquote_controller = CdnQuoteRequest()
+cdnresource_controller = CdnResourceReuest()
+
+CONF = cfg.CONF
+
+
+class AppEntityInternalReuest(AppEntityReuestBase):
+    """async ext function"""
+
+    MERGEAPPENTITYS = {'type': 'object',
+                       'required': [common.APPFILE],
+                       'properties': {
+                           common.APPFILE: {'type': 'string', 'format': 'md5',
+                                            'description': '程序文件md5'},
+                           'agent_id': {'type': 'integer', 'minimum': 1,
+                                        'description': '合并后程序运行服务器,不填自动分配'},
+                           'zone': {'type': 'string', 'description': '自动分配的安装区域,默认zone为all'},
+                           'opentime': {'type': 'integer', 'minimum': 1514736000,
+                                        'description': '合并后的开服时间'},
+                           'cross_id': {'type': 'integer', 'minimum': 1,
+                                        'description': '合并后对应跨服程序的实体id'},
+                           'group_id': {'type': 'integer', 'minimum': 1,
+                                        'description': '区服所在的组的ID'},
+                           'databases': {'type': 'object', 'description': '程序使用的数据库,不填自动分配'}}
+                       }
+
+    def bondto(self, req, entity, body=None):
+        """本地记录数据库绑定信息,用于数据绑定失败后重新绑定"""
+        body = body or {}
+        entity = int(entity)
+        databases = body.pop('databases')
+        session = endpoint_session()
+        with session.begin():
+            self._bondto(session, entity, databases)
+        return resultutils.results(result='bond entity %d database success' % entity)
+
+    def databases(self, req, objtype, body=None):
+        """返回可选数据库列表接口"""
+        body = body or {}
+        chioces = self._db_chioces(req, objtype, **body)
+        return resultutils.results(result='get databases chioces success',
+                                   data=chioces)
+
+    def agents(self, req, objtype, body=None):
+        """返回可选agent列表接口"""
+        body = body or {}
+        chioces = self._agent_chioces(req, objtype, **body)
+        return resultutils.results(result='get agents chioces success',
+                                   data=chioces)
+
+    def entitys(self, req, body=None):
+        """批量查询entitys信息接口,内部接口agent启动的时调用,一般由agent端调用"""
+        entitys = body.get('entitys')
+        if not entitys:
+            return resultutils.results(result='not any app entitys found')
+        entitys = argutils.map_to_int(entitys)
+        session = endpoint_session(readonly=True)
+        query = model_query(session, AppEntity, filter=AppEntity.entity.in_(entitys))
+        query = query.options(joinedload(AppEntity.areas, innerjoin=False))
+        return resultutils.results(result='get app entitys success',
+                                   data=[dict(entity=_entity.entity,
+                                              group_id=_entity.group_id,
+                                              status=_entity.status,
+                                              opentime=_entity.opentime,
+                                              areas=[dict(area_id=area.area_id,
+                                                          show_id=area.show_id,
+                                                          areaname=area.areaname)
+                                                     for area in _entity.areas],
+                                              objtype=_entity.objtype) for _entity in query])
+
+    def merge(self, req, entitys, body=None):
+        """合服接口,用于合服"""
+        body = body or {}
+        jsonutils.schema_validate(body, self.MERGEAPPENTITYS)
+        group_id = body.get('group_id')
+        session = endpoint_session()
+
+        # 需要合并的实体
+        entitys = list(argutils.map_to_int(entitys))
+        entitys.sort()
+
+        # 安装文件信息
+        appfile = body.pop(common.APPFILE)
+        # 选择合并后实例运行服务器
+        agent_id = self._agentselect(req, common.GAMESERVER, **body)
+        # 选择合并后实体数据库
+        databases = self._dbselect(req, common.GAMESERVER, **body)
+        opentime = body.get('opentime')
+        # 合服任务ID
+        task_id = uuidutils.generate_uuid()
+
+        # chiefs信息初始化
+        query = model_query(session,
+                            AppEntity,
+                            filter=and_(AppEntity.group_id == group_id,
+                                        AppEntity.objtype.in_([common.GMSERVER, common.CROSSSERVER])))
+        # 找到同组的gm和战场服
+        gm = None
+        cross = None
+        crosss = []
+        # 锁组
+        glock = get_gamelock()
+        with glock.grouplock(group_id):
+            for appentity in query:
+                if appentity.status != common.OK:
+                    continue
+                if appentity.objtype == common.GMSERVER:
+                    gm = appentity
+                else:
+                    crosss.append(appentity)
+            if not gm:
+                raise InvalidArgument('Group gm not active?')
+            if not crosss:
+                raise InvalidArgument('Group has no cross server?')
+            if not body.get('cross_id'):
+                cross = crosss[0]
+            else:
+                for appentity in crosss:
+                    if appentity.entity == body.get('cross_id'):
+                        cross = appentity
+                        break
+            if not cross:
+                raise InvalidArgument('cross server can not be found?')
+            # 获取实体相关服务器信息(端口/ip)
+            maps = entity_controller.shows(endpoint=common.NAME, entitys=[gm.entity, cross.entity])
+            chiefs = dict()
+            # 战场与GM服务器信息
+            for chief in (cross, gm):
+                chiefmetadata = maps.get(chief.entity).get('metadata')
+                ports = maps.get(chief.entity).get('ports')
+                if not chiefmetadata:
+                    raise InvalidArgument('%s.%d is offline' % (chief.objtype, chief.entity))
+                need = common.POSTS_COUNT[chief.objtype]
+                if need and len(ports) != need:
+                    raise InvalidArgument('%s.%d port count error, '
+                                          'find %d, need %d' % (chief.objtype, chief.entity,
+                                                                len(ports), need))
+                chiefs.setdefault(chief.objtype,
+                                  dict(entity=chief.entity,
+                                       ports=ports,
+                                       local_ip=chiefmetadata.get('local_ip')))
+
+            # 需要合服的实体
+            appentitys = []
+            query = model_query(session, AppEntity,
+                                filter=and_(AppEntity.group_id == group_id, AppEntity.entity.in_(entitys)))
+            query = query.options(joinedload(AppEntity.areas, innerjoin=False))
+            with session.begin():
+                for appentity in query:
+                    if appentity.objtype != common.GAMESERVER:
+                        raise InvalidArgument('Target is not %s' % common.GAMESERVER)
+                    if appentity.status != common.OK:
+                        raise InvalidArgument('Target is not active')
+                    if not appentity.areas:
+                        raise InvalidArgument('Target has no area?')
+                    appentitys.append(appentity)
+                if len(appentitys) != len(entitys):
+                    raise InvalidArgument('Can not match entitys count')
+
+                # 完整的rpc数据包,准备发送合服命令到agent
+                body = dict(objtype=common.GAMESERVER,
+                            appfile=appfile,
+                            databases=databases,
+                            opentime=opentime,
+                            chiefs=chiefs,
+                            uuid=task_id,
+                            entitys=entitys)
+                body.setdefault('finishtime', rpcfinishtime()[0] + 5)
+                try:
+                    create_result = entity_controller.create(req=req, agent_id=agent_id,
+                                                             endpoint=common.NAME, body=body,
+                                                             action='merge')['data'][0]
+                except RpcResultError as e:
+                    LOG.error('Create entity rpc call fail: %s' % e.message)
+                    raise InvalidArgument(e.message)
+                mergetd_entity = create_result.get('entity')
+                rpc_result = create_result.get('notify')
+                LOG.info('Entity controller merge rpc result %s' % str(rpc_result))
+                # 插入实体信息
+                appentity = AppEntity(entity=mergetd_entity,
+                                      agent_id=agent_id,
+                                      group_id=group_id,
+                                      objtype=common.GAMESERVER,
+                                      cross_id=cross.cross_id,
+                                      opentime=opentime)
+                session.add(appentity)
+                session.flush()
+                # 插入数据库绑定信息
+                if rpc_result.get('databases'):
+                    self._bondto(session, mergetd_entity, rpc_result.get('databases'))
+                else:
+                    LOG.error('New entity database miss')
+                # 插入合服记录
+                mtask = MergeTask(uuid=task_id, entity=mergetd_entity, mergetime=int(time.time()))
+                session.add(mtask)
+                session.flush()
+                for _appentity in appentitys:
+                    session.add(MergeEntity(entity=_appentity.entity,
+                                            uuid=task_id,
+                                            areas=jsonutils.loads([dict(area_id=area.area_id,
+                                                                        areaname=area.areaname,
+                                                                        show_id=area.show_id)
+                                                                   for area in _appentity.areas])))
+                    session.flush()
+                # 修改被合并服的状态
+                query.update({'status': common.MERGEING})
+        # 添加端口
+        threadpool.add_thread(port_controller.unsafe_create,
+                              agent_id, common.NAME, mergetd_entity, rpc_result.get('ports'))
+        return resultutils.results(result='entitys is mergeing',
+                                   data=[dict(uuid=task_id, entitys=entitys, entity=mergetd_entity)])
+
+    def swallow(self, req, entity, body=None):
+        """合服内部接口,一般由agent调用,用于新实体吞噬旧实体的区服和数据库"""
+        body = body or {}
+        entity = int(entity)
+        uuid = body.get('uuid')
+        if not uuid:
+            raise InvalidArgument('Merger uuid is None')
+        session = endpoint_session()
+        query = model_query(session, MergeTask, filter=MergeTask.uuid == uuid)
+        query = query.options(joinedload(MergeTask.entitys, innerjoin=False))
+        appentity = None
+        with session.begin():
+            etask = query.one_or_none()
+            if not etask:
+                raise InvalidArgument('Not task exit with %s' % uuid)
+            for _entity in etask.entitys:
+                if _entity.entity == entity:
+                    if _entity.status != common.MERGEING:
+                        raise InvalidArgument('Merger entity status error')
+                    appentity = model_query(session, AppEntity, filter=AppEntity.entity == entity).one_or_none()
+                    break
+            if not appentity:
+                raise InvalidArgument('Can not find app entity?')
+            if appentity.objtype != common.GAMESERVER:
+                raise InvalidArgument('Group not match or objtype error')
+
+    def spit(self, req, entity, body=None):
+        """合服内部接口,用于新实体在失败时候吐出旧实体的区服"""
+        raise NotImplementedError

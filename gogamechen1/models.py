@@ -183,8 +183,19 @@ class Group(TableBase):
     )
 
 
-class MergeHistory(TableBase):
+class MergeEntity(TableBase):
     entity = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
     status = sa.Column(TINYINT(64), nullable=False, default=common.MERGEING)
+    uuid = sa.Column(sa.ForeignKey('mergetasks.uuid', ondelete="RESTRICT", onupdate='RESTRICT'),
+                     nullable=False)
     areas = sa.Column(BLOB, nullable=False)
-    databases = sa.Column(BLOB, nullable=False)
+    databases = sa.Column(BLOB, nullable=True)
+
+
+class MergeTask(TableBase):
+    uuid = sa.Column(VARCHAR(36), nullable=False, primary_key=True)
+    entity = sa.Column(INTEGER(unsigned=True), default=0)
+    status = sa.Column(TINYINT(64), nullable=False, default=common.MERGEING)
+    mergetime = sa.Column(INTEGER(unsigned=True), nullable=False)
+    entitys = orm.relationship(MergeEntity, backref='mergetask', lazy='join',
+                               cascade='delete,delete-orphan')
