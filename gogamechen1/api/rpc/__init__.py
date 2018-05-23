@@ -613,16 +613,22 @@ class Application(AppEndpointBase):
             eventlet.sleep(1)
             timeout -= 1
         timeout = min(1, timeout)
+        running = False
         with self.lock(entity, timeout):
             if entity not in set(self.entitys):
                 return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                                   resultcode=manager_common.RESULT_ERROR,
                                                   ctxt=ctxt, result='change entity area fail, entity not exist')
+            if self._entity_process(entity):
+                LOG.warning('Change area will not flush config')
+                running = True
             areas = self.konwn_appentitys[entity].get('areas')
             for area in areas:
                 if area.get('area_id') == area_id:
                     area['show_id'] = show_id
                     area['areaname'] = areaname
+            if not running:
+                self.flush_config(entity)
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           ctxt=ctxt,
                                           result='change entity area info success')
@@ -630,6 +636,10 @@ class Application(AppEndpointBase):
     def rpc_change_status(self, ctxt, entity, status, **kwargs):
         if entity not in set(self.entitys):
             LOG.error('entity not found, can not change status')
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='change entity %d status fail, not exit' % entity)
         self.konwn_appentitys[entity].update({'status': status})
         objtype = self._objtype(entity)
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
@@ -802,14 +812,19 @@ class Application(AppEndpointBase):
             # 启动前进程快照
             proc_snapshot_before = utils.find_process()
             for entity in entitys:
+                status = self.konwn_appentitys[entity].get('status')
+                if status != common.OK:
+                    details.append(formater(entity, manager_common.RESULT_ERROR,
+                                            'upgrade entitys not executed, some entity status not ok'))
                 if self._entity_process(entity, proc_snapshot_before):
                     for __entity in entitys:
                         details.append(formater(__entity, manager_common.RESULT_ERROR,
                                                 'upgrade entitys not executed, some entity is running'))
-                    return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                                      ctxt=ctxt,
-                                                      result='upgrade entity fail, entity %d running' % entity,
-                                                      details=details)
+            if details:
+                return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                                  ctxt=ctxt,
+                                                  result='upgrade entity fail, check status fail',
+                                                  details=details)
             try:
                 middlewares, e = taskupgrade.upgrade_entitys(self, objtype, objfiles, entitys, timeline)
             except Exception as e:
@@ -876,6 +891,11 @@ class Application(AppEndpointBase):
                                                       result='flushconfig entity fail, entity %d running' % entity,
                                                       details=details)
             for entity in entitys:
+                status = self.konwn_appentitys[entity].get('status')
+                if status != common.OK:
+                    details.append(formater(entity, manager_common.RESULT_ERROR,
+                                            'flush entity %d fail,  status not ok'))
+                    continue
                 try:
                     self.flush_config(entity, opentime=kwargs.get('opentime'),
                                       chiefs=kwargs.get('chiefs'))
@@ -887,6 +907,65 @@ class Application(AppEndpointBase):
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           ctxt=ctxt,
                                           result='Flush entitys config end', details=details)
+
+    def rpc_swallow_entity(self, ctxt, entity, **kwargs):
+        if entity not in set(self.entitys):
+            LOG.error('entity not found, can not swallow entity')
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='swallow entity %d fail, not exit' % entity)
+        objtype = self._objtype(entity)
+        if objtype != common.GAMESERVER:
+            raise RpcEntityError(endpoint=common.NAME,
+                                 entity=entity,
+                                 reason='Entity type not %s' % common.GAMESERVER)
+        if self._entity_process(entity):
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='Entity %d is running' % entity)
+        status = self.konwn_appentitys[entity].get('status')
+        if status != common.UNACTIVE:
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='Entity %d status error' % entity)
+        self.konwn_appentitys[entity].update({'status': common.SWALLOWING})
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          resultcode=manager_common.RESULT_SUCCESS,
+                                          ctxt=ctxt,
+                                          result='swallow entity %s.%d success' % (objtype, entity))
+
+    def rpc_swallowed_entity(self, ctxt, entity, **kwargs):
+        if entity not in set(self.entitys):
+            LOG.error('entity not found, can not swallowd entity')
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='swallowd entity %d fail, not exit' % entity)
+        objtype = self._objtype(entity)
+        if objtype != common.GAMESERVER:
+            raise RpcEntityError(endpoint=common.NAME,
+                                 entity=entity,
+                                 reason='Entity type not %s' % common.GAMESERVER)
+        if self._entity_process(entity):
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='Entity %d is running' % entity)
+        status = self.konwn_appentitys[entity].get('status')
+        if status != common.SWALLOWING:
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='Entity %d status error' % entity)
+        self.konwn_appentitys[entity].update({'status': common.DELETED})
+        del self.konwn_appentitys[entity]['areas'][:]
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          resultcode=manager_common.RESULT_SUCCESS,
+                                          ctxt=ctxt,
+                                          result='swallow entity %s.%d success' % (objtype, entity))
 
     def rpc_merge_entity(self, ctxt, entity, **kwargs):
         uuid = kwargs.pop('uuid')
@@ -900,7 +979,7 @@ class Application(AppEndpointBase):
         timeout = count_timeout(ctxt, kwargs)
 
         try:
-            middleware = self._create_entity(entity, common.GAMESERVER, appfile, databases, timeout, ports, chiefs)
+            middleware = self._create_entity(entity, common.GAMESERVER, appfile, databases, timeout, ports)
         except NoFileFound:
             return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                               resultcode=manager_common.RESULT_ERROR,

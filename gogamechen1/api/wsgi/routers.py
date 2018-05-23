@@ -86,10 +86,6 @@ class Routers(router.RoutersBase):
         collection.member.link('areas', method='GET')
         collection.member.link('packages', method='GET')
         collection.member.link('area', method='PUT')
-        # collection.member.link('stop', method='POST')
-        # collection.member.link('status', method='GET')
-        # collection.member.link('upgrade', method='POST')
-        # collection.member.link('hotfix', method='POST')
 
         resource_name = 'entity'
         collection_name = resource_name + 's'
@@ -112,6 +108,23 @@ class Routers(router.RoutersBase):
         self._add_resource(mapper, game_controller,
                            path='/%s/{objtype}/agents' % common.NAME,
                            get_action='agents')
+
+        self._add_resource(mapper, game_controller,
+                           path='/%s/merge' % common.NAME,
+                           post_action='merge')
+
+        self._add_resource(mapper, game_controller,
+                           path='/%s/merge/{uuid}' % common.NAME,
+                           put_action='continues')
+
+        self._add_resource(mapper, game_controller,
+                           path='/%s/mergeing/{entity}/swallow' % common.NAME,
+                           post_action='swallow')
+
+        self._add_resource(mapper, game_controller,
+                           path='/%s/mergeing/{entity}/swallowed' % common.NAME,
+                           post_action='swallowed')
+
 
         collection = mapper.collection(collection_name=collection_name,
                                        resource_name=resource_name,

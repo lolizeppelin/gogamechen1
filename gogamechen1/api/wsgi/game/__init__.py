@@ -353,5 +353,8 @@ class GroupReuest(BaseContorller):
 
 
 @singleton.singleton
-class AppEntityReuest(AppEntityCURDRequest, AppEntityAsyncReuest, AppEntitySyncReuest, AppEntityInternalReuest):
+class AppEntityReuest(AppEntityCURDRequest,
+                      AppEntityAsyncReuest,
+                      AppEntitySyncReuest,
+                      AppEntityInternalReuest):
     """Appentity request class"""

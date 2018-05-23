@@ -417,12 +417,9 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         _entity = query.one()
         if status == _entity.status:
             return resultutils.results(result='%s entity status in same' % objtype)
-        if _entity.status == common.DELETED:
-            return resultutils.results(resultcode=manager_common.RESULT_ERROR,
-                                       result='%s entity has been deleted' % objtype)
         if _entity.status != common.UNACTIVE:
             return resultutils.results(resultcode=manager_common.RESULT_ERROR,
-                                       result='%s entity can not be actived' % objtype)
+                                       result='%s entity is not unactive' % objtype)
         if _entity.objtype != objtype:
             raise InvalidArgument('Objtype not match')
         if _entity.group_id != group_id:
@@ -499,7 +496,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                 if not rpc_ret:
                     raise RpcResultError('check entity stoped result is None')
                 if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
-                    raise RpcResultError('reset entity fail %s' % rpc_ret.get('result'))
+                    raise RpcResultError('check entity fail %s' % rpc_ret.get('result'))
                 _entity.status = common.DELETED
                 session.flush()
                 if objtype == common.GAMESERVER:

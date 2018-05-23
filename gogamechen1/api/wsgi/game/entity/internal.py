@@ -14,8 +14,11 @@ from simpleutil.config import cfg
 from simpleservice.ormdb.api import model_query
 
 from goperation import threadpool
+from goperation.manager import common as manager_common
+from goperation.manager.api import get_client
 from goperation.manager.api import rpcfinishtime
 from goperation.manager.utils import resultutils
+from goperation.manager.utils import targetutils
 from goperation.manager.wsgi.port.controller import PortReuest
 from goperation.manager.wsgi.entity.controller import EntityReuest
 from goperation.manager.wsgi.exceptions import RpcResultError
@@ -53,8 +56,11 @@ class AppEntityInternalReuest(AppEntityReuestBase):
     """async ext function"""
 
     MERGEAPPENTITYS = {'type': 'object',
-                       'required': [common.APPFILE],
+                       'required': [common.APPFILE, 'entitys', 'group_id'],
                        'properties': {
+                           'entitys': {'type': 'array',
+                                       'items': {'type': 'integer', 'minimum': 1},
+                                       'description': '需要合并的实体列表'},
                            common.APPFILE: {'type': 'string', 'format': 'md5',
                                             'description': '程序文件md5'},
                            'agent_id': {'type': 'integer', 'minimum': 1,
@@ -113,16 +119,17 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                                                      for area in _entity.areas],
                                               objtype=_entity.objtype) for _entity in query])
 
-    def merge(self, req, entitys, body=None):
+    def merge(self, req, body=None):
         """合服接口,用于合服"""
         body = body or {}
         jsonutils.schema_validate(body, self.MERGEAPPENTITYS)
-        group_id = body.get('group_id')
-        session = endpoint_session()
 
+        group_id = body.pop('group_id')
         # 需要合并的实体
-        entitys = list(argutils.map_to_int(entitys))
+        entitys = list(set(body.pop('entitys')))
         entitys.sort()
+
+        session = endpoint_session()
 
         # 安装文件信息
         appfile = body.pop(common.APPFILE)
@@ -132,7 +139,7 @@ class AppEntityInternalReuest(AppEntityReuestBase):
         databases = self._dbselect(req, common.GAMESERVER, **body)
         opentime = body.get('opentime')
         # 合服任务ID
-        task_id = uuidutils.generate_uuid()
+        uuid = uuidutils.generate_uuid()
 
         # chiefs信息初始化
         query = model_query(session,
@@ -193,21 +200,22 @@ class AppEntityInternalReuest(AppEntityReuestBase):
             with session.begin():
                 for appentity in query:
                     if appentity.objtype != common.GAMESERVER:
-                        raise InvalidArgument('Target is not %s' % common.GAMESERVER)
-                    if appentity.status != common.OK:
-                        raise InvalidArgument('Target is not active')
+                        raise InvalidArgument('Target entity %d is not %s' % (appentity.entity, common.GAMESERVER))
+                    if appentity.status != common.UNACTIVE:
+                        raise InvalidArgument('Target entity %d is not unactive' % appentity.entity)
                     if not appentity.areas:
-                        raise InvalidArgument('Target has no area?')
+                        raise InvalidArgument('Target entity %d has no area?' % appentity.entity)
+                    if appentity.versions:
+                        raise InvalidArgument('Traget entity %d version is not None' % appentity.entity)
                     appentitys.append(appentity)
                 if len(appentitys) != len(entitys):
                     raise InvalidArgument('Can not match entitys count')
-
                 # 完整的rpc数据包,准备发送合服命令到agent
                 body = dict(appfile=appfile,
                             databases=databases,
                             opentime=opentime,
                             chiefs=chiefs,
-                            uuid=task_id,
+                            uuid=uuid,
                             entitys=entitys)
                 body.setdefault('finishtime', rpcfinishtime()[0] + 5)
                 try:
@@ -223,7 +231,6 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                 # 插入实体信息
                 appentity = AppEntity(entity=mergetd_entity,
                                       agent_id=agent_id,
-                                      group_id=group_id,
                                       objtype=common.GAMESERVER,
                                       cross_id=cross.cross_id,
                                       opentime=opentime)
@@ -235,11 +242,11 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                 else:
                     LOG.error('New entity database miss')
                 # 插入合服记录
-                mtask = MergeTask(uuid=task_id, entity=mergetd_entity, mergetime=int(time.time()))
+                mtask = MergeTask(uuid=uuid, entity=mergetd_entity, mergetime=int(time.time()))
                 session.add(mtask)
                 session.flush()
                 for _appentity in appentitys:
-                    session.add(MergeEntity(entity=_appentity.entity, uuid=task_id))
+                    session.add(MergeEntity(entity=_appentity.entity, uuid=uuid))
                     session.flush()
                 # 修改被合并服的状态
                 query.update({'status': common.MERGEING})
@@ -247,10 +254,15 @@ class AppEntityInternalReuest(AppEntityReuestBase):
         threadpool.add_thread(port_controller.unsafe_create,
                               agent_id, common.NAME, mergetd_entity, rpc_result.get('ports'))
         return resultutils.results(result='entitys is mergeing',
-                                   data=[dict(uuid=task_id, entitys=entitys, entity=mergetd_entity)])
+                                   data=[dict(uuid=uuid, entitys=entitys, entity=mergetd_entity)])
+
+    def continues(req, uuid, body=None):
+        """中途失败的合服任务再次运行"""
+        raise NotImplementedError
 
     def swallow(self, req, entity, body=None):
-        """合服内部接口,一般由agent调用,用于新实体吞噬旧实体的区服和数据库"""
+        """合服内部接口,一般由agent调用
+        用于新实体吞噬旧实体的区服和数据库"""
         body = body or {}
         entity = int(entity)
         uuid = body.get('uuid')
@@ -260,6 +272,8 @@ class AppEntityInternalReuest(AppEntityReuestBase):
         query = model_query(session, MergeTask, filter=MergeTask.uuid == uuid)
         query = query.options(joinedload(MergeTask.entitys, innerjoin=False))
         appentity = None
+        glock = get_gamelock()
+        rpc = get_client()
         with session.begin():
             etask = query.one_or_none()
             if not etask:
@@ -291,6 +305,18 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                      for area in appentity.areas]
             if not databases or not areas:
                 LOG.error('Entity no areas or databases record')
+            with glock.grouplock(group=appentity.group_id):
+                # 发送吞噬命令到目标区服agent
+                metadata, ports = self._entityinfo(req=req, entity=entity)
+                target = targetutils.target_agent_by_string(metadata.get('agent_type'), metadata.get('host'))
+                target.namespace = common.NAME
+                rpc_ret = rpc.call(target, ctxt={'agents': [appentity.agent_id, ]},
+                                   msg={'method': 'swallow',
+                                        'args': dict(entity=entity)})
+                if not rpc_ret:
+                    raise RpcResultError('swallow entity result is None')
+                if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
+                    raise RpcResultError('swallow entity fail %s' % rpc_ret.get('result'))
             # 修改实体在合服任务中的状态,存储areas以及databases
             _entity.status = common.SWALLOWING
             _entity.areas = jsonutils.dumps(areas)
@@ -301,7 +327,8 @@ class AppEntityInternalReuest(AppEntityReuestBase):
 
     def swallowed(self, req, entity, body=None):
         """合服内部接口,一般由agent调用
-        用于新实体吞噬旧实体的区服完成后调用,调用后将设置appentity为deleted状态"""
+        用于新实体吞噬旧实体的区服完成后调用
+        调用后将设置appentity为deleted状态"""
         body = body or {}
         entity = int(entity)
         uuid = body.get('uuid')
@@ -310,6 +337,8 @@ class AppEntityInternalReuest(AppEntityReuestBase):
         session = endpoint_session()
         query = model_query(session, MergeTask, filter=MergeTask.uuid == uuid)
         query = query.options(joinedload(MergeTask.entitys, innerjoin=False))
+        glock = get_gamelock()
+        rpc = get_client()
         appentity = None
         with session.begin():
             etask = query.one_or_none()
@@ -328,6 +357,19 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                 raise InvalidArgument('objtype error, entity not %s' % common.GAMESERVER)
             if appentity.status != common.SWALLOWING:
                 raise InvalidArgument('find status error, when swallowed')
+
+            with glock.grouplock(group=appentity.group_id):
+                # 发送吞噬完成命令到目标区服agent
+                metadata, ports = self._entityinfo(req=req, entity=entity)
+                target = targetutils.target_agent_by_string(metadata.get('agent_type'), metadata.get('host'))
+                target.namespace = common.NAME
+                rpc_ret = rpc.call(target, ctxt={'agents': [appentity.agent_id, ]},
+                                   msg={'method': 'swallowed',
+                                        'args': dict(entity=entity)})
+                if not rpc_ret:
+                    raise RpcResultError('swallowed entity result is None')
+                if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
+                    raise RpcResultError('swallowed entity fail %s' % rpc_ret.get('result'))
             # appentity状态修改为deleted
             appentity.status = common.DELETED
             # 修改实体在合服任务中的状态

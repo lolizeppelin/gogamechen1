@@ -22,6 +22,10 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
     agents_chioces_path = '/gogamechen1/%s/agents'
     databases_chioces_path = '/gogamechen1/%s/databases'
 
+    merge_path = '/gogamechen1/merge'
+    continue_merge_path = '/gogamechen1/merge/%s'
+    mergeing_path = '/gogamechen1/mergeing/%s/%s'
+
     appentitys_path = '/gogamechen1/group/%s/%s/entitys'
     appentity_path = '/gogamechen1/group/%s/%s/entitys/%s'
     appentity_path_ex = '/gogamechen1/group/%s/%s/entitys/%s/%s'
@@ -165,7 +169,7 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
-    # -----------bond database api-----------------
+    # -----------internal api-----------------
     def bondto(self, entity, databases):
         resp, results = self.post(action=self.bond_path % str(entity), body=dict(databases=databases),
                                   timeout=15)
@@ -203,6 +207,39 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
         resp, results = self.get(action=self.databases_chioces_path % objtype, body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='list databases chioces fail:%d' % results['resultcode'],
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    # -----------merge api-----------------
+    def merge_entitys(self, group_id, body):
+        resp, results = self.post(action=self.merge_path, body=body, timeout=30)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='merge entitys fail',
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def continue_merge(self, uuid, body=None):
+        resp, results = self.put(action=self.continue_merge_path % uuid, body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='continue merge entitys fail',
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def swallow_entity(self, entity, uuid):
+        resp, results = self.post(action=self.mergeing_path % (str(entity), 'swallow'), body={'uuid': uuid})
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='swallow entity fail',
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def swallowed_entity(self, entity, uuid):
+        resp, results = self.post(action=self.mergeing_path % (str(entity), 'swallowed'), body={'uuid': uuid})
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='swallowed entity fail',
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
