@@ -134,7 +134,9 @@ def conf_type_1(logpath, local_ip, ports, entity, areas, databases, opentime, ch
     conf.setdefault('ListenAddr', '%s:%d' % (local_ip, ports[1]))
     conf.setdefault('RealServerId', entity)
     # conf.setdefault('ShowServerIds', [area.get('area_id') for area in areas])
-    conf.setdefault('ShowServers', areas)
+    conf.setdefault('ShowServers', [dict(Id=area.get('area_id'),
+                                         Name=area.get('areaname'),
+                                         show_id=area.get('show_id')) for area in areas])
     conf.setdefault('StartServerTime', opentime)
     conf.setdefault('ConnAddrs', chiefs)
     conf.setdefault('DB', databases[common.DATADB])

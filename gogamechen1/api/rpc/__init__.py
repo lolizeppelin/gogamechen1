@@ -300,7 +300,7 @@ class Application(AppEndpointBase):
             LOG.exception('flush config fail')
             raise
         with open(cfile, 'wb') as f:
-            json.dump(confobj, f, indent=4)
+            json.dump(confobj, f, indent=4, ensure_ascii=False)
             f.write('\n')
         LOG.info('Make config for %s.%d success' % (objtype, entity))
         systemutils.chown(cfile, self.entity_user(entity), self.entity_group(entity))
@@ -565,7 +565,8 @@ class Application(AppEndpointBase):
                     os.makedirs(confdir, 0755)
                     systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
                     with open(cfile, 'wb') as f:
-                        json.dump(oldcf, f)
+                        json.dump(oldcf, f, indent=4, ensure_ascii=False)
+                        f.write('\n')
                 used = time.time() - _start
                 timeout -= used
                 waiter = self.create_entity(entity, objtype, appfile, timeout)
