@@ -45,6 +45,7 @@ from gogamechen1.api.rpc.config import agent_opts
 
 from gogamechen1.api.rpc.taskflow import create as taskcreate
 from gogamechen1.api.rpc.taskflow import upgrade as taskupgrade
+from gogamechen1.api.rpc.taskflow import merge as taskmerge
 
 if systemutils.POSIX:
     from simpleutil.utils.systemutils import posix
@@ -305,6 +306,46 @@ class Application(AppEndpointBase):
         LOG.info('Make config for %s.%d success' % (objtype, entity))
         systemutils.chown(cfile, self.entity_user(entity), self.entity_group(entity))
 
+    def _create_entity(self, entity, objtype, appfile, databases, timeout, ports=None):
+        self.filemanager.find(appfile)
+        with self.lock(entity):
+            if entity in self.entitys:
+                raise RpcEntityError(endpoint=common.NAME, entity=entity, reason='Entity duplicate')
+            with self._prepare_entity_path(entity):
+                confdir = os.path.split(self._objconf(entity, objtype))[0]
+                os.makedirs(confdir, mode=0755)
+                systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
+                with self._allocate_port(entity, objtype, ports) as _ports:
+                    try:
+                        middleware = taskcreate.create_entity(self, entity, objtype, databases,
+                                                              appfile, timeout)
+                    except Exception:
+                        LOG.exception('prepare create taskflow error')
+                        raise
+                    # 有步骤失败
+                    if not middleware.success:
+                        if middleware.waiter is not None:
+                            try:
+                                middleware.waiter.stop()
+                                middleware.waiter.wait()
+                            except Exception as e:
+                                LOG.error('Stop waiter catch error %s' % e.__class__.__name__)
+                            finally:
+                                middleware.waiter = None
+                        LOG.error('create middleware result %s' % str(middleware))
+                        raise RpcEntityError(endpoint=common.NAME, entity=entity,
+                                             reason=str(middleware))
+
+                    def _extract_wait():
+                        middleware.waiter.wait()
+                        middleware.waiter = None
+                        self.manager.change_performance()
+
+                    # 等待解压完成
+                    threadpool.add_thread(_extract_wait)
+                    return middleware
+
+
     def delete_entity(self, entity):
         if self._entity_process(entity):
             raise ValueError('Entity is running')
@@ -322,7 +363,7 @@ class Application(AppEndpointBase):
             self.konwn_appentitys.pop(entity, None)
             systemutils.drop_user(self.entity_user(entity))
 
-    def create_entity(self, entity, objtype, appfile, timeout):
+    def extract_entity_file(self, entity, objtype, appfile, timeout):
         dst = self.apppath(entity)
         # 异步解压,没有报错说明解压开始
         waiter = zlibutils.async_extract(src=appfile, dst=dst, timeout=timeout,
@@ -399,118 +440,55 @@ class Application(AppEndpointBase):
 
     def rpc_create_entity(self, ctxt, entity, **kwargs):
         timeout = count_timeout(ctxt, kwargs)
-        _ports = kwargs.pop('ports', None)
+        ports = kwargs.pop('ports', None)
         chiefs = kwargs.pop('chiefs', None)
         objtype = kwargs.pop('objtype')
         databases = kwargs.pop('databases')
         appfile = kwargs.pop(common.APPFILE)
         entity = int(entity)
+
         try:
-            self.filemanager.find(appfile)
+            middleware = self._create_entity(entity, objtype, appfile, databases, timeout, ports)
         except NoFileFound:
             return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                               resultcode=manager_common.RESULT_ERROR,
                                               ctxt=ctxt,
                                               result='create %s.%d fail, appfile not find' % (objtype, entity))
-        with self.lock(entity):
-            if entity in self.entitys:
-                return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                                  resultcode=manager_common.RESULT_ERROR,
-                                                  ctxt=ctxt,
-                                                  result='create %s.%d fail, entity exist' % (objtype, entity))
-            with self._prepare_entity_path(entity):
-                confdir = os.path.split(self._objconf(entity, objtype))[0]
-                os.makedirs(confdir, mode=0755)
-                systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
-                with self._allocate_port(entity, objtype, _ports) as ports:
-                    try:
-                        middleware = taskcreate.create_entity(self, entity, objtype, databases,
-                                                              appfile, timeout)
-                    except Exception:
-                        LOG.exception('prepare create taskflow error')
-                        raise
-                    # 有步骤失败
-                    if not middleware.success:
-                        if middleware.waiter is not None:
-                            try:
-                                middleware.waiter.stop()
-                                middleware.waiter.wait()
-                            except Exception as e:
-                                LOG.error('Stop waiter catch error %s' % e.__class__.__name__)
-                            finally:
-                                middleware.waiter = None
-                        LOG.error('create middleware result %s' % str(middleware))
-                        raise RpcEntityError(endpoint=common.NAME, entity=entity,
-                                             reason=str(middleware))
 
-                    # def _ports_notify():
-                    #     """notify port bond  作废接口"""
-                    #     eventlet.sleep(0)
-                    #     with self.lock(entity, timeout=15):
-                    #         try:
-                    #             self.client.ports_add(agent_id=self.manager.agent_id,
-                    #                                   endpoint=common.NAME, entity=entity, ports=ports)
-                    #         except Exception:
-                    #             LOG.error('Bond ports for %d fail')
-                    #             self._free_ports(entity)
-                    #
-                    # def database_notity():
-                    #     """作废接口"""
-                    #     LOG.debug('Try bond database for %s.%d' % (objtype, entity))
-                    #     try:
-                    #         self.client.bondto(entity, middleware.databases)
-                    #     except Exception:
-                    #         LOG.error('Notify bond database info fail')
-                    #         LOG.error('Fail for %d %s' % (entity, str(databases)))
-                    #         raise
-                    #     LOG.info('Try bond database success, flush config')
+        def _config_wait():
+            overtime = int(time.time()) + timeout
+            while (entity not in self.konwn_appentitys or middleware.waiter is not None):
+                if int(time.time()) > overtime:
+                    break
+                eventlet.sleep(0.1)
+            success = True
+            if entity not in self.konwn_appentitys:
+                success = False
+                LOG.error('Get entity %d from konwn appentity fail' % entity)
+                LOG.error('%s' % str(chiefs))
+                LOG.error('%s' % str(databases))
 
-                    def _extract_wait():
-                        middleware.waiter.wait()
-                        middleware.waiter = None
-                        self.manager.change_performance()
+            if middleware.waiter is not None:
+                success = False
+                try:
+                    middleware.waiter.stop()
+                except Exception as e:
+                    LOG.error('Stop waiter catch error %s' % e.__class__.__name__)
+                finally:
+                    middleware.waiter = None
+                LOG.error('Wait extract overtime')
+            if not success:
+                return
+            opentime = self.konwn_appentitys[entity].get('opentime')
+            self.flush_config(entity, middleware.databases, opentime, chiefs)
 
-                    def _config_wait():
-                        overtime = int(time.time()) + timeout
-                        while (entity not in self.konwn_appentitys or middleware.waiter is not None):
-                            if int(time.time()) > overtime:
-                                break
-                            eventlet.sleep(0.1)
-                        success = True
-                        if entity not in self.konwn_appentitys:
-                            success = False
-                            LOG.error('Get entity %d from konwn appentity fail' % entity)
-                            LOG.error('%s' % str(chiefs))
-                            LOG.error('%s' % str(databases))
+        # 生成配置文件
+        threadpool.add_thread(_config_wait)
 
-                        if middleware.waiter is not None:
-                            success = False
-                            try:
-                                middleware.waiter.stop()
-                            except Exception as e:
-                                LOG.error('Stop waiter catch error %s' % e.__class__.__name__)
-                            finally:
-                                middleware.waiter = None
-                            LOG.error('Wait extract overtime')
-                        if not success:
-                            return
-                        opentime = self.konwn_appentitys[entity].get('opentime')
-                        self.flush_config(entity, middleware.databases, opentime, chiefs)
-
-                    # 数据库绑定申请,现由前端完成
-                    # threadpool.add_thread(database_notity)
-                    # 端口占用申请,现由前端完成
-                    # threadpool.add_thread(_ports_notify)
-                    # 等待解压完成
-                    threadpool.add_thread(_extract_wait)
-                    # 生成配置文件
-                    threadpool.add_thread(_config_wait)
-
-
-        resultcode = manager_common.RESULT_SUCCESS
         result = 'create %s success' % objtype
         return CreateResult(agent_id=self.manager.agent_id, ctxt=ctxt,
-                            resultcode=resultcode, result=result,
+                            resultcode=manager_common.RESULT_SUCCESS,
+                            result=result,
                             connection=self.manager.local_ip,
                             ports=ports, databases=middleware.databases)
 
@@ -569,8 +547,8 @@ class Application(AppEndpointBase):
                         f.write('\n')
                 used = time.time() - _start
                 timeout -= used
-                waiter = self.create_entity(entity, objtype, appfile, timeout)
-                waiter()
+                waiter = self.extract_entity_file(entity, objtype, appfile, timeout)
+                waiter.wait()
             self.flush_config(entity, databases=databases,
                               opentime=kwargs.get('opentime'), chiefs=chiefs)
 
@@ -909,3 +887,51 @@ class Application(AppEndpointBase):
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           ctxt=ctxt,
                                           result='Flush entitys config end', details=details)
+
+    def rpc_merge_entity(self, ctxt, entity, **kwargs):
+        uuid = kwargs.pop('uuid')
+        entitys = kwargs.pop('entitys')
+        ports = kwargs.pop('ports', None)
+        opentime = kwargs.pop('opentime')
+        chiefs = kwargs.pop('chiefs')
+        entity = int(entity)
+        appfile = kwargs.pop(common.APPFILE)
+        databases = kwargs.pop('databases')
+        timeout = count_timeout(ctxt, kwargs)
+
+        try:
+            middleware = self._create_entity(entity, common.GAMESERVER, appfile, databases, timeout, ports, chiefs)
+        except NoFileFound:
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='merge to %d fail, appfile not find' % entity)
+
+        def _merge_process():
+            success = False
+            try:
+                taskmerge.merge_entitys(self, uuid, entitys, middleware.databases)
+            except Exception:
+                LOG.exception('prepare merge taskflow error')
+
+            if middleware.waiter is not None:
+                success = False
+                try:
+                    middleware.waiter.stop()
+                except Exception as e:
+                    LOG.error('Stop waiter catch error %s' % e.__class__.__name__)
+                finally:
+                    middleware.waiter = None
+                LOG.error('Extract overtime')
+            if success:
+                self.flush_config(entity, middleware.databases, opentime, chiefs)
+
+        # 执行合服工作流
+        threadpool.add_thread(_merge_process)
+
+        result = 'merge task is running'
+        return CreateResult(agent_id=self.manager.agent_id, ctxt=ctxt,
+                            resultcode=manager_common.RESULT_SUCCESS,
+                            result=result,
+                            connection=self.manager.local_ip,
+                            ports=ports, databases=middleware.databases)

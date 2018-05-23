@@ -31,6 +31,7 @@ from gogamechen1.api import get_gamelock
 from gogamechen1.api import endpoint_session
 
 from gogamechen1.models import AppEntity
+from gogamechen1.models import GameArea
 from gogamechen1.models import MergeTask
 from gogamechen1.models import MergeEntity
 
@@ -202,8 +203,7 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                     raise InvalidArgument('Can not match entitys count')
 
                 # 完整的rpc数据包,准备发送合服命令到agent
-                body = dict(objtype=common.GAMESERVER,
-                            appfile=appfile,
+                body = dict(appfile=appfile,
                             databases=databases,
                             opentime=opentime,
                             chiefs=chiefs,
@@ -239,12 +239,7 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                 session.add(mtask)
                 session.flush()
                 for _appentity in appentitys:
-                    session.add(MergeEntity(entity=_appentity.entity,
-                                            uuid=task_id,
-                                            areas=jsonutils.loads([dict(area_id=area.area_id,
-                                                                        areaname=area.areaname,
-                                                                        show_id=area.show_id)
-                                                                   for area in _appentity.areas])))
+                    session.add(MergeEntity(entity=_appentity.entity, uuid=task_id))
                     session.flush()
                 # 修改被合并服的状态
                 query.update({'status': common.MERGEING})
@@ -272,13 +267,79 @@ class AppEntityInternalReuest(AppEntityReuestBase):
             for _entity in etask.entitys:
                 if _entity.entity == entity:
                     if _entity.status != common.MERGEING:
-                        raise InvalidArgument('Merger entity status error')
-                    appentity = model_query(session, AppEntity, filter=AppEntity.entity == entity).one_or_none()
+                        raise InvalidArgument('Swallow entity find status error')
+                    _query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
+                    _query = _query.options(joinedload(AppEntity.databases, innerjoin=False))
+                    appentity = _query.one_or_none()
                     break
             if not appentity:
                 raise InvalidArgument('Can not find app entity?')
             if appentity.objtype != common.GAMESERVER:
-                raise InvalidArgument('Group not match or objtype error')
+                raise InvalidArgument('objtype error, entity not %s' % common.GAMESERVER)
+            if appentity.status != common.MERGEING:
+                raise InvalidArgument('find status error, when swallowing')
+            databases = dict(zip([database['subtype'] for database in appentity.databases],
+                                 [dict(database_id=database['database_id'],
+                                       host=database['host'],
+                                       port=database['port'],
+                                       user=database['user'],
+                                       passwd=database['passwd'],
+                                       character_set=database['character_set']) for database in appentity.databases]))
+            areas = [dict(area_id=area.area_id,
+                          areaname=area.areaname,
+                          show_id=area.show_id)
+                     for area in appentity.areas]
+            if not databases or not areas:
+                LOG.error('Entity no areas or databases record')
+            # 修改实体在合服任务中的状态,存储areas以及databases
+            _entity.status = common.SWALLOWING
+            _entity.areas = jsonutils.dumps(areas)
+            _entity.databases = jsonutils.dumps(databases)
+            session.flush()
+            return resultutils.results(result='swallow entity is success',
+                                       data=[dict(databases=databases, areas=areas)])
+
+    def swallowed(self, req, entity, body=None):
+        """合服内部接口,一般由agent调用
+        用于新实体吞噬旧实体的区服完成后调用,调用后将设置appentity为deleted状态"""
+        body = body or {}
+        entity = int(entity)
+        uuid = body.get('uuid')
+        if not uuid:
+            raise InvalidArgument('Merger uuid is None')
+        session = endpoint_session()
+        query = model_query(session, MergeTask, filter=MergeTask.uuid == uuid)
+        query = query.options(joinedload(MergeTask.entitys, innerjoin=False))
+        appentity = None
+        with session.begin():
+            etask = query.one_or_none()
+            if not etask:
+                raise InvalidArgument('Not task exit with %s' % uuid)
+            for _entity in etask.entitys:
+                if _entity.entity == entity:
+                    if _entity.status != common.SWALLOWING:
+                        raise InvalidArgument('Swallowed entity find status error')
+                    _query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
+                    appentity = _query.one_or_none()
+                    break
+            if not appentity:
+                raise InvalidArgument('Can not find app entity?')
+            if appentity.objtype != common.GAMESERVER:
+                raise InvalidArgument('objtype error, entity not %s' % common.GAMESERVER)
+            if appentity.status != common.SWALLOWING:
+                raise InvalidArgument('find status error, when swallowed')
+            # appentity状态修改为deleted
+            appentity.status = common.DELETED
+            # 修改实体在合服任务中的状态
+            _entity.status = common.MERGEED
+            session.flush()
+            # area绑定新实体
+            _query = model_query(session, GameArea, filter=GameArea.entity == entity)
+            _query.update({'entity': _entity.entity})
+            session.flush()
+            return resultutils.results(result='swallowed entity is success',
+                                       data=[dict(databases=jsonutils.loads_as_bytes(_entity.databases),
+                                                  areas=jsonutils.loads_as_bytes(_entity.areas))])
 
     def spit(self, req, entity, body=None):
         """合服内部接口,用于新实体在失败时候吐出旧实体的区服"""

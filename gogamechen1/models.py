@@ -188,7 +188,7 @@ class MergeEntity(TableBase):
     status = sa.Column(TINYINT(64), nullable=False, default=common.MERGEING)
     uuid = sa.Column(sa.ForeignKey('mergetasks.uuid', ondelete="RESTRICT", onupdate='RESTRICT'),
                      nullable=False)
-    areas = sa.Column(BLOB, nullable=False)
+    areas = sa.Column(BLOB, nullable=True)
     databases = sa.Column(BLOB, nullable=True)
 
 

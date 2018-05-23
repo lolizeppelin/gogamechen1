@@ -12,9 +12,9 @@ DATADB = 'datadb'
 LOGDB = 'logdb'
 APPFILE = 'appfile'
 
-DELETED = -2
-UNACTIVE = -1
-OK = 0
+DELETED = -2  # has been delete
+UNACTIVE = -1  # not active
+OK = 0  # status ok
 MERGEING = 1
 SWALLOWING = 2
 MERGEED = 4

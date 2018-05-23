@@ -93,9 +93,9 @@ class GogameAppCreate(application.AppCreateBase):
             return
         appendpoint = self.middleware.reflection()
         # 创建实体程序文件
-        self.middleware.waiter = appendpoint.create_entity(self.middleware.entity,
-                                                           self.middleware.objtype,
-                                                           upgradefile, self.timeout)
+        self.middleware.waiter = appendpoint.extract_entity_file(self.middleware.entity,
+                                                                 self.middleware.objtype,
+                                                                 upgradefile, self.timeout)
 
     def revert(self, result, **kwargs):
         if isinstance(result, failure.Failure):
