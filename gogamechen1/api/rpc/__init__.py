@@ -132,6 +132,9 @@ class Application(AppEndpointBase):
     def entity_group(self, entity):
         return 'gogamechen1'
 
+    def logbakup(self, entity):
+        return os.path.join(self.bakpath(entity), 'logbak-%d' % entity)
+
     def pre_start(self, external_objects):
         super(AppEndpointBase, self).pre_start(external_objects)
         external_objects.update({'gogamechen1-aff': CONF[common.NAME].agent_affinity})
@@ -315,7 +318,7 @@ class Application(AppEndpointBase):
                 confdir = os.path.split(self._objconf(entity, objtype))[0]
                 os.makedirs(confdir, mode=0755)
                 systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
-                with self._allocate_port(entity, objtype, ports) as _ports:
+                with self._allocate_port(entity, objtype, ports):
                     try:
                         middleware = taskcreate.create_entity(self, entity, objtype, databases,
                                                               appfile, timeout)
@@ -345,10 +348,10 @@ class Application(AppEndpointBase):
                     threadpool.add_thread(_extract_wait)
                     return middleware
 
-
     def delete_entity(self, entity):
         if self._entity_process(entity):
-            raise ValueError('Entity is running')
+            raise RpcEntityError(endpoint=common.NAME, entity=entity,
+                                 reason='Entity is running')
         LOG.info('Try delete %s entity %d' % (self.namespace, entity))
         home = self.entity_home(entity)
         try:
@@ -388,7 +391,22 @@ class Application(AppEndpointBase):
         args = [EXEC, ]
         with self.lock(entity):
             if self._entity_process(entity, pids=pids):
-                raise ValueError('Entity is running')
+                raise RpcEntityError(endpoint=common.NAME, entity=entity,
+                                     reason='Entity is running')
+            logbakup = self.logbakup(entity)
+            logpath = self.logpath(entity)
+            if not os.path.exists(logbakup):
+                try:
+                    os.makedirs(logbakup)
+                except (OSError, IOError):
+                    LOG.error('Make path for backup entity log fail')
+            for logfile in logpath:
+                filename = os.path.join(logpath, logfile)
+                if os.path.isfile(filename):
+                    try:
+                        os.rename(filename, os.path.join(logbakup, logfile))
+                    except (OSError, IOError):
+                        LOG.error('Move log file %s to back up path fail' % filename)
             pid = safe_fork(user=user, group=group)
             if pid == 0:
                 ppid = os.fork()
@@ -414,7 +432,8 @@ class Application(AppEndpointBase):
             if not p:
                 return
             if not kill and self._objtype(entity) == common.GAMESERVER:
-                raise ValueError('Entity is running')
+                raise RpcEntityError(endpoint=common.NAME, entity=entity,
+                                     reason='Entity is running')
             sig = signal.SIGINT
             if kill:
                 sig = signal.SIGKILL
@@ -490,7 +509,8 @@ class Application(AppEndpointBase):
                             resultcode=manager_common.RESULT_SUCCESS,
                             result=result,
                             connection=self.manager.local_ip,
-                            ports=ports, databases=middleware.databases)
+                            ports=self._get_ports(entity),
+                            databases=middleware.databases)
 
     def rpc_post_create_entity(self, ctxt, entity, **kwargs):
         LOG.info('Get post create command with %s' % str(kwargs))
@@ -1013,4 +1033,5 @@ class Application(AppEndpointBase):
                             resultcode=manager_common.RESULT_SUCCESS,
                             result=result,
                             connection=self.manager.local_ip,
-                            ports=ports, databases=middleware.databases)
+                            ports=self._get_ports(entity),
+                            databases=middleware.databases)
