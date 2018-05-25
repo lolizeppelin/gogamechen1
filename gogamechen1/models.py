@@ -197,5 +197,5 @@ class MergeTask(TableBase):
     entity = sa.Column(INTEGER(unsigned=True), default=0)
     status = sa.Column(TINYINT(64), nullable=False, default=common.MERGEING)
     mergetime = sa.Column(INTEGER(unsigned=True), nullable=False)
-    entitys = orm.relationship(MergeEntity, backref='mergetask', lazy='join',
+    entitys = orm.relationship(MergeEntity, backref='mergetask', lazy='select',
                                cascade='delete,delete-orphan')
