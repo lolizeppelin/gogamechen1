@@ -940,18 +940,19 @@ class Application(AppEndpointBase):
             raise RpcEntityError(endpoint=common.NAME,
                                  entity=entity,
                                  reason='Entity type not %s' % common.GAMESERVER)
-        if self._entity_process(entity):
-            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                              resultcode=manager_common.RESULT_ERROR,
-                                              ctxt=ctxt,
-                                              result='Entity %d is running' % entity)
-        status = self.konwn_appentitys[entity].get('status')
-        if status != common.UNACTIVE:
-            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                              resultcode=manager_common.RESULT_ERROR,
-                                              ctxt=ctxt,
-                                              result='Entity %d status error' % entity)
-        self.konwn_appentitys[entity].update({'status': common.SWALLOWING})
+        with self.lock(entity):
+            if self._entity_process(entity):
+                return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                                  resultcode=manager_common.RESULT_ERROR,
+                                                  ctxt=ctxt,
+                                                  result='Entity %d is running' % entity)
+            status = self.konwn_appentitys[entity].get('status')
+            if status != common.UNACTIVE:
+                return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                                  resultcode=manager_common.RESULT_ERROR,
+                                                  ctxt=ctxt,
+                                                  result='Entity %d status error' % entity)
+            self.konwn_appentitys[entity].update({'status': common.SWALLOWING})
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           resultcode=manager_common.RESULT_SUCCESS,
                                           ctxt=ctxt,
