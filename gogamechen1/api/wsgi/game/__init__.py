@@ -316,6 +316,7 @@ class GroupReuest(BaseContorller):
                             areaname=area.areaname,
                             entity=appentity.entity,
                             opentime=appentity.opentime,
+                            platform=appentity.platform,
                             status=appentity.status,
                             versions=jsonutils.loads_as_bytes(appentity.versions) if appentity.versions else None,
                             external_ips=emaps[appentity.entity]['metadata']['external_ips'],
