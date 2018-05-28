@@ -271,17 +271,25 @@ class AppEntityInternalReuest(AppEntityReuestBase):
         session = endpoint_session()
         query = model_query(session, MergeTask, filter=MergeTask.uuid == uuid)
         query = query.options(joinedload(MergeTask.entitys, innerjoin=False))
-        appentity = None
         glock = get_gamelock()
         rpc = get_client()
         with session.begin():
             etask = query.one_or_none()
             if not etask:
                 raise InvalidArgument('Not task exit with %s' % uuid)
+            # 找到目标实体
+            appentity = None
             for _entity in etask.entitys:
                 if _entity.entity == entity:
                     if _entity.status != common.MERGEING:
-                        raise InvalidArgument('Swallow entity find status error')
+                        if _entity.status != common.SWALLOWING:
+                            raise InvalidArgument('Swallow entity find status error')
+                        if not _entity.databases or not _entity.areas:
+                            raise InvalidArgument('Entity is swallowing bug database or ares is None')
+                        LOG.warning('Entit is swallowing, return saved data')
+                        return resultutils.results(result='swallow entity is success',
+                                                   data=[dict(databases=jsonutils.loads_as_bytes(_entity.databases),
+                                                              areas=jsonutils.loads_as_bytes(_entity.areas))])
                     _query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
                     _query = _query.options(joinedload(AppEntity.databases, innerjoin=False))
                     appentity = _query.one_or_none()
