@@ -109,9 +109,23 @@ def format_chiefs(objtype, cfile, chiefs):
         return _format_chiefs(cfile, chiefs)
     else:
         if not os.path.exists(cfile):
-            raise ValueError('No chiefs file found')
+            raise ValueError('No config file found, need config of chiefs')
         conf = load(cfile)
         return conf.pop('ConnAddrs')
+
+
+def server_flag(objtype, cfile, flag=None):
+    if objtype != common.GAMESERVER:
+        return None
+    if not cfile and not flag:
+        return None
+    if flag is not None:
+        return flag
+    else:
+        if not os.path.exists(cfile):
+            return None
+        conf = load(cfile)
+        return conf.pop('ServerFlag', None)
 
 
 def format_opentime(objtype, cfile, opentime):
@@ -126,7 +140,7 @@ def format_opentime(objtype, cfile, opentime):
         return conf.pop('StartServerTime')
 
 
-def conf_type_1(logpath, local_ip, ports, entity, areas, databases, opentime, chiefs):
+def conf_type_1(logpath, local_ip, ports, entity, areas, databases, opentime, chiefs, flag=None):
     conf = OrderedDict()
     conf.setdefault('LogLevel', 'release')
     conf.setdefault('LogPath', logpath)
@@ -137,6 +151,8 @@ def conf_type_1(logpath, local_ip, ports, entity, areas, databases, opentime, ch
     conf.setdefault('ShowServers', [dict(Id=area.get('area_id'),
                                          Name=area.get('areaname'),
                                          show_id=area.get('show_id')) for area in areas])
+    if flag is not None:
+        conf.setdefault('ServerFlag', flag)
     conf.setdefault('StartServerTime', opentime)
     conf.setdefault('ConnAddrs', chiefs)
     conf.setdefault('DB', databases[common.DATADB])
@@ -149,7 +165,8 @@ def conf_type_2(logpath, local_ip, ports, entity, databases):
     conf = OrderedDict()
     conf.setdefault('LogLevel', 'release')
     conf.setdefault('LogPath', logpath)
-    conf.setdefault('WSAddr', '%s:%d' % (local_ip, ports[0]))
+    # conf.setdefault('WSAddr', '%s:%d' % (local_ip, ports[0]))
+    conf.setdefault('WSAddr', '%s:%d' % ('0.0.0.0', ports[0]))
     conf.setdefault('ListenAddr', '%s:%d' % (local_ip, ports[1]))
     conf.setdefault('DB', databases[common.DATADB])
     return conf
@@ -173,9 +190,9 @@ CONF_MAKE = {common.GMSERVER: conf_type_2,
 def make(objtype, logpath,
          local_ip, ports,
          entity, areas, databases,
-         opentime, chiefs):
+         opentime, chiefs, flag=None):
     if objtype == common.GAMESERVER:
-        args = (logpath, local_ip, ports, entity, areas, databases, opentime, chiefs)
+        args = (logpath, local_ip, ports, entity, areas, databases, opentime, chiefs, flag)
     elif objtype == common.GMSERVER:
         args = (logpath, local_ip, ports, entity, databases)
     elif objtype == common.CROSSSERVER:

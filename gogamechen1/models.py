@@ -148,6 +148,7 @@ class AppEntity(TableBase):
     group_id = sa.Column(sa.ForeignKey('groups.group_id', ondelete="RESTRICT", onupdate='RESTRICT'),
                          nullable=False)
     objtype = sa.Column(VARCHAR(64), nullable=False)
+    platform = sa.Column(VARCHAR(64), nullable=True)
     opentime = sa.Column(INTEGER(unsigned=True), nullable=True)
     status = sa.Column(TINYINT(64), nullable=False, default=common.UNACTIVE)
     cross_id = sa.Column(INTEGER(unsigned=True), nullable=True)

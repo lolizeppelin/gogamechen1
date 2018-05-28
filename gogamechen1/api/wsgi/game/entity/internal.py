@@ -150,6 +150,8 @@ class AppEntityInternalReuest(AppEntityReuestBase):
         gm = None
         cross = None
         crosss = []
+        # 默认平台识标
+        platform = None
         # 锁组
         glock = get_gamelock()
         with glock.grouplock(group_id):
@@ -207,6 +209,12 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                         raise InvalidArgument('Target entity %d has no area?' % appentity.entity)
                     if appentity.versions:
                         raise InvalidArgument('Traget entity %d version is not None' % appentity.entity)
+                    if not platform:
+                        platform = appentity.platform
+                    else:
+                        # 区服平台不相同, 直接设置为mix
+                        if platform != appentity.platform:
+                            platform = 'mix'
                     appentitys.append(appentity)
                 if len(appentitys) != len(entitys):
                     raise InvalidArgument('Can not match entitys count')
@@ -233,7 +241,8 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                                       agent_id=agent_id,
                                       objtype=common.GAMESERVER,
                                       cross_id=cross.cross_id,
-                                      opentime=opentime)
+                                      opentime=opentime,
+                                      platform=platform)
                 session.add(appentity)
                 session.flush()
                 # 插入数据库绑定信息

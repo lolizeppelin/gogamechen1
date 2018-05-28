@@ -295,11 +295,12 @@ class Application(AppEndpointBase):
             cfile = self._objconf(entity, objtype)
             databases = gconfig.format_databases(objtype, cfile, databases)
             chiefs = gconfig.format_chiefs(objtype, cfile, chiefs)
+            flag = gconfig.server_flag(objtype, cfile)
             opentime = gconfig.format_opentime(objtype, cfile, opentime) if not opentime else opentime
             confobj = gconfig.make(objtype, self.logpath(entity),
                                    self.manager.local_ip, ports,
                                    entity, areas,
-                                   databases, opentime, chiefs)
+                                   databases, opentime, chiefs, flag)
         except Exception:
             LOG.exception('flush config fail')
             raise

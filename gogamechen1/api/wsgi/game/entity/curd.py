@@ -66,6 +66,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                            'cross_id': {'type': 'integer', 'minimum': 1,
                                         'description': '跨服程序的实体id,gameserver专用参数'},
                            'areaname': {'type': 'string', 'description': '区服名称, gameserver专用参数'},
+                           'platform': {'type': 'string', 'description': '平台类型, gameserver专用参数'},
                            'databases': {'type': 'object', 'description': '程序使用的数据库,不填自动分配'}}
                        }
 
@@ -166,9 +167,11 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         opentime = body.pop('opentime', None)
         # 区服显示民称, gameserver专用
         areaname = body.pop('areaname', None)
+        # 平台类型
+        platform = body.pop('platform', None)
         if objtype == common.GAMESERVER:
-            if not areaname or not opentime:
-                raise InvalidArgument('%s need opentime and areaname' % objtype)
+            if not areaname or not opentime or not platform:
+                raise InvalidArgument('%s need opentime and areaname and platform' % objtype)
         # 安装文件信息
         appfile = body.pop(common.APPFILE)
         LOG.info('Try find agent and database for entity')
@@ -308,7 +311,8 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                                       agent_id=agent_id,
                                       group_id=group_id, objtype=objtype,
                                       cross_id=cross_id,
-                                      opentime=opentime)
+                                      opentime=opentime,
+                                      platform=platform)
                 session.add(appentity)
                 session.flush()
                 if objtype == common.GAMESERVER:
