@@ -285,7 +285,7 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                         if _entity.status != common.SWALLOWING:
                             raise InvalidArgument('Swallow entity find status error')
                         if not _entity.databases or not _entity.areas:
-                            raise InvalidArgument('Entity is swallowing bug database or ares is None')
+                            raise InvalidArgument('Entity is swallowing but database or ares is None')
                         LOG.warning('Entit is swallowing, return saved data')
                         return resultutils.results(result='swallow entity is success',
                                                    data=[dict(databases=jsonutils.loads_as_bytes(_entity.databases),
