@@ -83,6 +83,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                    AppEntity.group_id,
                    AppEntity.agent_id,
                    AppEntity.opentime,
+                   AppEntity.platform,
                    AppEntity.versions,
                    AppEntity.status,
                    AppEntity.objtype]
@@ -347,6 +348,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                 _result.setdefault('areas', areas)
                 _result.setdefault('cross_id', cross_id)
                 _result.setdefault('opentime', opentime)
+                _result.setdefault('platform', platform)
 
             # 添加端口
             threadpool.add_thread(port_controller.unsafe_create,
@@ -396,6 +398,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                                               agent_id=_entity.agent_id,
                                               objtype=objtype, group_id=_entity.group_id,
                                               opentime=_entity.opentime,
+                                              platform=_entity.platform,
                                               status=_entity.status,
                                               versions=jsonutils.loads_as_bytes(_entity.versions)
                                               if _entity.versions else None,
