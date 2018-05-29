@@ -170,7 +170,6 @@ class Group(TableBase):
     group_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True,
                          autoincrement=True)
     name = sa.Column(VARCHAR(64), default=None, nullable=False)
-    lastarea = sa.Column(INTEGER(unsigned=True), nullable=False, default=0)
     desc = sa.Column(VARCHAR(256), nullable=True)
     areas = orm.relationship(GameArea, backref='group', lazy='select',
                              cascade='delete,delete-orphan')

@@ -90,14 +90,13 @@ def list():
             print data
         print('\033[0m')
         sys.exit(1)
-    group_heads = ['id', 'name', 'lastarea', 'desc']
+    group_heads = ['id', 'name', 'desc']
     print '\033[1;32;40m\r',
     print 'List game group success'
     print '\033[0m'
     tb = table.PleasantTable(ident=0, columns=group_heads, counter=True)
     for package in data:
-        tb.add_row([package.get('group_id'), package.get('name'),
-                    package.get('lastarea'), package.get('desc')])
+        tb.add_row([package.get('group_id'), package.get('name'), package.get('desc')])
     print tb.pformat()
 
 
@@ -119,7 +118,6 @@ def create():
     group = data[0]
     print 'group id: %s' % group.get('group_id')
     print 'group name: %s' % group.get('name')
-    print 'lastarea: %s' % group.get('lastarea')
 
 
 def areas():
@@ -190,7 +188,6 @@ def show():
     print '\033[0m'
     print 'group id: %s' % group.get('group_id')
     print 'group name: %s' % group.get('name')
-    print 'lastarea: %s' % group.get('lastarea')
     gm = entitys.get(common.GMSERVER)
     if gm:
         gm = gm[0]
@@ -242,7 +239,6 @@ def delete():
     print 'Delete group success'
     print 'group id: %s' % group.get('group_id')
     print 'group name: %s' % group.get('name')
-    print 'lastarea: %s' % group.get('lastarea')
     print('\033[0m')
 
 

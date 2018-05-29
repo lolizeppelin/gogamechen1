@@ -303,7 +303,6 @@ def show():
     print '----------Group Info----------'
     print 'group id: %s' % group.get('group_id')
     print 'group name: %s' % group.get('name')
-    print 'lastarea: %d' % group.get('lastarea')
     print '---------Package file---------'
     tb = table.PleasantTable(ident=0, columns=pfile_heads, counter=True)
     for pfile in files:

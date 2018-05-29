@@ -109,7 +109,6 @@ class GroupReuest(BaseContorller):
         session = endpoint_session(readonly=True)
         columns = [Group.group_id,
                    Group.name,
-                   Group.lastarea,
                    Group.desc,
                    Group.areas]
 
@@ -142,8 +141,7 @@ class GroupReuest(BaseContorller):
         return resultutils.results(result='create group success',
                                    data=[dict(group_id=_group.group_id,
                                               name=_group.name,
-                                              desc=_group.desc,
-                                              lastarea=_group.lastarea)])
+                                              desc=_group.desc)])
 
     def show(self, req, group_id, body=None):
         body = body or {}
@@ -158,7 +156,6 @@ class GroupReuest(BaseContorller):
         _group = query.one()
         group_info = dict(group_id=_group.group_id,
                           name=_group.name,
-                          lastarea=_group.lastarea,
                           desc=_group.desc)
         if detail:
             _entitys = {}
@@ -187,7 +184,7 @@ class GroupReuest(BaseContorller):
         query = model_query(session, Group, filter=Group.group_id == group_id)
         query = query.options(joinedload(Group.entitys, innerjoin=False))
         _group = query.one()
-        deleted = dict(group_id=_group.group_id, name=_group.name, lastarea=_group.lastarea)
+        deleted = dict(group_id=_group.group_id, name=_group.name)
         if _group.entitys:
             raise InvalidArgument('Group has entitys, can not be delete')
         session.delete(_group)

@@ -6,6 +6,7 @@ from six.moves import zip
 
 from sqlalchemy.orm import joinedload
 from sqlalchemy.sql import and_
+from sqlalchemy import func
 
 from simpleutil.common.exceptions import InvalidArgument
 from simpleutil.log import log as logging
@@ -14,6 +15,7 @@ from simpleutil.config import cfg
 
 from simpleservice.ormdb.api import model_query
 from simpleservice.ormdb.api import model_count_with_key
+from simpleservice.ormdb.api import model_max_with_key
 
 from goperation import threadpool
 from goperation.manager import common as manager_common
@@ -190,7 +192,6 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         joins = joins.joinedload(AppEntity.databases, innerjoin=False)
         query = query.options(joins)
         _group = query.one()
-        next_show_area = _group.lastarea + 1
         glock = get_gamelock()
         with glock.grouplock(group_id):
             typemap = {}
@@ -317,9 +318,13 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                 session.add(appentity)
                 session.flush()
                 if objtype == common.GAMESERVER:
+                    # 获取相同platform的最大show id
+                    query = session.query(func.max(GameArea.show_id)).select_from(AppEntity)
+                    query = query.join(AppEntity.areas, isouter=True)
+                    query = query.filter(and_(AppEntity.group_id == group_id, AppEntity.platform == platform))
+                    last_show_id = query.scalar() or 0
                     # 插入area数据
-                    query = model_query(session, Group, filter=Group.group_id == group_id)
-                    gamearea = GameArea(show_id=next_show_area,
+                    gamearea = GameArea(show_id=last_show_id + 1,
                                         areaname=areaname.decode('utf-8')
                                         if isinstance(areaname, six.binary_type)
                                         else areaname,
@@ -327,8 +332,6 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                                         entity=appentity.entity)
                     session.add(gamearea)
                     session.flush()
-                    # 更新 group lastarea属性
-                    query.update({'lastarea': next_show_area})
                 # 插入数据库绑定信息
                 if rpc_result.get('databases'):
                     self._bondto(session, entity, rpc_result.get('databases'))
@@ -517,11 +520,9 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                         if len(_entity.areas) > 1:
                             raise InvalidArgument('%s areas more then one' % objtype)
                         area = _entity.areas[0]
-                        group = _entity.group
                         if not force:
-                            if area.show_id != group.lastarea:
-                                raise InvalidArgument('%d entity not the last area entity' % entity)
-                            group.lastarea = group.lastarea - 1
+                            if _entity.entity == model_max_with_key(session, AppEntity.entity):
+                                raise InvalidArgument('entity %d is not the last entity' % entity)
                         session.flush()
                         session.delete(area)
                         session.flush()
