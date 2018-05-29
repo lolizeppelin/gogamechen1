@@ -94,7 +94,7 @@ def AsyncActionResult(action, stores):
         if not entity.get('areas'):
             areas = 'N/A'
         else:
-            areas = ['%d:%s:%d' % (area.get('show_id'), area.get('areaname'), area.get('area_id'))
+            areas = ['%s:%d' % (area.get('areaname'), area.get('area_id'))
                      for area in entity.get('areas')]
             areas = ','.join(areas)
         if not entity.get('pid'):
@@ -625,7 +625,7 @@ class Application(AppEndpointBase):
                                           ctxt=ctxt,
                                           result='change entity opentime success')
 
-    def rpc_change_entity_area(self, ctxt, entity, area_id, show_id, areaname, **kwargs):
+    def rpc_change_entity_area(self, ctxt, entity, area_id, areaname, **kwargs):
         entity = int(entity)
         timeout = count_timeout(ctxt, kwargs)
         while self.frozen:
@@ -646,7 +646,6 @@ class Application(AppEndpointBase):
             areas = self.konwn_appentitys[entity].get('areas')
             for area in areas:
                 if area.get('area_id') == area_id:
-                    area['show_id'] = show_id
                     area['areaname'] = areaname
             if not running:
                 self.flush_config(entity)

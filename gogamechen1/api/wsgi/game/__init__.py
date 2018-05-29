@@ -83,9 +83,9 @@ def areas_map(group_id):
     maps = {}
     for _area in query:
         try:
-            maps[_area.entity].append(dict(area_id=_area.area_id, show_id=_area.show_id, areaname=_area.areaname))
+            maps[_area.entity].append(dict(area_id=_area.area_id, areaname=_area.areaname))
         except KeyError:
-            maps[_area.entity] = [dict(area_id=_area.area_id, show_id=_area.show_id, areaname=_area.areaname), ]
+            maps[_area.entity] = [dict(area_id=_area.area_id, areaname=_area.areaname), ]
     session.close()
     return maps
 
@@ -96,7 +96,6 @@ class GroupReuest(BaseContorller):
             'required': ['area_id'],
             'properties': {
                 'area_id': {'type': 'integer', 'minimum': 1, 'description': '游戏区服ID'},
-                'show_id': {'type': 'integer', 'minimum': 1, 'description': '游戏区服显示ID'},
                 'areaname': {'type': 'string', 'description': '游戏区服显示名称'}}
             }
 
@@ -124,7 +123,7 @@ class GroupReuest(BaseContorller):
             areas = column.get('areas', [])
             column['areas'] = []
             for area in areas:
-                column['areas'].append(dict(area_id=area.area_id, show_id=area.show_id, areaname=area.areaname))
+                column['areas'].append(dict(area_id=area.area_id, areaname=area.areaname))
         return results
 
     def create(self, req, body=None):
@@ -164,7 +163,6 @@ class GroupReuest(BaseContorller):
                 entityinfo = dict(entity=entity.entity, status=entity.status)
                 if objtype == common.GAMESERVER:
                     entityinfo.setdefault('areas', [dict(area_id=area.area_id,
-                                                         show_id=area.show_id,
                                                          areaname=area.areaname)
                                                     for area in entity.areas])
                 try:
@@ -199,9 +197,8 @@ class GroupReuest(BaseContorller):
         except (TypeError, ValueError):
             raise InvalidArgument('Group id value error')
         area_id = body.get('area_id')
-        show_id = body.get('show_id')
         areaname = body.get('areaname')
-        if not areaname and not show_id:
+        if not areaname:
             raise InvalidArgument('No value change')
         rpc = get_client()
         session = endpoint_session()
@@ -225,8 +222,6 @@ class GroupReuest(BaseContorller):
                                                     GameArea.areaname == areaname)):
                     raise InvalidArgument('Area name duplicate in group %d' % group_id)
                 area.areaname = areaname
-            if show_id:
-                area.show_id = show_id
             target = targetutils.target_agent_by_string(metadata.get('agent_type'), metadata.get('host'))
             target.namespace = common.NAME
             finishtime, timeout = rpcfinishtime()
@@ -234,7 +229,6 @@ class GroupReuest(BaseContorller):
                                msg={'method': 'change_entity_area',
                                     'args': dict(entity=area.entity,
                                                  area_id=area.area_id,
-                                                 show_id=area.show_id,
                                                  areaname=area.areaname)},
                                timeout=timeout)
             if not rpc_ret:
@@ -309,7 +303,6 @@ class GroupReuest(BaseContorller):
                 continue
             for area in appentity.areas:
                 info = dict(area_id=area.area_id,
-                            show_id=area.show_id,
                             areaname=area.areaname,
                             entity=appentity.entity,
                             opentime=appentity.opentime,

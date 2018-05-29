@@ -98,11 +98,9 @@ class AppEntityCURDRequest(AppEntityReuestBase):
             for _area in query:
                 try:
                     _maps[_area.entity].append(dict(area_id=_area.area_id,
-                                                    show_id=_area.show_id,
                                                     areaname=_area.areaname))
                 except KeyError:
                     _maps[_area.entity] = [dict(area_id=_area.area_id,
-                                                show_id=_area.show_id,
                                                 areaname=_area.areaname), ]
             # session.close()
             return _maps
@@ -318,14 +316,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                 session.add(appentity)
                 session.flush()
                 if objtype == common.GAMESERVER:
-                    # 获取相同platform的最大show id
-                    query = session.query(func.max(GameArea.show_id)).select_from(AppEntity)
-                    query = query.join(AppEntity.areas, isouter=True)
-                    query = query.filter(and_(AppEntity.group_id == group_id, AppEntity.platform == platform))
-                    last_show_id = query.scalar() or 0
-                    # 插入area数据
-                    gamearea = GameArea(show_id=last_show_id + 1,
-                                        areaname=areaname.decode('utf-8')
+                    gamearea = GameArea(areaname=areaname.decode('utf-8')
                                         if isinstance(areaname, six.binary_type)
                                         else areaname,
                                         group_id=_group.group_id,
@@ -347,7 +338,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
 
             areas = []
             if objtype == common.GAMESERVER:
-                areas = [dict(area_id=gamearea.area_id, show_id=gamearea.show_id, areaname=areaname)]
+                areas = [dict(area_id=gamearea.area_id, areaname=areaname)]
                 _result.setdefault('areas', areas)
                 _result.setdefault('cross_id', cross_id)
                 _result.setdefault('opentime', opentime)
@@ -406,7 +397,6 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                                               versions=jsonutils.loads_as_bytes(_entity.versions)
                                               if _entity.versions else None,
                                               areas=[dict(area_id=area.area_id,
-                                                          show_id=area.show_id,
                                                           areaname=area.areaname.encode('utf-8'),
                                                           ) for area in _entity.areas],
                                               databases=databases,

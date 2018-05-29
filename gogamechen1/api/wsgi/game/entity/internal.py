@@ -114,7 +114,6 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                                               status=_entity.status,
                                               opentime=_entity.opentime,
                                               areas=[dict(area_id=area.area_id,
-                                                          show_id=area.show_id,
                                                           areaname=area.areaname)
                                                      for area in _entity.areas],
                                               objtype=_entity.objtype) for _entity in query])
@@ -317,8 +316,7 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                                        passwd=database['passwd'],
                                        character_set=database['character_set']) for database in appentity.databases]))
             areas = [dict(area_id=area.area_id,
-                          areaname=area.areaname,
-                          show_id=area.show_id)
+                          areaname=area.areaname)
                      for area in appentity.areas]
             if not databases or not areas:
                 LOG.error('Entity no areas or databases record')
