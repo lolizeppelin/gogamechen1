@@ -65,20 +65,13 @@ ANY = 'any'
 ANDROID = 'android'
 IOS = 'ios'
 
-# EntityTypeMap = {IOS: 'ios',
-#                  ANDROID: 'android',
-#                  ANY: 'any'}
-#
-# InvertEntityTypeMap = dict([(v, k) for k, v in EntityTypeMap.iteritems()])
+PlatformTypeMap = {
+    ANDROID: 1,
+    IOS: 2,
+}
+
+InvertPlatformTypeMap = dict([(v, k) for k, v in PlatformTypeMap.iteritems()])
 
 SMALL_PACKAGE = 'small'
 UPDATE_PACKAGE = 'update'
 FULL_PACKAGE = 'full'
-
-# PackageTypeMap = {SMALL_PACKAGE: 'small',
-#                   UPDATE_PACKAGE: 'update',
-#                   FULL_PACKAGE: 'full'}
-
-# from itertools import izip
-# InvertPackageTypeMap = dict(izip(PackageTypeMap.itervalues(), PackageTypeMap.iterkeys()))
-# InvertPackageTypeMap = dict([(v, k) for k, v in PackageTypeMap.iteritems()])

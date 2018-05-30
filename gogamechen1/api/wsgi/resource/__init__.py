@@ -49,6 +49,7 @@ from gogamechen1.models import AppEntity
 from gogamechen1.models import ObjtypeFile
 from gogamechen1.models import Package
 from gogamechen1.models import PackageFile
+from gogamechen1.models import PackageEntity
 from gogamechen1.models import PackageRemark
 from gogamechen1.api.wsgi.game import GroupReuest
 from gogamechen1.api.wsgi.caches import resource_cache_map
@@ -318,17 +319,21 @@ class PackageReuest(BaseContorller):
 
     CREATESCHEMA = {
         'type': 'object',
-        'required': ['resource_id', 'package_name', 'mark'],
+        'required': ['resource_id', 'package_name', 'mark', 'platform'],
         'properties':
             {
                 'resource_id': {'type': 'integer', 'minimum': 1,
                                 'description': '安装包关联的游戏cdn资源'},
                 'package_name': {'type': 'string'},
-                'mark': {'type': 'string', 'description': '渠道标记'},
+                'mark': {'type': 'string', 'description': '渠道标记名'},
+                'platform': {'type': 'string', 'description': '平台类型'},
                 'magic': {'oneOf': [{'type': 'object'},
                                     {'type': 'null'}]},
                 'extension': {'oneOf': [{'type': 'object'},
                                         {'type': 'null'}]},
+                'entitys': {'type': 'array',
+                            'items': {'type': 'integer', 'minimum': 1},
+                            'description': '包含的实体列表'},
                 'desc': {'oneOf': [{'type': 'string'}, {'type': 'null'}]},
             }
     }
@@ -375,19 +380,18 @@ class PackageReuest(BaseContorller):
                              etype=resource.get('etype'),
                              name=resource.get('name'),
                              mark=package.mark,
+                             platform=package.platform,
                              status=package.status,
                              magic=jsonutils.loads_as_bytes(package.magic) if package.magic else None,
                              extension=jsonutils.loads_as_bytes(package.extension) if package.extension else None,
                              resource=dict(versions=resource.get('versions'),
                                            urls=resource_url(package.resource_id),
-                                           resource_id=package.resource_id,
-                                           ),
+                                           resource_id=package.resource_id),
                              login=dict(local_ip=chief.get('local_ip'),
                                         ports=chief.get('ports'),
                                         objtype=chief.get('objtype'),
                                         dnsnames=chief.get('dnsnames'),
-                                        external_ips=chief.get('external_ips'),
-                                        ),
+                                        external_ips=chief.get('external_ips')),
                              files=[dict(pfile_id=pfile.pfile_id,
                                          ftype=pfile.ftype,
                                          address=pfile.address,
@@ -426,6 +430,18 @@ class PackageReuest(BaseContorller):
 
         return resultutils.results(result='list packages resource success', data=data)
 
+    def entitys(self, req, body=None):
+        session = endpoint_session(readonly=True)
+        query = model_query(session, Package, filter=Package.status == common.ENABLE)
+        query = query.options(joinedload(Package.entitys, innerjoin=False))
+        data = [dict(package_id=package.package_id,
+                     package_name=package.package_name,
+                     mark=package.mark,
+                     entitys=[dict(entity=pentity.entity, status=pentity.status)
+                              for pentity in package.entitys]
+                     ) for package in query]
+        return resultutils.results(result='list packages entitys success', data=data)
+
     def index(self, req, group_id, body=None):
         body = body or {}
         group_id = int(group_id)
@@ -441,6 +457,7 @@ class PackageReuest(BaseContorller):
                                                     Package.rversion,
                                                     Package.resource_id,
                                                     Package.mark,
+                                                    Package.platform,
                                                     Package.status,
                                                     Package.magic,
                                                     Package.extension],
@@ -464,6 +481,10 @@ class PackageReuest(BaseContorller):
         jsonutils.schema_validate(body, self.CREATESCHEMA)
         resource_id = int(body.pop('resource_id'))
         package_name = body.pop('package_name')
+        entitys = set(body.pop('entitys', []))
+        platform = common.PlatformTypeMap.get(body.pop('platform'))
+        if not platform:
+            raise InvalidArgument('platform value error')
         group_id = int(group_id)
         mark = body.pop('mark')
         magic = body.get('magic')
@@ -471,10 +492,21 @@ class PackageReuest(BaseContorller):
         desc = body.get('desc')
         session = endpoint_session()
         with session.begin():
-            # 确认package_name没有相同
             if model_count_with_key(session, Package.package_id,
                                     filter=Package.package_name == package_name):
                 raise InvalidArgument('Package name Duplicate')
+            if entitys:
+                query = model_query(session, AppEntity, filter=AppEntity.entity.in_(entitys))
+                appentitys = query.all()
+                if len(appentitys) != len(entitys):
+                    raise InvalidArgument('Some entity can not be found')
+                for appentity in appentitys:
+                    if appentity.group_id != group_id \
+                            or appentity.objtype != common.GAMESERVER \
+                            or not appentity.platform & platform:
+                        raise InvalidArgument('Entity not exist, create package fail')
+            else:
+                appentitys = []
             # 确认group以及gmsvr
             if not group_controller._chiefs(group_ids=[group_id], cross=False):
                 return resultutils.results(result='Can not find entity of %s' % common.GMSERVER,
@@ -489,8 +521,10 @@ class PackageReuest(BaseContorller):
                               package_name=package_name,
                               group_id=group_id,
                               mark=mark,
+                              platform=platform,
                               magic=jsonutils.dumps(magic) if magic else None,
                               extension=jsonutils.dumps(extension) if extension else None,
+                              entitys=[PackageEntity(entity=appentity.entity) for appentity in appentitys],
                               desc=desc)
             session.add(package)
             session.flush()
@@ -534,6 +568,7 @@ class PackageReuest(BaseContorller):
                                               versions=resource.get('versions'),
                                               urls=resource_url(package.resource_id),
                                               mark=package.mark,
+                                              platform=package.platform,
                                               status=package.status,
                                               magic=jsonutils.loads_as_bytes(package.magic)
                                               if package.magic else None,

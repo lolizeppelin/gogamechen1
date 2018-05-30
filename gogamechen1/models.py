@@ -30,6 +30,14 @@ class PackageRemark(TableBase):
     message = sa.Column(VARCHAR(512), nullable=False)
 
 
+class PackageEntity(TableBase):
+    """包对应实体"""
+    package_id = sa.Column(sa.ForeignKey('packages.package_id', ondelete="CASCADE", onupdate='RESTRICT'),
+                           nullable=False, primary_key=True)
+    entity = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
+    status = sa.Column(SMALLINT, nullable=False, default=0)
+
+
 class PackageFile(TableBase):
     # 包文件id
     pfile_id = sa.Column(INTEGER(unsigned=True), nullable=False,
@@ -73,8 +81,10 @@ class Package(TableBase):
     # 游戏服务器组id
     group_id = sa.Column(sa.ForeignKey('groups.group_id', ondelete="RESTRICT", onupdate='RESTRICT'),
                          nullable=False)
-    # 标记
+    # 渠道标记名字
     mark = sa.Column(VARCHAR(32), nullable=False)
+    # 平台标记
+    platform = sa.Column(TINYINT(unsigned=True), nullable=True)
     # 状态
     status = sa.Column(SMALLINT, nullable=False, default=common.ENABLE)
     # 说明
@@ -85,6 +95,8 @@ class Package(TableBase):
     extension = sa.Column(BLOB, nullable=True)
     files = orm.relationship(PackageFile, backref='package', lazy='select',
                              cascade='delete,delete-orphan,save-update')
+    entitys = orm.relationship(PackageEntity, backref='package', lazy='select',
+                               cascade='delete,delete-orphan,save-update')
     __table_args__ = (
         sa.UniqueConstraint('package_name', name='package_unique'),
         InnoDBTableBase.__table_args__
@@ -147,7 +159,7 @@ class AppEntity(TableBase):
     group_id = sa.Column(sa.ForeignKey('groups.group_id', ondelete="RESTRICT", onupdate='RESTRICT'),
                          nullable=False)
     objtype = sa.Column(VARCHAR(64), nullable=False)
-    platform = sa.Column(VARCHAR(64), nullable=True)
+    platform = sa.Column(TINYINT(unsigned=True), nullable=True)
     opentime = sa.Column(INTEGER(unsigned=True), nullable=True)
     status = sa.Column(TINYINT(64), nullable=False, default=common.UNACTIVE)
     cross_id = sa.Column(INTEGER(unsigned=True), nullable=True)
