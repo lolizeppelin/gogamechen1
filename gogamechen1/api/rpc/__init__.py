@@ -432,12 +432,8 @@ class Application(AppEndpointBase):
             p = self._entity_process(entity, pids)
             if not p:
                 return
-            if not kill and self._objtype(entity) == common.GAMESERVER:
-                raise RpcEntityError(endpoint=common.NAME, entity=entity,
-                                     reason='Entity is running')
-            sig = signal.SIGINT
-            if kill:
-                sig = signal.SIGKILL
+            # 程序默认使用SIGINT停服兼容windows和linux
+            sig = signal.SIGINT if not kill else signal.SIGKILL
             os.kill(p.pid, sig)
             eventlet.sleep(1)
 
@@ -732,6 +728,7 @@ class Application(AppEndpointBase):
 
     def rpc_stop_entitys(self, ctxt, entitys, **kwargs):
         timeout = count_timeout(ctxt, kwargs)
+        kill = kwargs.get('kill')
         overtime = timeout + time.time()
         entitys = argutils.map_to_int(entitys) & set(self.entitys)
         if not entitys:
@@ -750,8 +747,16 @@ class Application(AppEndpointBase):
 
         def safe_wapper(__entity):
             try:
-                self.stop_entity(__entity, pids=proc_snapshot_before, kill=kwargs.get('kill'))
-                details.append(formater(__entity, manager_common.RESULT_SUCCESS))
+                if delay and not kill:
+                    with self.lock(entity):
+                        if self._entity_process(entity, proc_snapshot_before):
+                            details.append(formater(__entity, manager_common.RESULT_ERROR,
+                                                    'entity %d still running, stop fail' % entity))
+                        else:
+                            details.append(formater(__entity, manager_common.RESULT_SUCCESS))
+                else:
+                    self.stop_entity(__entity, pids=proc_snapshot_before, kill=kill)
+                    details.append(formater(__entity, manager_common.RESULT_SUCCESS))
             except RpcTargetLockException as e:
                 details.append(formater(__entity, manager_common.RESULT_ERROR,
                                         'stop entity %d fail, %s' % (__entity, e.message)))

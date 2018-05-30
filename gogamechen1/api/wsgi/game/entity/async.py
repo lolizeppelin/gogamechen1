@@ -206,6 +206,8 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
                                                                                                   common.GMSERVER),
                                            resultcode=manager_common.RESULT_ERROR)
             body.update({'delay': delay})
+        else:
+            body.pop('delay', None)
         return self._async_bluck_rpc('stop', group_id, objtype, entity, body)
 
     def status(self, req, group_id, objtype, entity, body=None):
