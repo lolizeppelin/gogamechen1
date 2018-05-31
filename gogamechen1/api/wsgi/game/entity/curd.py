@@ -182,6 +182,8 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                         raise InvalidArgument('Package group not match when create entity')
                     if not (package.platform & platform):
                         raise InvalidArgument('Pacakge platform not match when create entity')
+            else:
+                _packages = []
         # 安装文件信息
         appfile = body.pop(common.APPFILE)
         LOG.info('Try find agent and database for entity')
@@ -324,7 +326,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                 session.add(appentity)
                 session.flush()
                 if objtype == common.GAMESERVER:
-                    area_id = model_max_with_key(GameArea, GameArea.area_id) + 1
+                    area_id = model_max_with_key(session, GameArea.area_id) + 1
                     session.add(GameArea(areaname=areaname.decode('utf-8')
                     if isinstance(areaname, six.binary_type)
                     else areaname,
