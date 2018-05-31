@@ -397,8 +397,8 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
         return results
 
     # -----------package api-----------------
-    def package_all(self):
-        resp, results = self.get(action=self.all_packages_path)
+    def package_all(self, areas=False):
+        resp, results = self.get(action=self.all_packages_path, body={'areas': areas})
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='list all package fail',
                                             code=resp.status_code,

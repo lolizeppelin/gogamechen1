@@ -35,8 +35,6 @@ class PackageArea(TableBase):
     package_id = sa.Column(sa.ForeignKey('packages.package_id', ondelete="CASCADE", onupdate='RESTRICT'),
                            nullable=False, primary_key=True)
     area_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
-    show_id = sa.Column(INTEGER(unsigned=True), nullable=False)
-    state = sa.Column(SMALLINT, nullable=False, default=0)
 
 
 class PackageFile(TableBase):

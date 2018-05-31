@@ -348,6 +348,8 @@ class PackageReuest(BaseContorller):
     }
 
     def packages(self, req, body=None):
+        body = body or {}
+        areas = body.get('areas')
         session = endpoint_session(readonly=True)
         query = model_query(session, Package, filter=Package.status == common.ENABLE)
         query = query.options(joinedload(Package.files, innerjoin=False))
@@ -363,75 +365,78 @@ class PackageReuest(BaseContorller):
         rth = eventlet.spawn(map_resources, resource_ids=resource_ids)
 
         # 异步获取渠道areas
-        def _areas():
+        def _getareas():
             query = model_query(session, PackageArea)
             for parea in query:
-                area = dict(show_id=parea.show_id, area_id=parea.area_id, state=parea.state)
                 try:
-                    pareas[parea.package_id].append(area)
+                    pareas[parea.package_id].append(parea.area_id)
                 except KeyError:
-                    pareas[parea.package_id] = [area, ]
+                    pareas[parea.package_id] = [parea.area_id, ]
 
-        ath = eventlet.spawn(_areas)
+        if areas:
+            ath = eventlet.spawn(_getareas)
 
-        chiefs, areas = group_controller.entitys([common.GMSERVER, common.GAMESERVER], need_ok=True)
+        objtypes = [common.GMSERVER]
+        if areas:
+            objtypes.append(common.GAMESERVER)
+
+        _chiefs, _areas = group_controller.entitys(objtypes, need_ok=True)
         chiefs_maps = {}
-        for chief in chiefs:
+        for chief in _chiefs:
             chiefs_maps.setdefault(chief.get('group_id'), chief)
-        areas_maps = {}
-        for area in areas:
-            areas_maps.setdefault(area.get('area_id'), area)
 
         rth.wait()
-        ath.wait()
+
+        if areas:
+            areas_maps = {}
+            for area in _areas:
+                areas_maps.setdefault(area.get('area_id'), area)
+            ath.wait()
+
         data = []
         for package in packages:
             chief = chiefs_maps[package.group_id]
             resource = resource_cache_map(resource_id=package.resource_id, flush=False)
-            info = dict(dict(package_id=package.package_id,
-                             package_name=package.package_name,
-                             gversion=package.gversion,
-                             rversion=package.rversion,
-                             group_id=package.group_id,
-                             etype=resource.get('etype'),
-                             name=resource.get('name'),
-                             mark=package.mark,
-                             platform=package.platform,
-                             status=package.status,
-                             magic=jsonutils.loads_as_bytes(package.magic) if package.magic else None,
-                             extension=jsonutils.loads_as_bytes(package.extension) if package.extension else None,
-                             resource=dict(versions=resource.get('versions'),
-                                           urls=resource_url(package.resource_id),
-                                           resource_id=package.resource_id),
-                             login=dict(local_ip=chief.get('local_ip'),
-                                        ports=chief.get('ports'),
-                                        objtype=chief.get('objtype'),
-                                        dnsnames=chief.get('dnsnames'),
-                                        external_ips=chief.get('external_ips')),
-                             files=[dict(pfile_id=pfile.pfile_id,
-                                         ftype=pfile.ftype,
-                                         address=pfile.address,
-                                         gversion=pfile.gversion,
-                                         uptime=pfile.uptime,
-                                         status=pfile.status)
-                                    for pfile in package.files
-                                    if pfile.status == manager_common.DOWNFILE_FILEOK],
-                             areas=[dict(show_id=area.get('show_id'),
-                                         state=area.get('state'),
-                                         area_id=area.get('area_id'),
-                                         areaname=areas_maps[area.get('area_id')].get('areaname'),
-                                         entity=areas_maps[area.get('area_id')].get('entity'),
-                                         status=areas_maps[area.get('area_id')].get('status'),
-                                         external_ips=areas_maps[area.get('area_id')].get('external_ips'),
-                                         dnsnames=areas_maps[area.get('area_id')].get('dnsnames'),
-                                         port=areas_maps[area.get('area_id')].get('port'),
-                                         version=areas_maps[area.get('area_id')].get('versions').get(
-                                             str(package.package_id))
-                                         if areas_maps[area.get('area_id')].get('versions') else None
-                                         )
-                                    for area in pareas[package.package_id]] if package.package_id in pareas else [],
-                             )
-                        )
+            info = dict(package_id=package.package_id,
+                        package_name=package.package_name,
+                        gversion=package.gversion,
+                        rversion=package.rversion,
+                        group_id=package.group_id,
+                        etype=resource.get('etype'),
+                        name=resource.get('name'),
+                        mark=package.mark,
+                        platform=package.platform,
+                        status=package.status,
+                        magic=jsonutils.loads_as_bytes(package.magic) if package.magic else None,
+                        extension=jsonutils.loads_as_bytes(package.extension) if package.extension else None,
+                        resource=dict(versions=resource.get('versions'),
+                                      urls=resource_url(package.resource_id),
+                                      resource_id=package.resource_id),
+                        login=dict(local_ip=chief.get('local_ip'),
+                                   ports=chief.get('ports'),
+                                   objtype=chief.get('objtype'),
+                                   dnsnames=chief.get('dnsnames'),
+                                   external_ips=chief.get('external_ips')),
+                        files=[dict(pfile_id=pfile.pfile_id,
+                                    ftype=pfile.ftype,
+                                    address=pfile.address,
+                                    gversion=pfile.gversion,
+                                    uptime=pfile.uptime,
+                                    status=pfile.status)
+                               for pfile in package.files
+                               if pfile.status == manager_common.DOWNFILE_FILEOK])
+            if areas:
+                info.setdefault('areas', [
+                    dict(area_id=area_id,
+                         areaname=areas_maps[area_id].get('areaname'),
+                         entity=areas_maps[area_id].get('entity'),
+                         status=areas_maps[area_id].get('status'),
+                         external_ips=areas_maps[area_id].get('external_ips'),
+                         dnsnames=areas_maps[area_id].get('dnsnames'),
+                         port=areas_maps[area_id].get('port'),
+                         version=areas_maps[area_id].get('versions').get(str(package.package_id))
+                         if areas_maps[area_id].get('versions') else None)
+                    for area_id in sorted(pareas[package.package_id])] if package.package_id in pareas else [])
             data.append(info)
         return resultutils.results(result='list packages success', data=data)
 
@@ -468,8 +473,7 @@ class PackageReuest(BaseContorller):
         data = [dict(package_id=package.package_id,
                      package_name=package.package_name,
                      mark=package.mark,
-                     areas=[dict(area_id=pareas.area_id, show_id=pareas.show_id, status=pareas.state)
-                            for pareas in package.areas]
+                     areas=sorted([pareas.area_id for pareas in package.areas])
                      ) for package in query]
         return resultutils.results(result='list packages areas success', data=data)
 

@@ -114,7 +114,7 @@ def client(session=None):
 def all():
     CONF(project='cmd')
     _client = client()
-    code, result, data = prepare_results(_client.package_all)
+    code, result, data = prepare_results(_client.package_all, areas=True)
     if code:
         print('\033[1;31;40m')
         print 'Fail, code %d, result %s' % (code, result)
@@ -127,8 +127,7 @@ def all():
     print '\033[0m'
 
     file_heads = ['id', 'ftype', 'gversion', 'status', 'uptime', 'address']
-    area_heads = ['show', 'area', 'name', 'state',
-                  'entity', 'status', 'ips', 'dnsnames', 'port', 'version']
+    area_heads = ['area', 'name', 'entity', 'status', 'ips', 'dnsnames', 'port', 'version']
 
     for package in data:
         resource = package.get('resource')
@@ -170,7 +169,7 @@ def all():
         tb = table.PleasantTable(ident=0, columns=area_heads, counter=True)
         if areas:
             for area in areas:
-                tb.add_row([area.get('show_id'), area.get('area_id'), area.get('areaname'), area.get('state'),
+                tb.add_row([area.get('area_id'), area.get('areaname'),
                             area.get('entity'), area.get('status'), ','.join(area.get('external_ips')),
                             ','.join(area.get('dnsnames')), area.get('port'), area.get('version')])
         print tb.pformat()

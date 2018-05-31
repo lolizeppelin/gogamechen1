@@ -333,23 +333,11 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                                          group_id=_group.group_id,
                                          entity=appentity.entity))
                     session.flush()
-                    # 插入渠道包包含列表中
+                    # area id插入渠道包包含列表中
                     if packages:
-                        _pquery = session.query(PackageArea.package_id,
-                                                func.max(PackageArea.show_id))
-                        _pquery = _pquery.group_by(PackageArea.package_id)
-                        _pquery.filter(PackageArea.package_id.in_([package.package_id for package in _packages]))
-                        for package_area in _pquery:
-                            package_id = package_area[0]
-                            show_id = package_area[1] + 1
-                            session.add(PackageArea(package_id=package_id, area_id=area_id, show_id=show_id))
+                        for package_id in packages:
+                            session.add(PackageArea(package_id=package_id, area_id=area_id))
                             session.flush()
-                            packages.pop(package_id)
-                        # 没有在PackageArea中找到,插入show id值1
-                        if packages:
-                            for package_id in packages:
-                                session.add(PackageArea(package_id=package_id, area_id=area_id, show_id=1))
-                                session.flush()
                 # 插入数据库绑定信息
                 if rpc_result.get('databases'):
                     self._bondto(session, entity, rpc_result.get('databases'))

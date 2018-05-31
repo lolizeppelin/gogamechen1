@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 import six
+import eventlet
 import webob.exc
 
 from sqlalchemy.orm import joinedload
@@ -46,6 +47,7 @@ from gogamechen1.api import endpoint_session
 from gogamechen1.models import Group
 from gogamechen1.models import AppEntity
 from gogamechen1.models import GameArea
+from gogamechen1.models import Package
 
 from .entity.curd import AppEntityCURDRequest
 from .entity.async import AppEntityAsyncReuest
@@ -248,7 +250,7 @@ class GroupReuest(BaseContorller):
                                    data=[dict(entity=k, areas=v) for k, v in six.iteritems(maps)])
 
     @staticmethod
-    def entitys(objtypes=None, group_ids=None, need_ok=False):
+    def entitys(objtypes=None, group_ids=None, need_ok=False, packages=False):
         filters = [AppEntity.objtype.in_(objtypes)]
         if group_ids:
             filters.append(AppEntity.group_id.in_(argutils.map_to_int(group_ids)))
@@ -259,7 +261,30 @@ class GroupReuest(BaseContorller):
         entitys = set()
         for entity in appentitys:
             entitys.add(entity.entity)
+
+        # 反查渠道
+        if packages and common.GAMESERVER in objtypes:
+            pmaps = {}
+            pquery = model_query(session, Package)
+            pquery = pquery.joinedload(Package.areas)
+            if group_ids:
+                pquery = query.filter(Package.group_id.in_(argutils.map_to_int(group_ids)))
+
+            def _pmaps():
+                for package in pquery:
+                    for parea in package.areas:
+                        try:
+                            pmaps[parea.area_id].append(package.package_name)
+                        except KeyError:
+                            pmaps[parea.area_id] = [package.package_name, ]
+
+            th = eventlet.spawn(_pmaps)
+
         emaps = entity_controller.shows(common.NAME, entitys, ports=True, metadata=True)
+
+        if packages and common.GAMESERVER in objtypes:
+            th.wait()
+
         chiefs = []
         areas = []
         for entity in appentitys:
@@ -282,7 +307,9 @@ class GroupReuest(BaseContorller):
                                       versions=jsonutils.loads_as_bytes(entity.versions) if entity.versions else None,
                                       external_ips=metadata.get('external_ips'),
                                       dnsnames=metadata.get('dnsnames'),
-                                      port=ports[0]))
+                                      port=ports[0],
+                                      packagenames=pmaps.get(area.area_id, []) if packages else [],
+                                      ))
             else:
                 chiefs.append(dict(entity=entity.entity,
                                    objtype=entity.objtype,
@@ -323,11 +350,12 @@ class GroupReuest(BaseContorller):
     def areas(self, req, group_id, body=None):
         body = body or {}
         need_ok = body.get('need_ok', False)
+        packages = body.get('packages', False)
         group_ids = None
         if group_id != 'all':
             group_ids = argutils.map_to_int(group_id)
         chiefs, areas = self.entitys([common.GAMESERVER, common.GMSERVER],
-                                     group_ids, need_ok)
+                                     group_ids, need_ok, packages)
         return resultutils.results(result='list group areas success',
                                    data=[dict(chiefs=chiefs, areas=areas)])
 
