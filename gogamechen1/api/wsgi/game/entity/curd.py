@@ -541,8 +541,9 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                         if not force:
                             if _entity.entity != model_max_with_key(session,
                                                                     AppEntity.entity,
-                                                                    filter=AppEntity.objtype == common.GAMESERVER):
-                                raise InvalidArgument('entity %d is not the last entity' % entity)
+                                                                    filter=and_(AppEntity.objtype == common.GAMESERVER,
+                                                                                AppEntity.group_id == group_id)):
+                                raise InvalidArgument('entity %d is not the last gamesvr entity in group' % entity)
                         session.flush()
                         session.delete(area)
                         session.flush()
