@@ -416,17 +416,18 @@ class PackageReuest(BaseContorller):
                                          status=pfile.status)
                                     for pfile in package.files
                                     if pfile.status == manager_common.DOWNFILE_FILEOK],
-                             areas=[dict(show_id=area.show_id,
-                                         state=area.state,
-                                         area_id=area.area_id,
-                                         areaname=areas_maps[area.area_id].get('areaname'),
-                                         entity=areas_maps[area.area_id].get('entity'),
-                                         status=areas_maps[area.area_id].get('status'),
-                                         external_ips=areas_maps[area.area_id].get('external_ips'),
-                                         dnsnames=areas_maps[area.area_id].get('dnsnames'),
-                                         port=areas_maps[area.area_id].get('port'),
-                                         version=areas_maps[area.area_id].get('versions').get(str(package.package_id))
-                                         if areas_maps[area.area_id].get('versions') else None
+                             areas=[dict(show_id=area.get('show_id'),
+                                         state=area.get('state'),
+                                         area_id=area.get('area_id'),
+                                         areaname=areas_maps[area.get('area_id')].get('areaname'),
+                                         entity=areas_maps[area.get('area_id')].get('entity'),
+                                         status=areas_maps[area.get('area_id')].get('status'),
+                                         external_ips=areas_maps[area.get('area_id')].get('external_ips'),
+                                         dnsnames=areas_maps[area.get('area_id')].get('dnsnames'),
+                                         port=areas_maps[area.get('area_id')].get('port'),
+                                         version=areas_maps[area.get('area_id')].get('versions').get(
+                                             str(package.package_id))
+                                         if areas_maps[area.get('area_id')].get('versions') else None
                                          )
                                     for area in pareas[package.package_id]] if package.package_id in pareas else [],
                              )

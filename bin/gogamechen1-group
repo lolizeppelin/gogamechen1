@@ -135,14 +135,13 @@ def areas():
     print '\033[1;32;40m\r',
     print 'List all areas of group: %d success' % CONF.group_id
     print '\033[0m'
-    area_heads = ['area_id', 'name', 'entity', 'port', 'dnsnames', 'external_ips', 'versions', 'packages']
+    area_heads = ['area_id', 'name', 'entity', 'port', 'dnsnames', 'external_ips', 'versions']
     tb = table.PleasantTable(ident=0, columns=area_heads, counter=True)
     areas = data[0].get('areas')
     for area in areas:
         tb.add_row([area.get('area_id'), area.get('name'), area.get('entity'), area.get('port'),
                     ','.join(area.get('dnsnames')), ','.join(area.get('external_ips')),
-                    area.get('versions'),
-                    ','.join(area.get('packages'))])
+                    area.get('versions')])
     print tb.pformat()
 
 
@@ -267,8 +266,6 @@ def chiefs():
                     ','.join(map(str, chief.get('dnsnames'))),
                     ])
     print tb.pformat()
-
-
 
 def main():
     FUNCS = ['list', 'create', 'areas', 'show', 'delete', 'chiefs']

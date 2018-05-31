@@ -127,11 +127,13 @@ def all():
     print '\033[0m'
 
     file_heads = ['id', 'ftype', 'gversion', 'status', 'uptime', 'address']
+    area_heads = ['show', 'area', 'name', 'entity', 'status', 'ips', 'dnsnames', 'port', 'version']
 
     for package in data:
         resource = package.get('resource')
         login = package.get('login')
         files = package.get('files')
+        areas = package.get('areas')
         print '\033[1;32;40m\r',
         print '---------Pakcage Info---------',
         print '\033[0m'
@@ -164,6 +166,13 @@ def all():
                             _file.get('status'), _file.get('uptime'), _file.get('address')])
         print tb.pformat()
 
+        tb = table.PleasantTable(ident=0, columns=area_heads, counter=True)
+        if areas:
+            for area in areas:
+                tb.add_row([area.get('show_id'), area.get('area_id'), area.get('areaname'), area.get('state'),
+                            area.get('entity'), area.get('status'), ','.join(area.get('external_ips')),
+                            ','.join(area.get('dnsnames')), area.get('port'), area.get('versions')])
+        print tb.pformat()
 
 def resources():
     CONF(project='cmd')
