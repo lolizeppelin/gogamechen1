@@ -539,7 +539,9 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                             raise InvalidArgument('%s areas more then one' % objtype)
                         area = _entity.areas[0]
                         if not force:
-                            if _entity.entity == model_max_with_key(session, AppEntity.entity):
+                            if _entity.entity != model_max_with_key(session,
+                                                                    AppEntity.entity,
+                                                                    filter=AppEntity.objtype == common.GAMESERVER):
                                 raise InvalidArgument('entity %d is not the last entity' % entity)
                         session.flush()
                         session.delete(area)
