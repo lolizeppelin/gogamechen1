@@ -266,9 +266,9 @@ class GroupReuest(BaseContorller):
         if packages and common.GAMESERVER in objtypes:
             pmaps = {}
             pquery = model_query(session, Package)
-            pquery = pquery.joinedload(Package.areas)
+            pquery = pquery.options(joinedload(Package.areas, innerjoin=False))
             if group_ids:
-                pquery = query.filter(Package.group_id.in_(argutils.map_to_int(group_ids)))
+                pquery = pquery.filter(Package.group_id.in_(argutils.map_to_int(group_ids)))
 
             def _pmaps():
                 for package in pquery:

@@ -124,7 +124,7 @@ def areas():
     CONF.register_cli_opts(one_opts)
     CONF(project='cmd')
     _client = client()
-    code, result, data = prepare_results(_client.group_areas, CONF.group_id)
+    code, result, data = prepare_results(_client.group_areas, CONF.group_id, {'packages': True})
     if code:
         print('\033[1;31;40m')
         print 'Fail, code %d, result %s' % (code, result)
@@ -135,13 +135,13 @@ def areas():
     print '\033[1;32;40m\r',
     print 'List all areas of group: %d success' % CONF.group_id
     print '\033[0m'
-    area_heads = ['area_id', 'name', 'entity', 'port', 'dnsnames', 'external_ips', 'versions']
+    area_heads = ['area_id', 'name', 'entity', 'port', 'dnsnames', 'external_ips', 'versions', 'packages']
     tb = table.PleasantTable(ident=0, columns=area_heads, counter=True)
     areas = data[0].get('areas')
     for area in areas:
         tb.add_row([area.get('area_id'), area.get('name'), area.get('entity'), area.get('port'),
                     ','.join(area.get('dnsnames')), ','.join(area.get('external_ips')),
-                    area.get('versions')])
+                    area.get('versions'), ','.join(area.get('packagenames')), ])
     print tb.pformat()
 
 
