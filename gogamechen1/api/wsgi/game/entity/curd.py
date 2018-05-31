@@ -97,20 +97,6 @@ class AppEntityCURDRequest(AppEntityReuestBase):
 
         def _databases():
             _maps = {}
-            query = model_query(session, PackageEntity)
-            for _package in query:
-                try:
-                    _maps[_package.entity].add(_package.package_id)
-                except KeyError:
-                    _maps[_package.entity] = set()
-                    _maps[_package.entity].add(_package.package_id)
-            return _maps
-
-        if detail:
-            dth = eventlet.spawn(_databases)
-
-        def _packages():
-            _maps = {}
             if objtype != common.GAMESERVER:
                 return _maps
             query = model_query(session, AreaDatabase)
@@ -120,6 +106,20 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                     _maps[_db.entity].append(dbinfo)
                 except KeyError:
                     _maps[_db.entity] = [dbinfo, ]
+            return _maps
+
+        if detail:
+            dth = eventlet.spawn(_databases)
+
+        def _packages():
+            _maps = {}
+            query = model_query(session, PackageEntity)
+            for _package in query:
+                try:
+                    _maps[_package.entity].add(_package.package_id)
+                except KeyError:
+                    _maps[_package.entity] = set()
+                    _maps[_package.entity].add(_package.package_id)
             return _maps
 
         if packages:
