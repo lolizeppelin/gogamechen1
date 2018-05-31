@@ -15,7 +15,6 @@ from simpleutil.common.exceptions import InvalidArgument
 from simpleutil.log import log as logging
 from simpleutil.utils import jsonutils
 from simpleutil.utils import singleton
-from simpleutil.utils import digestutils
 from simpleutil.config import cfg
 
 from simpleservice.ormdb.api import model_query
@@ -49,7 +48,7 @@ from gogamechen1.models import AppEntity
 from gogamechen1.models import ObjtypeFile
 from gogamechen1.models import Package
 from gogamechen1.models import PackageFile
-from gogamechen1.models import PackageEntity
+from gogamechen1.models import PackageArea
 from gogamechen1.models import PackageRemark
 from gogamechen1.api.wsgi.game import GroupReuest
 from gogamechen1.api.wsgi.caches import resource_cache_map
@@ -331,9 +330,6 @@ class PackageReuest(BaseContorller):
                                     {'type': 'null'}]},
                 'extension': {'oneOf': [{'type': 'object'},
                                         {'type': 'null'}]},
-                'entitys': {'type': 'array',
-                            'items': {'type': 'integer', 'minimum': 1},
-                            'description': '包含的实体列表'},
                 'desc': {'oneOf': [{'type': 'string'}, {'type': 'null'}]},
             }
     }
@@ -358,16 +354,36 @@ class PackageReuest(BaseContorller):
         packages = query.all()
         resource_ids = set()
         group_ids = set()
+        pareas = dict()
         for package in packages:
             resource_ids.add(package.resource_id)
             group_ids.add(package.group_id)
+
         # 异步更新resources缓存
-        th = eventlet.spawn(map_resources, resource_ids=resource_ids)
-        chiefs = group_controller._chiefs(list(group_ids), cross=False)
+        rth = eventlet.spawn(map_resources, resource_ids=resource_ids)
+
+        # 异步获取渠道areas
+        def _areas():
+            query = model_query(session, PackageArea)
+            for parea in query:
+                area = dict(show_id=parea.show_id, area_id=parea.area_id, state=parea.state)
+                try:
+                    pareas[parea.package_id].append(area)
+                except KeyError:
+                    pareas[parea.package_id] = [area, ]
+
+        ath = eventlet.spawn(_areas)
+
+        chiefs, areas = group_controller.entitys([common.GMSERVER, common.GAMESERVER], need_ok=True)
         chiefs_maps = {}
         for chief in chiefs:
             chiefs_maps.setdefault(chief.get('group_id'), chief)
-        th.wait()
+        areas_maps = {}
+        for area in areas:
+            areas_maps.setdefault(area.get('area_id'), area)
+
+        rth.wait()
+        ath.wait()
         data = []
         for package in packages:
             chief = chiefs_maps[package.group_id]
@@ -399,7 +415,21 @@ class PackageReuest(BaseContorller):
                                          uptime=pfile.uptime,
                                          status=pfile.status)
                                     for pfile in package.files
-                                    if pfile.status == manager_common.DOWNFILE_FILEOK])
+                                    if pfile.status == manager_common.DOWNFILE_FILEOK],
+                             areas=[dict(show_id=area.show_id,
+                                         state=area.state,
+                                         area_id=area.area_id,
+                                         areaname=areas_maps[area.area_id].get('areaname'),
+                                         entity=areas_maps[area.area_id].get('entity'),
+                                         status=areas_maps[area.area_id].get('status'),
+                                         external_ips=areas_maps[area.area_id].get('external_ips'),
+                                         dnsnames=areas_maps[area.area_id].get('dnsnames'),
+                                         port=areas_maps[area.area_id].get('port'),
+                                         version=areas_maps[area.area_id].get('versions').get(str(package.package_id))
+                                         if areas_maps[area.area_id].get('versions') else None
+                                         )
+                                    for area in pareas[package.package_id]] if package.package_id in pareas else [],
+                             )
                         )
             data.append(info)
         return resultutils.results(result='list packages success', data=data)
@@ -430,17 +460,17 @@ class PackageReuest(BaseContorller):
 
         return resultutils.results(result='list packages resource success', data=data)
 
-    def entitys(self, req, body=None):
+    def areas(self, req, body=None):
         session = endpoint_session(readonly=True)
         query = model_query(session, Package, filter=Package.status == common.ENABLE)
-        query = query.options(joinedload(Package.entitys, innerjoin=False))
+        query = query.options(joinedload(Package.areas, innerjoin=False))
         data = [dict(package_id=package.package_id,
                      package_name=package.package_name,
                      mark=package.mark,
-                     entitys=[dict(entity=pentity.entity, status=pentity.status)
-                              for pentity in package.entitys]
+                     areas=[dict(area_id=pareas.area_id, show_id=pareas.show_id, status=pareas.state)
+                            for pareas in package.areas]
                      ) for package in query]
-        return resultutils.results(result='list packages entitys success', data=data)
+        return resultutils.results(result='list packages areas success', data=data)
 
     def index(self, req, group_id, body=None):
         body = body or {}
@@ -481,7 +511,6 @@ class PackageReuest(BaseContorller):
         jsonutils.schema_validate(body, self.CREATESCHEMA)
         resource_id = int(body.pop('resource_id'))
         package_name = body.pop('package_name')
-        entitys = set(body.pop('entitys', []))
         platform = common.PlatformTypeMap.get(body.pop('platform'))
         if not platform:
             raise InvalidArgument('platform value error')
@@ -495,20 +524,10 @@ class PackageReuest(BaseContorller):
             if model_count_with_key(session, Package.package_id,
                                     filter=Package.package_name == package_name):
                 raise InvalidArgument('Package name Duplicate')
-            if entitys:
-                query = model_query(session, AppEntity, filter=AppEntity.entity.in_(entitys))
-                appentitys = query.all()
-                if len(appentitys) != len(entitys):
-                    raise InvalidArgument('Some entity can not be found')
-                for appentity in appentitys:
-                    if appentity.group_id != group_id \
-                            or appentity.objtype != common.GAMESERVER \
-                            or not appentity.platform & platform:
-                        raise InvalidArgument('Entity not exist, create package fail')
-            else:
-                appentitys = []
             # 确认group以及gmsvr
-            if not group_controller._chiefs(group_ids=[group_id], cross=False):
+            chiefs, areas = group_controller.entitys([common.GMSERVER],
+                                                     group_ids=[group_id], need_ok=True)
+            if not chiefs:
                 return resultutils.results(result='Can not find entity of %s' % common.GMSERVER,
                                            resultcode=manager_common.RESULT_ERROR)
             # 确认cdn资源
@@ -524,7 +543,6 @@ class PackageReuest(BaseContorller):
                               platform=platform,
                               magic=jsonutils.dumps(magic) if magic else None,
                               extension=jsonutils.dumps(extension) if extension else None,
-                              entitys=[PackageEntity(entity=appentity.entity) for appentity in appentitys],
                               desc=desc)
             session.add(package)
             session.flush()
@@ -679,7 +697,8 @@ class PackageReuest(BaseContorller):
                 raise InvalidArgument('Package files exist')
             checked = set()
             # 确认组别中没有特殊version引用
-            for area in group_controller._areas(group_id=package.group_id):
+            chiefs, areas = group_controller.entitys([common.GMSERVER], group_ids=package.group_id)
+            for area in areas:
                 entity = area.get('entity')
                 if entity in checked:
                     continue

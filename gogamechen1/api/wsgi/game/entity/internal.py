@@ -37,7 +37,6 @@ from gogamechen1.models import AppEntity
 from gogamechen1.models import GameArea
 from gogamechen1.models import MergeTask
 from gogamechen1.models import MergeEntity
-from gogamechen1.models import PackageEntity
 
 from .base import AppEntityReuestBase
 
@@ -394,27 +393,6 @@ class AppEntityInternalReuest(AppEntityReuestBase):
             _query = model_query(session, GameArea, filter=GameArea.entity == entity)
             _query.update({'entity': _entity.entity})
             session.flush()
-            # 更新渠道包含关系
-            olds = set()
-            news = set()
-            _query = model_query(session, PackageEntity, filter=PackageEntity.entity.in_([entity, _entity.entity]))
-            for pentity in _query:
-                if pentity.entity == entity:
-                    olds.add(pentity.package_id)
-                else:
-                    news.add(pentity.package_id)
-            if (olds & news):
-                _query = model_query(session, PackageEntity,
-                                     filter=and_(PackageEntity.entity == entity,
-                                                 PackageEntity.package_id.in_(olds & news)))
-                _query.delete()
-                session.flush()
-            if (olds - news):
-                _query = model_query(session, PackageEntity,
-                                     filter=and_(PackageEntity.entity == entity,
-                                                 PackageEntity.package_id.in_(olds - news)))
-                _query.update({'entity': _entity.entity})
-                session.flush()
             return resultutils.results(result='swallowed entity is success',
                                        data=[dict(databases=jsonutils.loads_as_bytes(_entity.databases),
                                                   areas=jsonutils.loads_as_bytes(_entity.areas))])

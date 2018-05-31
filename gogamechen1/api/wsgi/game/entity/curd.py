@@ -6,6 +6,7 @@ from six.moves import zip
 
 from sqlalchemy.orm import joinedload
 from sqlalchemy.sql import and_
+from sqlalchemy.sql import func
 
 from simpleutil.common.exceptions import InvalidArgument
 from simpleutil.log import log as logging
@@ -39,7 +40,7 @@ from gogamechen1.models import AppEntity
 from gogamechen1.models import GameArea
 from gogamechen1.models import AreaDatabase
 from gogamechen1.models import Package
-from gogamechen1.models import PackageEntity
+from gogamechen1.models import PackageArea
 
 from .base import AppEntityReuestBase
 
@@ -81,7 +82,6 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         order = body.pop('order', None)
         desc = body.pop('desc', False)
         detail = body.pop('detail', False)
-        packages = body.pop('packages', False)
         page_num = int(body.pop('page_num', 0))
 
         session = endpoint_session(readonly=True)
@@ -111,20 +111,6 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         if detail:
             dth = eventlet.spawn(_databases)
 
-        def _packages():
-            _maps = {}
-            query = model_query(session, PackageEntity)
-            for _package in query:
-                try:
-                    _maps[_package.entity].add(_package.package_id)
-                except KeyError:
-                    _maps[_package.entity] = set()
-                    _maps[_package.entity].add(_package.package_id)
-            return _maps
-
-        if packages:
-            pth = eventlet.spawn(_packages)
-
         results = resultutils.bulk_results(session,
                                            model=AppEntity,
                                            columns=columns,
@@ -137,8 +123,6 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                                            page_num=page_num)
         if detail:
             dbmaps = dth.wait()
-        if packages:
-            pkgmaps = pth.wait()
 
         if not results['data']:
             return results
@@ -154,8 +138,6 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                     column['databases'] = dbmaps[entity]
                 except KeyError:
                     LOG.error('Entity %d lose database' % entity)
-            if packages:
-                column.setdefault('packages', list(pkgmaps.get(entity, [])))
             if column['agent_id'] != entityinfo.get('agent_id'):
                 raise RuntimeError('Entity agent id %d not the same as %d' % (column['agent_id'],
                                                                               entityinfo.get('agent_id')))
@@ -191,14 +173,15 @@ class AppEntityCURDRequest(AppEntityReuestBase):
             platform = common.PlatformTypeMap.get(platform)
             if not areaname or not opentime or not platform:
                 raise InvalidArgument('%s need opentime and areaname and platform' % objtype)
-            _packages = model_query(session, Package, filter=Package.package_id.in_(packages)).all()
-            if len(_packages) != packages:
-                raise InvalidArgument('Package can not be found when create entity')
-            for package in _packages:
-                if package.group_id != group_id:
-                    raise InvalidArgument('Package group not match when create entity')
-                if not (package.platform & platform):
-                    raise InvalidArgument('Pacakge platform not match when create entity')
+            if packages:
+                _packages = model_query(session, Package, filter=Package.package_id.in_(packages)).all()
+                if len(_packages) != packages:
+                    raise InvalidArgument('Package can not be found when create entity')
+                for package in _packages:
+                    if package.group_id != group_id:
+                        raise InvalidArgument('Package group not match when create entity')
+                    if not (package.platform & platform):
+                        raise InvalidArgument('Pacakge platform not match when create entity')
         # 安装文件信息
         appfile = body.pop(common.APPFILE)
         LOG.info('Try find agent and database for entity')
@@ -341,17 +324,30 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                 session.add(appentity)
                 session.flush()
                 if objtype == common.GAMESERVER:
-                    gamearea = GameArea(areaname=areaname.decode('utf-8')
-                                        if isinstance(areaname, six.binary_type)
-                                        else areaname,
-                                        group_id=_group.group_id,
-                                        entity=appentity.entity)
-                    session.add(gamearea)
+                    area_id = model_max_with_key(GameArea, GameArea.area_id) + 1
+                    session.add(GameArea(areaname=areaname.decode('utf-8')
+                    if isinstance(areaname, six.binary_type)
+                    else areaname,
+                                         group_id=_group.group_id,
+                                         entity=appentity.entity))
                     session.flush()
                     # 插入渠道包包含列表中
-                    for package_id in packages:
-                        session.add(PackageEntity(package_id=package_id, entity=entity))
-                        session.flush()
+                    if packages:
+                        _pquery = session.query(PackageArea.package_id,
+                                                func.max(PackageArea.show_id))
+                        _pquery = _pquery.group_by(PackageArea.package_id)
+                        _pquery.filter(PackageArea.package_id.in_([package.package_id for package in _packages]))
+                        for package_area in _pquery:
+                            package_id = package_area[0]
+                            show_id = package_area[1] + 1
+                            session.add(PackageArea(package_id=package_id, area_id=area_id, show_id=show_id))
+                            session.flush()
+                            packages.pop(package_id)
+                        # 没有在PackageArea中找到,插入show id值1
+                        if packages:
+                            for package_id in packages:
+                                session.add(PackageArea(package_id=package_id, area_id=area_id, show_id=1))
+                                session.flush()
                 # 插入数据库绑定信息
                 if rpc_result.get('databases'):
                     self._bondto(session, entity, rpc_result.get('databases'))
@@ -367,11 +363,12 @@ class AppEntityCURDRequest(AppEntityReuestBase):
 
             areas = []
             if objtype == common.GAMESERVER:
-                areas = [dict(area_id=gamearea.area_id, areaname=areaname)]
+                areas = [dict(area_id=area_id, areaname=areaname)]
                 _result.setdefault('areas', areas)
                 _result.setdefault('cross_id', cross_id)
                 _result.setdefault('opentime', opentime)
                 _result.setdefault('platform', platform)
+                _result.setdefault('packages', [package.package_id for package in _packages])
 
             # 添加端口
             threadpool.add_thread(port_controller.unsafe_create,
@@ -545,9 +542,9 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                         session.flush()
                         session.delete(area)
                         session.flush()
-                    _query = model_query(session, PackageEntity, filter=PackageEntity.entity == entity)
-                    _query.delete()
-                    session.flush()
+                        _query = model_query(session, PackageArea, filter=PackageArea.area_id == area.area_id)
+                        _query.delete()
+                        session.flush()
                 rpc.cast(target, ctxt={'agents': [_entity.agent_id, ]},
                          msg={'method': 'change_status',
                               'args': dict(entity=entity, status=common.DELETED)})

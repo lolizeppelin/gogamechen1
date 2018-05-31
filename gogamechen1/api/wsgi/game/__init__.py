@@ -1,7 +1,6 @@
 # -*- coding:utf-8 -*-
 import six
 import webob.exc
-import eventlet
 
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm.exc import MultipleResultsFound
@@ -47,7 +46,6 @@ from gogamechen1.api import endpoint_session
 from gogamechen1.models import Group
 from gogamechen1.models import AppEntity
 from gogamechen1.models import GameArea
-from gogamechen1.models import PackageEntity
 
 from .entity.curd import AppEntityCURDRequest
 from .entity.async import AppEntityAsyncReuest
@@ -194,6 +192,7 @@ class GroupReuest(BaseContorller):
                                    data=[deleted])
 
     def area(self, req, group_id, body=None):
+        """change entity area"""
         body = body or {}
         try:
             group_id = int(group_id)
@@ -248,100 +247,51 @@ class GroupReuest(BaseContorller):
         return resultutils.results(result='get group areas map success',
                                    data=[dict(entity=k, areas=v) for k, v in six.iteritems(maps)])
 
-    def _chiefs(self, group_ids=None, cross=True):
-        if cross:
-            objtypes = [common.GMSERVER, common.CROSSSERVER]
-        else:
-            objtypes = [common.GMSERVER]
+    @staticmethod
+    def entitys(objtypes=None, group_ids=None, need_ok=False):
         filters = [AppEntity.objtype.in_(objtypes)]
         if group_ids:
             filters.append(AppEntity.group_id.in_(argutils.map_to_int(group_ids)))
         session = endpoint_session(readonly=True)
         query = model_query(session, AppEntity, filter=and_(*filters))
+        query = query.options(joinedload(AppEntity.areas))
         appentitys = query.all()
-        chiefs = []
         entitys = set()
         for entity in appentitys:
             entitys.add(entity.entity)
-        emaps = entity_controller.shows(common.NAME, entitys=entitys, ports=True, metadata=True)
+        emaps = entity_controller.shows(common.NAME, entitys, ports=True, metadata=True)
+        chiefs = []
+        areas = []
         for entity in appentitys:
+            if need_ok and entity.status != common.OK:
+                continue
             entityinfo = emaps.get(entity.entity)
+            ports = entityinfo.get('ports')
             metadata = entityinfo.get('metadata')
             if not metadata:
                 raise ValueError('Can not get agent metadata for %d' % entity.entity)
-            ports = entityinfo.get('ports')
-            chiefs.append(dict(entity=entity.entity,
-                               objtype=entity.objtype,
-                               group_id=entity.group_id,
-                               ports=ports,
-                               local_ip=metadata.get('local_ip'),
-                               dnsnames=metadata.get('dnsnames'),
-                               external_ips=metadata.get('external_ips'))
-                          )
-        return chiefs
-
-    def chiefs(self, req, group_id, body=None):
-        body = body or {}
-        cross = body.get('cross', True)
-        group_ids = None
-        if group_id != 'all':
-            group_ids = argutils.map_to_int(group_id)
-        return resultutils.results(result='get group chiefs success',
-                                   data=self._chiefs(group_ids, cross))
-
-    def _areas(self, group_id, need_ok=False):
-        session = endpoint_session(readonly=True)
-        query = model_query(session, AppEntity,
-                            filter=and_(AppEntity.group_id == group_id,
-                                        AppEntity.objtype == common.GAMESERVER))
-        query = query.options(joinedload(AppEntity.areas))
-        appentitys = query.all()
-        entitys = []
-        for appentity in appentitys:
-            entitys.append(appentity.entity)
-
-        def _entitys():
-            _emaps = entity_controller.shows(common.NAME, entitys, ports=True, metadata=True)
-            return _emaps
-
-        th = eventlet.spawn(_entitys)
-
-        pmaps = {}
-        query = model_query(session, PackageEntity)
-        for _package in query:
-            try:
-                pmaps[_package.entity].add(_package.package_id)
-            except KeyError:
-                pmaps[_package.entity] = set()
-                pmaps[_package.entity].add(_package.package_id)
-
-        emaps = th.wait()
-
-        return [dict(area_id=area.area_id,
-                     areaname=area.areaname,
-                     entity=appentity.entity,
-                     opentime=appentity.opentime,
-                     platform=appentity.platform,
-                     status=appentity.status,
-                     versions=jsonutils.loads_as_bytes(appentity.versions) if appentity.versions else None,
-                     external_ips=emaps[appentity.entity]['metadata']['external_ips'],
-                     dnsnames=emaps[appentity.entity]['metadata'].get('dnsnames'),
-                     port=emaps[appentity.entity]['ports'][0],
-                     packages=list(pmaps.get(appentity.entity, [])))
-                for appentity in appentitys if not (need_ok and appentity.status != common.OK)
-                for area in appentity.areas]
-
-    def areas(self, req, group_id, body=None):
-        body = body or {}
-        need_ok = body.get('need_ok', False)
-        try:
-            group_id = int(group_id)
-        except (TypeError, ValueError):
-            raise InvalidArgument('Group id value error')
-        return resultutils.results(result='list group areas success',
-                                   data=[dict(
-                                       chiefs=self._chiefs([group_id], cross=body.get('cross', False)),
-                                       areas=self._areas(group_id, need_ok))])
+            if entity.objtype == common.GAMESERVER:
+                for area in entity.areas:
+                    areas.append(dict(area_id=area.area_id,
+                                      areaname=area.areaname,
+                                      entity=entity.entity,
+                                      group_id=entity.group_id,
+                                      opentime=entity.opentime,
+                                      platform=entity.platform,
+                                      status=entity.status,
+                                      versions=jsonutils.loads_as_bytes(entity.versions) if entity.versions else None,
+                                      external_ips=metadata.get('external_ips'),
+                                      dnsnames=metadata.get('dnsnames'),
+                                      port=ports[0]))
+            else:
+                chiefs.append(dict(entity=entity.entity,
+                                   objtype=entity.objtype,
+                                   group_id=entity.group_id,
+                                   ports=ports,
+                                   local_ip=metadata.get('local_ip'),
+                                   dnsnames=metadata.get('dnsnames'),
+                                   external_ips=metadata.get('external_ips')))
+        return chiefs, areas
 
     def packages(self, req, group_id, body=None):
         body = body or {}
@@ -358,6 +308,28 @@ class GroupReuest(BaseContorller):
                                               resource_id=package.resource_id,
                                               ) for package in _group.packages])
 
+    def chiefs(self, req, group_id, body=None):
+        body = body or {}
+        cross = body.get('cross', True)
+        group_ids = None
+        if group_id != 'all':
+            group_ids = argutils.map_to_int(group_id)
+        objtypes = [common.GMSERVER]
+        if cross:
+            objtypes.append(common.CROSSSERVER)
+        chiefs, areas = self.entitys(objtypes, group_ids)
+        return resultutils.results(result='get group chiefs success', data=chiefs)
+
+    def areas(self, req, group_id, body=None):
+        body = body or {}
+        need_ok = body.get('need_ok', False)
+        group_ids = None
+        if group_id != 'all':
+            group_ids = argutils.map_to_int(group_id)
+        chiefs, areas = self.entitys([common.GAMESERVER, common.GMSERVER],
+                                     group_ids, need_ok)
+        return resultutils.results(result='list group areas success',
+                                   data=[dict(chiefs=chiefs, areas=areas)])
 
 @singleton.singleton
 class AppEntityReuest(AppEntityCURDRequest,

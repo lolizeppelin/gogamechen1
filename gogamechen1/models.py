@@ -30,12 +30,13 @@ class PackageRemark(TableBase):
     message = sa.Column(VARCHAR(512), nullable=False)
 
 
-class PackageEntity(TableBase):
-    """包对应实体"""
+class PackageArea(TableBase):
+    """包对应区服"""
     package_id = sa.Column(sa.ForeignKey('packages.package_id', ondelete="CASCADE", onupdate='RESTRICT'),
                            nullable=False, primary_key=True)
-    entity = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
-    status = sa.Column(SMALLINT, nullable=False, default=0)
+    area_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
+    show_id = sa.Column(INTEGER(unsigned=True), nullable=False)
+    state = sa.Column(SMALLINT, nullable=False, default=0)
 
 
 class PackageFile(TableBase):
@@ -95,8 +96,8 @@ class Package(TableBase):
     extension = sa.Column(BLOB, nullable=True)
     files = orm.relationship(PackageFile, backref='package', lazy='select',
                              cascade='delete,delete-orphan,save-update')
-    entitys = orm.relationship(PackageEntity, backref='package', lazy='select',
-                               cascade='delete,delete-orphan,save-update')
+    areas = orm.relationship(PackageArea, backref='package', lazy='select',
+                             cascade='delete,delete-orphan,save-update')
     __table_args__ = (
         sa.UniqueConstraint('package_name', name='package_unique'),
         InnoDBTableBase.__table_args__
