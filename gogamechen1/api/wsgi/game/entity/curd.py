@@ -37,6 +37,7 @@ from gogamechen1.api import endpoint_session
 from gogamechen1.models import Group
 from gogamechen1.models import AppEntity
 from gogamechen1.models import GameArea
+from gogamechen1.models import AreaDatabase
 from gogamechen1.models import Package
 from gogamechen1.models import PackageEntity
 
@@ -80,50 +81,64 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         order = body.pop('order', None)
         desc = body.pop('desc', False)
         detail = body.pop('detail', False)
+        packages = body.pop('packages', False)
         page_num = int(body.pop('page_num', 0))
 
         session = endpoint_session(readonly=True)
         columns = [AppEntity.entity,
                    AppEntity.group_id,
                    AppEntity.agent_id,
+                   AppEntity.areas,
                    AppEntity.opentime,
                    AppEntity.platform,
                    AppEntity.versions,
                    AppEntity.status,
                    AppEntity.objtype]
 
-        def _areas():
+        def _databases():
+            _maps = {}
+            query = model_query(session, PackageEntity)
+            for _package in query:
+                try:
+                    _maps[_package.entity].add(_package.package_id)
+                except KeyError:
+                    _maps[_package.entity] = set()
+                    _maps[_package.entity].add(_package.package_id)
+            return _maps
+
+        if detail:
+            dth = eventlet.spawn(_databases)
+
+        def _packages():
             _maps = {}
             if objtype != common.GAMESERVER:
                 return _maps
-            query = model_query(session, GameArea, filter=GameArea.group_id == group_id)
-            for _area in query:
+            query = model_query(session, AreaDatabase)
+            for _db in query:
+                dbinfo = dict(quote_id=_db.quote_id, subtype=_db.subtype, host=_db.host, port=_db.port, )
                 try:
-                    _maps[_area.entity].append(dict(area_id=_area.area_id,
-                                                    areaname=_area.areaname))
+                    _maps[_db.entity].append(dbinfo)
                 except KeyError:
-                    _maps[_area.entity] = [dict(area_id=_area.area_id,
-                                                areaname=_area.areaname), ]
-            # session.close()
+                    _maps[_db.entity] = [dbinfo, ]
             return _maps
 
-        th = eventlet.spawn(_areas)
-
-        option = None
-        if detail:
-            columns.append(AppEntity.databases)
-            option = joinedload(AppEntity.databases, innerjoin=False)
+        if packages:
+            pth = eventlet.spawn(_packages)
 
         results = resultutils.bulk_results(session,
                                            model=AppEntity,
                                            columns=columns,
                                            counter=AppEntity.entity,
                                            order=order, desc=desc,
-                                           option=option,
+                                           option=joinedload(AppEntity.areas, innerjoin=False)
+                                           if objtype == common.GAMESERVER else None,
                                            filter=and_(AppEntity.group_id == group_id,
                                                        AppEntity.objtype == objtype),
                                            page_num=page_num)
-        maps = th.wait()
+        if detail:
+            dbmaps = dth.wait()
+        if packages:
+            pkgmaps = pth.wait()
 
         if not results['data']:
             return results
@@ -135,13 +150,12 @@ class AppEntityCURDRequest(AppEntityReuestBase):
             entity = column.get('entity')
             entityinfo = emaps.get(entity)
             if detail:
-                databases = column.get('databases', [])
-                column['databases'] = []
-                for database in databases:
-                    column['databases'].append(dict(quote_id=database.quote_id, subtype=database.subtype,
-                                                    host=database.host, port=database.port,
-                                                    ))
-            column.setdefault('areas', maps.get(entity, []))
+                try:
+                    column['databases'] = dbmaps[entity]
+                except KeyError:
+                    LOG.error('Entity %d lose database' % entity)
+            if packages:
+                column.setdefault('packages', list(pkgmaps.get(entity, [])))
             if column['agent_id'] != entityinfo.get('agent_id'):
                 raise RuntimeError('Entity agent id %d not the same as %d' % (column['agent_id'],
                                                                               entityinfo.get('agent_id')))
@@ -157,7 +171,6 @@ class AppEntityCURDRequest(AppEntityReuestBase):
             versions = column.get('versions')
             if versions:
                 column['versions'] = jsonutils.loads_as_bytes(versions)
-
         return results
 
     def create(self, req, group_id, objtype, body=None):
