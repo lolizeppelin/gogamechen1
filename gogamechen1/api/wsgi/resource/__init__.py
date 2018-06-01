@@ -349,7 +349,7 @@ class PackageReuest(BaseContorller):
 
     def packages(self, req, body=None):
         body = body or {}
-        areas = body.get('areas')
+        areas = body.get('areas', False)
         session = endpoint_session(readonly=True)
         query = model_query(session, Package, filter=Package.status == common.ENABLE)
         query = query.options(joinedload(Package.files, innerjoin=False))

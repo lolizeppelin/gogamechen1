@@ -297,19 +297,20 @@ class GroupReuest(BaseContorller):
                 raise ValueError('Can not get agent metadata for %d' % entity.entity)
             if entity.objtype == common.GAMESERVER:
                 for area in entity.areas:
-                    areas.append(dict(area_id=area.area_id,
-                                      areaname=area.areaname,
-                                      entity=entity.entity,
-                                      group_id=entity.group_id,
-                                      opentime=entity.opentime,
-                                      platform=entity.platform,
-                                      status=entity.status,
-                                      versions=jsonutils.loads_as_bytes(entity.versions) if entity.versions else None,
-                                      external_ips=metadata.get('external_ips'),
-                                      dnsnames=metadata.get('dnsnames'),
-                                      port=ports[0],
-                                      packagenames=pmaps.get(area.area_id, []) if packages else [],
-                                      ))
+                    info = dict(area_id=area.area_id,
+                                areaname=area.areaname,
+                                entity=entity.entity,
+                                group_id=entity.group_id,
+                                opentime=entity.opentime,
+                                platform=entity.platform,
+                                status=entity.status,
+                                versions=jsonutils.loads_as_bytes(entity.versions) if entity.versions else None,
+                                external_ips=metadata.get('external_ips'),
+                                dnsnames=metadata.get('dnsnames'),
+                                port=ports[0])
+                    if packages:
+                        info.setdefault('packagenames', pmaps.get(area.area_id, []))
+                    areas.append(info)
             else:
                 chiefs.append(dict(entity=entity.entity,
                                    objtype=entity.objtype,
