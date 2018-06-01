@@ -544,8 +544,7 @@ class PackageReuest(BaseContorller):
                 for area in source.areas:
                     areas.append(area.area_id)
             # 确认group以及gmsvr
-            chiefs, areas = group_controller.entitys([common.GMSERVER],
-                                                     group_ids=[group_id], need_ok=True)
+            chiefs = group_controller.entitys([common.GMSERVER], group_ids=[group_id], need_ok=True)[0]
             if not chiefs:
                 return resultutils.results(result='Can not find entity of %s' % common.GMSERVER,
                                            resultcode=manager_common.RESULT_ERROR)
@@ -562,10 +561,11 @@ class PackageReuest(BaseContorller):
                               platform=platform,
                               magic=jsonutils.dumps(magic) if magic else None,
                               extension=jsonutils.dumps(extension) if extension else None,
-                              desc=desc,
-                              areas=[PackageArea(area_id=area_id) for area_id in areas])
+                              desc=desc)
             session.add(package)
             session.flush()
+            for area_id in areas:
+                session.add(PackageArea(area_id=area_id, package_id=package.package_id))
         return resultutils.results(result='Add a new package success',
                                    data=[dict(package_id=package.package_id,
                                               group_id=package.group_id,

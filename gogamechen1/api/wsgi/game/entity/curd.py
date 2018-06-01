@@ -6,7 +6,6 @@ from six.moves import zip
 
 from sqlalchemy.orm import joinedload
 from sqlalchemy.sql import and_
-from sqlalchemy.sql import func
 
 from simpleutil.common.exceptions import InvalidArgument
 from simpleutil.log import log as logging
@@ -326,17 +325,16 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                 session.add(appentity)
                 session.flush()
                 if objtype == common.GAMESERVER:
-                    area_id = model_max_with_key(session, GameArea.area_id) + 1
-                    session.add(GameArea(areaname=areaname.decode('utf-8')
-                    if isinstance(areaname, six.binary_type)
-                    else areaname,
-                                         group_id=_group.group_id,
-                                         entity=appentity.entity))
+                    gamearea = GameArea(areaname=areaname.decode('utf-8')
+                    if isinstance(areaname, six.binary_type) else areaname,
+                                        group_id=_group.group_id,
+                                        entity=appentity.entity)
+                    session.add(gamearea)
                     session.flush()
                     # area id插入渠道包包含列表中
                     if packages:
                         for package_id in packages:
-                            session.add(PackageArea(package_id=package_id, area_id=area_id))
+                            session.add(PackageArea(package_id=package_id, area_id=gamearea.area_id))
                             session.flush()
                 # 插入数据库绑定信息
                 if rpc_result.get('databases'):
@@ -353,7 +351,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
 
             areas = []
             if objtype == common.GAMESERVER:
-                areas = [dict(area_id=area_id, areaname=areaname)]
+                areas = [dict(area_id=gamearea.area_id, areaname=areaname)]
                 _result.setdefault('areas', areas)
                 _result.setdefault('cross_id', cross_id)
                 _result.setdefault('opentime', opentime)
