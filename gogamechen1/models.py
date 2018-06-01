@@ -34,7 +34,9 @@ class PackageArea(TableBase):
     """包对应区服"""
     package_id = sa.Column(sa.ForeignKey('packages.package_id', ondelete="CASCADE", onupdate='RESTRICT'),
                            nullable=False, primary_key=True)
-    area_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
+    area_id = sa.Column(sa.ForeignKey('gameareas.area_id', ondelete="CASCADE", onupdate='RESTRICT'),
+                        nullable=False, primary_key=True)
+    # area_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True)
 
 
 class PackageFile(TableBase):
@@ -83,7 +85,7 @@ class Package(TableBase):
     # 渠道标记名字
     mark = sa.Column(VARCHAR(32), nullable=False)
     # 平台标记
-    platform = sa.Column(TINYINT(unsigned=True), nullable=True)
+    platform = sa.Column(TINYINT(unsigned=True), nullable=False)
     # 状态
     status = sa.Column(SMALLINT, nullable=False, default=common.ENABLE)
     # 说明
@@ -144,6 +146,7 @@ class GameArea(TableBase):
     areaname = sa.Column(VARCHAR(128), nullable=False)
     entity = sa.Column(sa.ForeignKey('appentitys.entity', ondelete="RESTRICT", onupdate='RESTRICT'),
                        nullable=False)
+    packages = orm.relationship(PackageArea, backref='area', lazy='select', cascade='delete,delete-orphan')
 
     __table_args__ = (
         sa.UniqueConstraint('group_id', 'areaname', name='name_unique'),
@@ -158,7 +161,7 @@ class AppEntity(TableBase):
     group_id = sa.Column(sa.ForeignKey('groups.group_id', ondelete="RESTRICT", onupdate='RESTRICT'),
                          nullable=False)
     objtype = sa.Column(VARCHAR(64), nullable=False)
-    platform = sa.Column(TINYINT(unsigned=True), nullable=True)
+    platform = sa.Column(TINYINT(unsigned=True), nullable=False, default=0)
     opentime = sa.Column(INTEGER(unsigned=True), nullable=True)
     status = sa.Column(TINYINT(64), nullable=False, default=common.UNACTIVE)
     cross_id = sa.Column(INTEGER(unsigned=True), nullable=True)
