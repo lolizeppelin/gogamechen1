@@ -566,6 +566,7 @@ class PackageReuest(BaseContorller):
             session.flush()
             for area_id in areas:
                 session.add(PackageArea(area_id=area_id, package_id=package.package_id))
+                session.flush()
         return resultutils.results(result='Add a new package success',
                                    data=[dict(package_id=package.package_id,
                                               group_id=package.group_id,
