@@ -326,6 +326,8 @@ class PackageReuest(BaseContorller):
                 'package_name': {'type': 'string'},
                 'mark': {'type': 'string', 'description': '渠道标记名'},
                 'platform': {'type': 'string', 'description': '平台类型'},
+                'clone': {'type': 'integer', 'minimum': 1,
+                          'description': '克隆包id,用于复制包可显示区服列表'},
                 'magic': {'oneOf': [{'type': 'object'},
                                     {'type': 'null'}]},
                 'extension': {'oneOf': [{'type': 'object'},
@@ -524,11 +526,23 @@ class PackageReuest(BaseContorller):
         magic = body.get('magic')
         extension = body.get('extension')
         desc = body.get('desc')
+        clone = body.get('clone')
         session = endpoint_session()
+        areas = []
         with session.begin():
             if model_count_with_key(session, Package.package_id,
                                     filter=Package.package_name == package_name):
                 raise InvalidArgument('Package name Duplicate')
+            if clone:
+                query = model_query(session, Package, filter=Package.package_id == clone)
+                query.options(joinedload(Package.areas, innerjoin=False))
+                source = query.one_or_none()
+                if not source:
+                    raise InvalidArgument('Clone target package not exist')
+                if not (source.platform & platform):
+                    raise InvalidArgument('Clone target package platform not match')
+                for area in source.areas:
+                    areas.append(area.area_id)
             # 确认group以及gmsvr
             chiefs, areas = group_controller.entitys([common.GMSERVER],
                                                      group_ids=[group_id], need_ok=True)
@@ -548,7 +562,8 @@ class PackageReuest(BaseContorller):
                               platform=platform,
                               magic=jsonutils.dumps(magic) if magic else None,
                               extension=jsonutils.dumps(extension) if extension else None,
-                              desc=desc)
+                              desc=desc,
+                              areas=[PackageArea(area_id=area_id) for area_id in areas])
             session.add(package)
             session.flush()
         return resultutils.results(result='Add a new package success',
