@@ -32,13 +32,19 @@ def upgrade_entitys(appendpoint,
                     entitys, timeline):
     upgradefile = None
     backupfile = None
-    download_time = 60
+    download_time = 600
+    upzip_timeout = 600
     if common.APPFILE in objfiles:
         objfile = objfiles[common.APPFILE]
         md5 = objfile.get('md5')
         backup = objfile.get('backup', True)
         revertable = objfile.get('revertable', False)
         rollback = objfile.get('rollback', True)
+        timeout = objfile.get('timeout')
+        if timeout < download_time:
+            download_time = timeout
+        if timeout < upzip_timeout:
+            upzip_timeout = timeout
         # 程序更新文件
         upgradefile = GogameAppFile(md5, objtype, rollback=rollback, revertable=revertable)
         if backup:
@@ -65,6 +71,8 @@ def upgrade_entitys(appendpoint,
                 revertable = objfile.get('revertable', False)
                 rollback = objfile.get('rollback', False)
                 timeout = objfile.get('timeout')
+                if timeout < download_time:
+                    download_time = timeout
                 dbinfo = appendpoint.local_database_info(entity, subtype)
                 try:
                     update = _updates[subtype]
@@ -83,7 +91,7 @@ def upgrade_entitys(appendpoint,
         # 更新程序文件任务
         upgradetask = None
         if common.APPFILE in objfiles:
-            upgradetask = AppFileUpgradeByFile(middleware)
+            upgradetask = AppFileUpgradeByFile(middleware, rebind=['upgradefile', 'upzip_timeout'])
         app = Application(middleware, upgradetask=upgradetask, databases=_database)
         applications.append(app)
 
