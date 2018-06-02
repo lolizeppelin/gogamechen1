@@ -32,7 +32,7 @@ def upgrade_entitys(appendpoint,
                     entitys, timeline):
     upgradefile = None
     backupfile = None
-
+    download_time = 60
     if common.APPFILE in objfiles:
         objfile = objfiles[common.APPFILE]
         md5 = objfile.get('md5')
@@ -88,7 +88,7 @@ def upgrade_entitys(appendpoint,
         applications.append(app)
 
     book = LogBook(name='upgrad_%s' % appendpoint.namespace)
-    store = dict(download_timeout=60)
+    store = dict(download_timeout=download_time)
     taskflow_session = sqlite.get_taskflow_session()
     upgrade_flow = pipe.flow_factory(taskflow_session,
                                      applications=applications,

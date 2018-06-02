@@ -81,18 +81,27 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         order = body.pop('order', None)
         desc = body.pop('desc', False)
         detail = body.pop('detail', False)
+        packages = body.pop('packages', False)
         page_num = int(body.pop('page_num', 0))
 
         session = endpoint_session(readonly=True)
         columns = [AppEntity.entity,
                    AppEntity.group_id,
                    AppEntity.agent_id,
-                   AppEntity.areas,
                    AppEntity.opentime,
                    AppEntity.platform,
                    AppEntity.versions,
                    AppEntity.status,
                    AppEntity.objtype]
+
+        option = None
+        if objtype == common.GAMESERVER:
+            columns.append(AppEntity.areas)
+            option = joinedload(AppEntity.areas, innerjoin=False)
+            if packages:
+                option = option.joinedload(GameArea.packages, innerjoin=False)
+
+
 
         def _databases():
             _maps = {}
@@ -115,8 +124,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                                            columns=columns,
                                            counter=AppEntity.entity,
                                            order=order, desc=desc,
-                                           option=joinedload(AppEntity.areas, innerjoin=False)
-                                           if objtype == common.GAMESERVER else None,
+                                           option=option,
                                            filter=and_(AppEntity.group_id == group_id,
                                                        AppEntity.objtype == objtype),
                                            page_num=page_num)
@@ -140,6 +148,15 @@ class AppEntityCURDRequest(AppEntityReuestBase):
             if column['agent_id'] != entityinfo.get('agent_id'):
                 raise RuntimeError('Entity agent id %d not the same as %d' % (column['agent_id'],
                                                                               entityinfo.get('agent_id')))
+            areas = column.pop('areas', [])
+            if objtype == common.GAMESERVER:
+                for area in areas:
+                    _area = dict(area_id=area.area_id,
+                                 areaname=area.areaname)
+                    if packages:
+                        _area.setdefault('packages', [parea.package_id for parea in area.packages])
+                    areas.append(_area)
+            column['areas'] = areas
             column['ports'] = entityinfo.get('ports')
             metadata = entityinfo.get('metadata')
             if metadata:

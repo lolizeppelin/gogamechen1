@@ -710,7 +710,7 @@ class Application(AppEndpointBase):
             # 确认entity进程
             if not self._entity_process(entity, proc_snapshot_after):
                 detail.update(formater(entity, manager_common.RESULT_ERROR,
-                                       'start entity %d fail, process not exist after start'))
+                                       'start entity %d fail, process not exist after start' % entity))
             else:
                 # 写入PID
                 results = detail['result'].split('|')
