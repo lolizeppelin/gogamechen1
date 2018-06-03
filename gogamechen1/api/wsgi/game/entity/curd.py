@@ -150,12 +150,14 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                                                                               entityinfo.get('agent_id')))
             areas = column.pop('areas', [])
             if objtype == common.GAMESERVER:
+                _areas = []
                 for area in areas:
                     _area = dict(area_id=area.area_id,
                                  areaname=area.areaname)
                     if packages:
                         _area.setdefault('packages', [parea.package_id for parea in area.packages])
-                    areas.append(_area)
+                    _areas.append(_area)
+                areas = _areas
             column['areas'] = areas
             column['ports'] = entityinfo.get('ports')
             metadata = entityinfo.get('metadata')
