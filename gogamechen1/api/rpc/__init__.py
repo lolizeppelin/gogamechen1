@@ -369,10 +369,11 @@ class Application(AppEndpointBase):
 
     def extract_entity_file(self, entity, objtype, appfile, timeout):
         dst = self.apppath(entity)
-        # 异步解压,没有报错说明解压开始
-        waiter = zlibutils.async_extract(src=appfile, dst=dst, timeout=timeout,
-                                         fork=functools.partial(safe_fork, self.entity_user(entity),
-                                                                self.entity_group(entity)))
+        # 异步解压
+        waiter = zlibutils.async_extract(src=appfile, dst=dst, timeout=timeout)
+        # 解压完成速度过快, 检查是否有错, 没有报错说明解压完成
+        if waiter.finished:
+            waiter.wait()
         # 返回解压waiter对象
         return waiter
 
