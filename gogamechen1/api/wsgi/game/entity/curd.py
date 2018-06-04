@@ -450,9 +450,9 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         _entity = query.one()
         if status == _entity.status:
             return resultutils.results(result='%s entity status in same' % objtype)
-        if _entity.status != common.UNACTIVE:
+        if _entity.status not in (common.OK, common.UNACTIVE):
             return resultutils.results(resultcode=manager_common.RESULT_ERROR,
-                                       result='%s entity is not unactive' % objtype)
+                                       result='%s entity is not ok or unactive' % objtype)
         if _entity.objtype != objtype:
             raise InvalidArgument('Objtype not match')
         if _entity.group_id != group_id:
