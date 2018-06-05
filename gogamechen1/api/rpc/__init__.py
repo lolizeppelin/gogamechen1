@@ -147,7 +147,7 @@ class Application(AppEndpointBase):
             LOG.info('Try reflect entity objtype and group info')
             entitymaps = self.client.appentitys(entitys=self.entitys)['data']
             if len(entitymaps) != len(self.entitys):
-                raise RuntimeError('Entity count error, miss some entity')
+                raise RuntimeError('Gogamechen1 entity count error, miss some entity')
             for entityinfo in entitymaps:
                 _entity = entityinfo.get('entity')
                 objtype = entityinfo.get('objtype')

@@ -91,12 +91,13 @@ def upgrade_entitys(appendpoint,
         # 更新程序文件任务
         upgradetask = None
         if common.APPFILE in objfiles:
-            upgradetask = AppFileUpgradeByFile(middleware, rebind=['upgradefile', 'upzip_timeout'])
+            upgradetask = AppFileUpgradeByFile(middleware,
+                                               rebind=['upgradefile', 'upzip_timeout'])
         app = Application(middleware, upgradetask=upgradetask, databases=_database)
         applications.append(app)
 
     book = LogBook(name='upgrad_%s' % appendpoint.namespace)
-    store = dict(download_timeout=download_time)
+    store = dict(download_timeout=download_time, upzip_timeout=upzip_timeout)
     taskflow_session = sqlite.get_taskflow_session()
     upgrade_flow = pipe.flow_factory(taskflow_session,
                                      applications=applications,
