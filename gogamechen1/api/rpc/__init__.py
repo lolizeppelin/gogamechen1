@@ -6,7 +6,6 @@ import signal
 import shutil
 import json
 import contextlib
-import functools
 import eventlet
 import psutil
 
@@ -20,6 +19,7 @@ from simpleutil.utils import systemutils
 
 from goperation import threadpool
 from goperation.utils import safe_fork
+from goperation.utils import umask
 from goperation.filemanager.exceptions import NoFileFound
 from goperation.manager.api import get_http
 from goperation.manager import common as manager_common
@@ -370,7 +370,14 @@ class Application(AppEndpointBase):
     def extract_entity_file(self, entity, objtype, appfile, timeout):
         dst = self.apppath(entity)
         # 异步解压
-        waiter = zlibutils.async_extract(src=appfile, dst=dst, timeout=timeout)
+        if systemutils.POSIX:
+            def prefunc():
+                systemutils.drop_privileges(self.entity_user(entity), self.entity_user(entity))
+                umask()
+        else:
+            prefunc = None
+        waiter = zlibutils.async_extract(src=appfile, dst=dst, timeout=timeout,
+                                         native=False, prefunc=prefunc)
         # 解压完成速度过快, 检查是否有错, 没有报错说明解压完成
         if waiter.finished:
             waiter.wait()
