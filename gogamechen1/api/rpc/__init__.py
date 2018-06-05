@@ -893,7 +893,7 @@ class Application(AppEndpointBase):
                                         'upgrade entity %d not executed'))
             else:
                 details.append(formater(middleware.entity, manager_common.RESULT_ERROR,
-                                        'upgrade entity %d fail, check agent log for more'))
+                                        'upgrade entity %d fail, check agent log for more' % middleware.entity))
                 LOG.debug('%s.%d %s', (objtype, middleware.entity, str(middleware)))
         if e:
             if hasattr(e, 'message') and e.message:

@@ -1,6 +1,5 @@
 # -*- coding:utf-8 -*-
 import os
-import time
 from simpleutil.config import cfg
 from simpleutil.log import log as logging
 
@@ -96,10 +95,10 @@ def upgrade_entitys(appendpoint,
         app = Application(middleware, upgradetask=upgradetask, databases=_database)
         applications.append(app)
 
-    book = LogBook(name='upgrad_%s' % appendpoint.namespace)
+    book = LogBook(name='upgrade_%s' % appendpoint.namespace)
     store = dict(download_timeout=download_time, upzip_timeout=upzip_timeout)
     taskflow_session = sqlite.get_taskflow_session()
-    upgrade_flow = pipe.flow_factory(taskflow_session,
+    upgrade_flow = pipe.flow_factory(taskflow_session, book,
                                      applications=applications,
                                      upgradefile=upgradefile,
                                      backupfile=backupfile,

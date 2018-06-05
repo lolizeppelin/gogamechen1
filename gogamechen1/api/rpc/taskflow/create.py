@@ -136,7 +136,8 @@ def create_entity(appendpoint, entity, objtype, databases, appfile, timeout):
     book = LogBook(name='create_%s_%d' % (appendpoint.namespace, entity))
     store = dict(download_timeout=timeout)
     taskflow_session = sqlite.get_taskflow_session()
-    create_flow = pipe.flow_factory(taskflow_session, applications=[app, ],
+    create_flow = pipe.flow_factory(taskflow_session, book,
+                                    applications=[app, ],
                                     upgradefile=GogameAppFile(source=appfile, objtype=objtype),
                                     store=store,
                                     create_cls=GogameDatabaseCreateTask)
