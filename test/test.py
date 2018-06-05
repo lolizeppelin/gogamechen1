@@ -16,3 +16,15 @@ if match:
     # match = re.match(aaa, 'gogamelog-rw-8:111111@tcp')
     #
     # print match
+
+targets = set([1, 2, 3])
+
+
+def is_include(entity):
+    for area in entity.area:
+        if set(area.packages) & targets:
+            return True
+    return False
+
+
+ok = [entity for entity in entitys if is_include(entity)]

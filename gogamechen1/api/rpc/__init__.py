@@ -341,8 +341,15 @@ class Application(AppEndpointBase):
                                              reason=str(middleware))
 
                     def _extract_wait():
-                        middleware.waiter.wait()
-                        middleware.waiter = None
+                        if middleware.waiter is not None:
+                            try:
+                                middleware.waiter.wait()
+                            except Exception:
+                                LOG.error('Wait extract entity file catch error')
+                                if LOG.isEnabledFor(logging.DEBUG):
+                                    LOG.exception('extract fail')
+                            finally:
+                                middleware.waiter = None
                         self.manager.change_performance()
 
                     # 等待解压完成
@@ -372,7 +379,7 @@ class Application(AppEndpointBase):
         # 异步解压
         if systemutils.POSIX:
             def prefunc():
-                systemutils.drop_privileges(self.entity_user(entity), self.entity_user(entity))
+                systemutils.drop_privileges(self.entity_user(entity), self.entity_group(entity))
                 umask()
         else:
             prefunc = None
@@ -416,6 +423,7 @@ class Application(AppEndpointBase):
                         os.rename(filename, os.path.join(logbakup, logfile))
                     except (OSError, IOError):
                         LOG.error('Move log file %s to back up path fail' % filename)
+            # TODO logbak zip
             pid = safe_fork(user=user, group=group)
             if pid == 0:
                 ppid = os.fork()
