@@ -185,23 +185,12 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         areaname = body.pop('areaname', None)
         # 平台类型
         platform = body.pop('platform', None)
-        packages = set(body.pop('packages', []))
+        packages = list(set(body.pop('packages', [])))
         session = endpoint_session()
         if objtype == common.GAMESERVER:
             platform = common.PlatformTypeMap.get(platform)
             if not areaname or not opentime or not platform:
                 raise InvalidArgument('%s need opentime and areaname and platform' % objtype)
-            if packages:
-                _packages = model_query(session, Package, filter=Package.package_id.in_(packages)).all()
-                if len(_packages) != packages:
-                    raise InvalidArgument('Package can not be found when create entity')
-                for package in _packages:
-                    if package.group_id != group_id:
-                        raise InvalidArgument('Package group not match when create entity')
-                    if not (package.platform & platform):
-                        raise InvalidArgument('Pacakge platform not match when create entity')
-            else:
-                _packages = []
         # 安装文件信息
         appfile = body.pop(common.APPFILE)
         LOG.info('Try find agent and database for entity')
@@ -220,6 +209,17 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         _group = query.one()
         glock = get_gamelock()
         with glock.grouplock(group_id):
+            if packages:
+                _packages = model_query(session, Package, filter=Package.package_id.in_(packages)).all()
+                if len(_packages) != len(packages):
+                    raise InvalidArgument('Package can not be found when create entity')
+                for package in _packages:
+                    if package.group_id != group_id:
+                        raise InvalidArgument('Package group not match when create entity')
+                    if not (package.platform & platform):
+                        raise InvalidArgument('Pacakge platform not match when create entity')
+            else:
+                _packages = []
             typemap = {}
             for _entity in _group.entitys:
                 # 跳过未激活的实体

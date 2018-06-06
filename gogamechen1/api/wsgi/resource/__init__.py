@@ -44,6 +44,7 @@ from gogamechen1 import common
 from gogamechen1 import utils
 
 from gogamechen1.api import endpoint_session
+from gogamechen1.api import get_gamelock
 from gogamechen1.models import AppEntity
 from gogamechen1.models import ObjtypeFile
 from gogamechen1.models import Package
@@ -706,39 +707,41 @@ class PackageReuest(BaseContorller):
         package_id = int(package_id)
         session = endpoint_session()
         package_id = int(package_id)
+        glock = get_gamelock()
         query = model_query(session, Package, filter=Package.package_id == package_id)
         query = query.options(joinedload(Package.files))
-        with session.begin():
-            package = query.one()
-            if package.group_id != group_id:
-                raise InvalidArgument('Group id not the same')
-            if package.group_id != group_id:
-                raise InvalidArgument('Group id not match')
-            if package.files:
-                raise InvalidArgument('Package files exist')
-            checked = set()
-            # 确认组别中没有特殊version引用
-            chiefs, areas = group_controller.entitys([common.GMSERVER], group_ids=package.group_id)
-            for area in areas:
-                entity = area.get('entity')
-                if entity in checked:
-                    continue
-                checked.add(entity)
-                versions = area.get('versions')
-                if versions:
-                    for p in versions:
-                        if int(p) == package_id:
-                            version = versions[p]
-                            raise InvalidArgument('Entity %d set package %d, version %s' %
-                                                  (entity, package_id, version.get('version')))
-            # 版本资源引用删除
-            if package.rquote_id:
-                cdnquote_controller.delete(req, package.rquote_id)
-            # 资源引用计数器减少
-            cdnresource_controller.unquote(req, package.resource_id)
-            session.delete(package)
-            session.flush()
-        return resultutils.results(result='Delete package success')
+        with glock.grouplock(group_id):
+            with session.begin():
+                package = query.one()
+                if package.group_id != group_id:
+                    raise InvalidArgument('Group id not the same')
+                if package.group_id != group_id:
+                    raise InvalidArgument('Group id not match')
+                if package.files:
+                    raise InvalidArgument('Package files exist')
+                checked = set()
+                # 确认组别中没有特殊version引用
+                chiefs, areas = group_controller.entitys([common.GMSERVER], group_ids=package.group_id)
+                for area in areas:
+                    entity = area.get('entity')
+                    if entity in checked:
+                        continue
+                    checked.add(entity)
+                    versions = area.get('versions')
+                    if versions:
+                        for p in versions:
+                            if int(p) == package_id:
+                                version = versions[p]
+                                raise InvalidArgument('Entity %d set package %d, version %s' %
+                                                      (entity, package_id, version.get('version')))
+                # 版本资源引用删除
+                if package.rquote_id:
+                    cdnquote_controller.delete(req, package.rquote_id)
+                # 资源引用计数器减少
+                cdnresource_controller.unquote(req, package.resource_id)
+                session.delete(package)
+                session.flush()
+            return resultutils.results(result='Delete package success')
 
     def upgrade(self, req, group_id, package_id, body=None):
         """更新资源版本"""
