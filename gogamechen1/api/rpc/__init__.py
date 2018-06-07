@@ -374,7 +374,7 @@ class Application(AppEndpointBase):
             self.konwn_appentitys.pop(entity, None)
             systemutils.drop_user(self.entity_user(entity))
 
-    def extract_entity_file(self, entity, objtype, appfile, timeout):
+    def extract_entity_file(self, entity, objtype, appfile, timeout, exclude=None):
         dst = self.apppath(entity)
         # 异步解压
         if systemutils.POSIX:
@@ -383,7 +383,8 @@ class Application(AppEndpointBase):
                 umask()
         else:
             prefunc = None
-        waiter = zlibutils.async_extract(src=appfile, dst=dst, timeout=timeout,
+        waiter = zlibutils.async_extract(src=appfile, dst=dst,
+                                         exclude=exclude, timeout=timeout,
                                          native=False, prefunc=prefunc)
         # 解压完成速度过快, 检查是否有错, 没有报错说明解压完成
         if waiter.finished:
