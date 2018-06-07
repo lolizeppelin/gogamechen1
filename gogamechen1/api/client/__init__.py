@@ -34,7 +34,8 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
     appentitys_all_path = '/gogamechen1/entitys'
 
     all_packages_path = '/gogamechen1/packages'
-    all_resources_path = '/gogamechen1/resources'
+    group_resources_path = '/gogamechen1/group/%s/resources'
+    group_resource_path = '/gogamechen1/group/%s/resources/%s'
     packages_path = '/gogamechen1/group/%s/packages'
     package_path = '/gogamechen1/group/%s/packages/%s'
     package_path_ex = '/gogamechen1/group/%s/packages/%s/%s'
@@ -405,10 +406,18 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
-    def package_resource_all(self):
-        resp, results = self.get(action=self.all_resources_path)
+    def package_group_resources(self, group_id):
+        resp, results = self.get(action=self.group_resources_path % str(group_id))
         if results['resultcode'] != common.RESULT_SUCCESS:
-            raise ServerExecuteRequestError(message='list all package resource fail',
+            raise ServerExecuteRequestError(message='get group package resource fail',
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def package_bulk_update_resources(self, group_id, resource_id, body):
+        resp, results = self.get(action=self.group_resource_path % (str(group_id), str(resource_id)), body=body)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='bulk up packages resource fail',
                                             code=resp.status_code,
                                             resone=results['result'])
         return results

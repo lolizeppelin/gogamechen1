@@ -14,7 +14,6 @@ class Routers(router.RoutersBase):
 
     def append_routers(self, mapper, routers=None):
 
-
         resource_name = 'objfile'
         collection_name = resource_name + 's'
 
@@ -36,9 +35,15 @@ class Routers(router.RoutersBase):
         self._add_resource(mapper, package_controller,
                            path='/%s/packages' % common.NAME,
                            get_action='packages')
+
         self._add_resource(mapper, package_controller,
-                           path='/%s/resources' % common.NAME,
+                           path='/%s/group/{group_id}/resources' % common.NAME,
                            get_action='resources')
+
+        self._add_resource(mapper, package_controller,
+                           path='/%s/group/{group_id}/resources/{resource_id}' % common.NAME,
+                           put_action='updates')
+
         collection = mapper.collection(collection_name=collection_name,
                                        resource_name=resource_name,
                                        controller=package_controller,
@@ -54,7 +59,6 @@ class Routers(router.RoutersBase):
         # list cdn resource file
         collection.member.link('remark', name='list_remarks', method='GET', action='list_remarks')
 
-
         resource_name = 'pfile'
         collection_name = resource_name + 's'
         pfile_controller = controller_return_response(resource.PackageFileReuest(),
@@ -67,7 +71,6 @@ class Routers(router.RoutersBase):
                                        member_prefix='/{pfile_id}',
                                        collection_actions=COLLECTION_ACTIONS,
                                        member_actions=MEMBER_ACTIONS)
-
 
         resource_name = 'group'
         collection_name = resource_name + 's'
@@ -124,7 +127,6 @@ class Routers(router.RoutersBase):
         self._add_resource(mapper, game_controller,
                            path='/%s/mergeing/{entity}/swallowed' % common.NAME,
                            post_action='swallowed')
-
 
         collection = mapper.collection(collection_name=collection_name,
                                        resource_name=resource_name,

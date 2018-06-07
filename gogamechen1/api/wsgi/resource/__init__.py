@@ -350,6 +350,16 @@ class PackageReuest(BaseContorller):
             }
     }
 
+    UPDATES = {
+        'type': 'object',
+        'required': ['rversion', 'packages'],
+        'properties': {
+            'rversion': {'type': 'string', 'description': '更新到指定资源版本'},
+            'packages': {'type': 'array', 'maxItems': 1, 'items': {'type': 'integer', 'minimum': 1},
+                         'description': '批量更新的包ID'},
+        }
+    }
+
     def packages(self, req, body=None):
         body = body or {}
         areas = body.get('areas', False)
@@ -443,9 +453,9 @@ class PackageReuest(BaseContorller):
             data.append(info)
         return resultutils.results(result='list packages success', data=data)
 
-    def resources(self, req, body=None):
+    def resources(self, req, group_id, body=None):
         session = endpoint_session(readonly=True)
-        query = model_query(session, Package)
+        query = model_query(session, Package, filter=Package.group_id == group_id)
         packages = query.all()
         _resources = set()
         maps = {}
@@ -461,13 +471,49 @@ class PackageReuest(BaseContorller):
         for resource_id in _resources:
             resource = resource_cache_map(resource_id=resource_id, flush=False)
             data.append(dict(resource_id=resource_id,
-                             packages=[p.package_id for p in maps[resource_id]],
-                             groups=[p.group_id for p in maps[resource_id]],
+                             group_id=group_id,
+                             packages=[dict(package_id=p.package_id,
+                                            group_id=p.group_id,
+                                            package_name=p.package_name,
+                                            rversion=p.rversion,
+                                            gversion=p.gversion,
+                                            mark=p.mark,
+                                            platform=p.platform,
+                                            ) for p in maps[resource_id]],
                              etype=resource.get('etype'),
                              name=resource.get('name'),
                              versions=resource.get('versions')))
-
         return resultutils.results(result='list packages resource success', data=data)
+
+    def updates(self, req, group_id, resource_id, body=None):
+        """批量更新包版本号"""
+        body = body or {}
+        group_id = int(group_id)
+        jsonutils.schema_validate(body, self.UPDATES)
+        rversion = body.get('rversion')
+        packages = body.get('packages')
+        session = endpoint_session(readonly=True)
+        query = model_query(session, Package,
+                            filter=and_(Package.resource_id == resource_id,
+                                        Package.group_id == group_id,
+                                        Package.package_id.in_(packages)))
+        success = []
+        fail = []
+        for package in query:
+            pkginfo = dict(package_id=package.package_id,
+                           group_id=package.group_id,
+                           package_name=package.package_name,
+                           rversion=package.rversion,
+                           gversion=package.gversion,
+                           mark=package.mark,
+                           platform=package.platform)
+            try:
+                self.update(req, group_id, package.package_id, body=dict(rversion=rversion))
+                success.append(pkginfo)
+            except Exception:
+                LOG.error('update %d rversion fail' % package.package_id)
+                fail.append(pkginfo)
+        return resultutils.results(result='list packages resource success', data=[dict(success=success, fail=fail)])
 
     def areas(self, req, body=None):
         session = endpoint_session(readonly=True)
@@ -485,6 +531,7 @@ class PackageReuest(BaseContorller):
         group_id = int(group_id)
         order = body.pop('order', None)
         page_num = int(body.pop('page_num', 0))
+        resource_id = int(body.pop('resource_id', 0))
         session = endpoint_session(readonly=True)
         results = resultutils.bulk_results(session,
                                            model=Package,
@@ -501,7 +548,9 @@ class PackageReuest(BaseContorller):
                                                     Package.extension],
                                            counter=Package.package_id,
                                            order=order,
-                                           filter=Package.group_id == group_id,
+                                           filter=Package.group_id == group_id
+                                           if not resource_id
+                                           else and_(Package.group_id == group_id, resource_id=resource_id),
                                            page_num=page_num)
         for column in results['data']:
             magic = column.get('magic')
