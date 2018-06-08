@@ -482,6 +482,9 @@ class PackageReuest(BaseContorller):
                                             ) for p in maps[resource_id]],
                              etype=resource.get('etype'),
                              name=resource.get('name'),
+                             impl=resource.get('impl'),
+                             quotes=resource.get('quotes'),
+                             netlocs=resource.get('netlocs'),
                              versions=resource.get('versions')))
         return resultutils.results(result='list packages resource success', data=data)
 
@@ -513,7 +516,7 @@ class PackageReuest(BaseContorller):
             except Exception:
                 LOG.error('update %d rversion fail' % package.package_id)
                 fail.append(pkginfo)
-        return resultutils.results(result='list packages resource success', data=[dict(success=success, fail=fail)])
+        return resultutils.results(result='updates packages rversion finish', data=[dict(success=success, fail=fail)])
 
     def areas(self, req, body=None):
         session = endpoint_session(readonly=True)
@@ -725,21 +728,22 @@ class PackageReuest(BaseContorller):
             # 游戏资源版本号, 由cdn相关版本号决定
             if rversion is not DEFAULTVALUE:
                 if rversion:
-                    # 没有引用过默认version,添加资源引用
-                    if not package.rversion:
-                        qresult = cdnresource_controller.vquote(req, resource_id=package.resource_id,
-                                                                body=dict(version=rversion))
-                        quote = qresult['data'][0]
-                        package.rquote_id = quote.get('quote_id')
-                        alias = quote.get('alias')
-                    # 有引用,修改资源引用
-                    else:
-                        upresult = cdnquote_controller.update(req, quote_id=package.rquote_id,
-                                                              body={'version': rversion})['data'][0]
-                        alias = upresult.get('version').get('alias')
-                    if not alias:
-                        LOG.error('version alias is None, check it')
-                    LOG.info('Package version %s with alias %s' % (rversion, alias))
+                    if rversion != package.rversion:
+                        # 没有引用过默认version,添加资源引用
+                        if not package.rversion:
+                            qresult = cdnresource_controller.vquote(req, resource_id=package.resource_id,
+                                                                    body=dict(version=rversion))
+                            quote = qresult['data'][0]
+                            package.rquote_id = quote.get('quote_id')
+                            alias = quote.get('alias')
+                        # 有引用,修改资源引用
+                        else:
+                            upresult = cdnquote_controller.update(req, quote_id=package.rquote_id,
+                                                                  body={'version': rversion})['data'][0]
+                            alias = upresult.get('version').get('alias')
+                        if not alias:
+                            LOG.error('version alias is None, check it')
+                        LOG.info('Package version %s with alias %s' % (rversion, alias))
                 else:
                     if package.rversion:
                         delresult = cdnquote_controller.delete(req, quote_id=package.rquote_id)['data'][0]
