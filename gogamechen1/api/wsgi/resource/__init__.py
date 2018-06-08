@@ -355,7 +355,7 @@ class PackageReuest(BaseContorller):
         'required': ['rversion', 'packages'],
         'properties': {
             'rversion': {'type': 'string', 'description': '更新到指定资源版本'},
-            'packages': {'type': 'array', 'maxItems': 1, 'items': {'type': 'integer', 'minimum': 1},
+            'packages': {'type': 'array', 'minItems': 1, 'items': {'type': 'integer', 'minimum': 1},
                          'description': '批量更新的包ID'},
         }
     }
