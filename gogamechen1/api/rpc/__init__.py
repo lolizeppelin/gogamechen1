@@ -45,6 +45,7 @@ from gogamechen1.api.rpc.config import agent_opts
 
 from gogamechen1.api.rpc.taskflow import create as taskcreate
 from gogamechen1.api.rpc.taskflow import upgrade as taskupgrade
+from gogamechen1.api.rpc.taskflow import hotfix as taskhotfix
 from gogamechen1.api.rpc.taskflow import merge as taskmerge
 
 if systemutils.POSIX:
@@ -854,14 +855,17 @@ class Application(AppEndpointBase):
             # 启动前进程快照
             proc_snapshot_before = utils.find_process()
             for entity in entitys:
-                status = self.konwn_appentitys[entity].get('status')
-                if status != common.OK:
-                    details.append(formater(entity, manager_common.RESULT_ERROR,
-                                            'upgrade entitys not executed, some entity status not ok'))
                 if self._entity_process(entity, proc_snapshot_before):
                     for __entity in entitys:
                         details.append(formater(__entity, manager_common.RESULT_ERROR,
                                                 'upgrade entitys not executed, some entity is running'))
+                    break
+                status = self.konwn_appentitys[entity].get('status')
+                if status != common.OK:
+                    for __entity in entitys:
+                        details.append(formater(__entity, manager_common.RESULT_ERROR,
+                                                'upgrade entitys not executed, some entity status not ok'))
+                    break
             if details:
                 return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                                   ctxt=ctxt,
@@ -949,6 +953,92 @@ class Application(AppEndpointBase):
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           ctxt=ctxt,
                                           result='Flush entitys config end', details=details)
+
+    def rpc_hotfix_entitys(self, ctxt, entitys, **kwargs):
+        entitys = argutils.map_to_int(entitys) & set(self.entitys)
+        if not entitys:
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='hotfix entity fail, no entitys found')
+        timeline = int(kwargs.get('timeline', 0))
+        objfile = kwargs.get('objfile')
+        objtype = kwargs.get('objtype')
+        if objtype != common.GAMESERVER:
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='Objtype not %s' % common.GAMESERVER)
+        # 校验objtype是否一致
+        for entity in entitys:
+            if self._objtype(entity) != objtype:
+                return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                                  resultcode=manager_common.RESULT_ERROR,
+                                                  ctxt=ctxt,
+                                                  result='hotfix entity %d not %s' % (entity, objtype))
+        details = []
+        formater = AsyncActionResult('hotfix', self.konwn_appentitys)
+        with self.locks(entitys):
+            # 启动前进程快照
+            proc_snapshot_before = utils.find_process()
+            for entity in entitys:
+                if self._entity_process(entity, proc_snapshot_before):
+                    for __entity in entitys:
+                        details.append(formater(__entity, manager_common.RESULT_ERROR,
+                                                'hotfix entitys not executed, some entity is running'))
+                    break
+                status = self.konwn_appentitys[entity].get('status')
+                if status != common.OK:
+                    for __entity in entitys:
+                        details.append(formater(__entity, manager_common.RESULT_ERROR,
+                                                'hotfix entitys not executed, some entity status not ok'))
+                    break
+            if details:
+                return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                                  ctxt=ctxt,
+                                                  result='hotfix entity fail, check status fail',
+                                                  details=details)
+            try:
+                middlewares, e = taskhotfix.hotfix_entitys(self, objtype, objfile, entitys, timeline)
+            except Exception as e:
+                if hasattr(e, 'message'):
+                    msg = e.message
+                else:
+                    msg = 'prepare hotfix taskflow fail'
+                if LOG.isEnabledFor(logging.DEBUG):
+                    LOG.exception(msg)
+                else:
+                    LOG.error('prepare hotfix fail, %s %s' % (e.__class__.__name__, str(e)))
+                for entity in entitys:
+                    details.append(formater(entity, manager_common.RESULT_ERROR,
+                                            'hotfix entity %d not executed' % entity))
+                return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                                  ctxt=ctxt,
+                                                  details=details,
+                                                  result='hotfix %s entitys fail, %s' % (objtype, msg))
+
+        for middleware in middlewares:
+            if middleware.success:
+                details.append(formater(middleware.entity, manager_common.RESULT_SUCCESS))
+            elif middleware.notexecuted:
+                details.append(formater(middleware.entity, manager_common.RESULT_ERROR,
+                                        'hotfix entity %d not executed'))
+            else:
+                details.append(formater(middleware.entity, manager_common.RESULT_ERROR,
+                                        'hotfix entity %d fail, check agent log for more' % middleware.entity))
+                LOG.debug('%s.%d %s', (objtype, middleware.entity, str(middleware)))
+        if e:
+            if hasattr(e, 'message') and e.message:
+                msg = e.message
+            else:
+                msg = 'Task execute fail by %s' % e.__class__.__name__
+            result = 'hotfix %s entitys fail, %s' % (objtype, msg)
+        else:
+            result = 'hotfix %s entitys finish' % objtype
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          ctxt=ctxt,
+                                          details=details,
+                                          result=result)
 
     def rpc_swallow_entity(self, ctxt, entity, **kwargs):
         if entity not in set(self.entitys):

@@ -104,6 +104,25 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
                            'description': '忽略运行状态'}}
              }
 
+    HOTFIX = {'type': 'object',
+              'required': [common.APPFILE],
+              'properties': {
+                  common.APPFILE: {
+                      'type': 'object',
+                      'required': ['md5', 'timeout'],
+                      'properties': {'md5': {'type': 'string', 'format': 'md5',
+                                             'description': '更新程序文件所需文件'},
+                                     'timeout': {'type': 'integer', 'minimum': 10, 'maxmum': 300,
+                                                 'description': '更新超时时间'},
+                                     'backup': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
+                                                'description': '是否更新前备份程序,默认否'},
+                                     'revertable': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
+                                                    'description': '程序文件是否可以回滚,默认是'},
+                                     'rollback': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
+                                                  'description': '是否连带回滚(回滚前方已经成功的步骤),默认否'},
+                                     }},}
+              }
+
     def _async_bluck_rpc(self, action, group_id, objtype, entity, body):
         caller = inspect.stack()[0][3]
         body = body or {}
@@ -284,3 +303,10 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
                                            ))
                 body.update({'chiefs': chiefs})
         return self._async_bluck_rpc('flushconfig', group_id, objtype, entity, body)
+
+    def hotfix(self, req, group_id, objtype, entity, body=None):
+        body = body or {}
+        if objtype != common.GAMESERVER:
+            raise InvalidArgument('Hotfix just for %s' % common.GAMESERVER)
+        jsonutils.schema_validate(body, self.HOTFIX)
+        return self._async_bluck_rpc('hotfix', group_id, objtype, entity, body)
