@@ -23,7 +23,7 @@ CONF = cfg.CONF
 
 LOG = logging.getLogger(__name__)
 
-SHELLZIPEXCLUDES = ['"bin**"', '"geology**"'] if systemutils.WINDOWS else ['bin**', 'geology**']
+SHELLZIPEXCLUDES = ['bin**', 'geology**']
 SHELTAREXCLUDE = ['bin', 'geology']
 
 
