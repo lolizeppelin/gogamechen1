@@ -962,7 +962,7 @@ class Application(AppEndpointBase):
                                               ctxt=ctxt,
                                               result='hotfix entity fail, no entitys found')
         timeline = int(kwargs.get('timeline', 0))
-        objfile = kwargs.get('objfile')
+        appfile = kwargs.get('appfile')
         objtype = kwargs.get('objtype')
         if objtype != common.GAMESERVER:
             return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
@@ -992,7 +992,7 @@ class Application(AppEndpointBase):
                                                   result='hotfix entity fail, check status fail',
                                                   details=details)
             try:
-                middlewares, e = taskhotfix.hotfix_entitys(self, objtype, objfile, entitys, timeline)
+                middlewares, e = taskhotfix.hotfix_entitys(self, objtype, appfile, entitys, timeline)
             except Exception as e:
                 if hasattr(e, 'message'):
                     msg = e.message

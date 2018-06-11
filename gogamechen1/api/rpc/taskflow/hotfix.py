@@ -52,16 +52,16 @@ hofixexcluer = Excluder()
 
 
 def hotfix_entitys(appendpoint,
-                   objtype, objfile,
+                   objtype, appfile,
                    entitys, timeline):
     backupfile = None
     download_time = 600
     upzip_timeout = 600
-    md5 = objfile.get('md5')
-    backup = objfile.get('backup', True)
-    revertable = objfile.get('revertable', False)
-    rollback = objfile.get('rollback', True)
-    timeout = objfile.get('timeout')
+    md5 = appfile.get('md5')
+    backup = appfile.get('backup', True)
+    revertable = appfile.get('revertable', False)
+    rollback = appfile.get('rollback', True)
+    timeout = appfile.get('timeout')
     if timeout < download_time:
         download_time = timeout
     if timeout < upzip_timeout:
