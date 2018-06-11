@@ -33,9 +33,9 @@ class HOFIXExcluder(Excluder):
         if not shell:
             raise TypeError('Just for shell extract')
         if compretype == 'zip':
-            return self.unzip
+            return HOFIXExcluder.unzip
         elif compretype == 'gz':
-            return self.untar
+            return HOFIXExcluder.untar
         else:
             raise NotImplementedError('Can not extract %s file' % compretype)
 
