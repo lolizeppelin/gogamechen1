@@ -48,7 +48,7 @@ class HOFIXExcluder(Excluder):
         return SHELTAREXCLUDE
 
 
-hofixexcluer = Excluder()
+hofixexcluer = HOFIXExcluder()
 
 
 def hotfix_entitys(appendpoint,
