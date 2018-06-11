@@ -149,9 +149,9 @@ def create_entity(appendpoint, entity, objtype, databases, appfile, timeout):
         engine.run()
     except Exception as e:
         if LOG.isEnabledFor(logging.DEBUG):
-            LOG.exception('Task execute fail')
+            LOG.exception('Create task execute fail')
         else:
-            LOG.error('Task execute fail, %s %s' % (e.__class__.__name__, str(e)))
+            LOG.error('Create task execute fail, %s %s' % (e.__class__.__name__, str(e)))
     finally:
         connection.destroy_logbook(book.uuid)
         for dberror in middleware.dberrors:

@@ -979,14 +979,7 @@ class Application(AppEndpointBase):
         details = []
         formater = AsyncActionResult('hotfix', self.konwn_appentitys)
         with self.locks(entitys):
-            # 启动前进程快照
-            proc_snapshot_before = utils.find_process()
             for entity in entitys:
-                if self._entity_process(entity, proc_snapshot_before):
-                    for __entity in entitys:
-                        details.append(formater(__entity, manager_common.RESULT_ERROR,
-                                                'hotfix entitys not executed, some entity is running'))
-                    break
                 status = self.konwn_appentitys[entity].get('status')
                 if status != common.OK:
                     for __entity in entitys:

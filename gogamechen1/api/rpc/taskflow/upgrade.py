@@ -112,9 +112,9 @@ def upgrade_entitys(appendpoint,
         engine.run()
     except Exception as e:
         if LOG.isEnabledFor(logging.DEBUG):
-            LOG.exception('Task execute fail')
+            LOG.exception('Upgrade task execute fail')
         else:
-            LOG.error('Task execute fail, %s %s' % (e.__class__.__name__, str(e)))
+            LOG.error('Upgrade task execute fail, %s %s' % (e.__class__.__name__, str(e)))
     finally:
         connection.destroy_logbook(book.uuid)
     return middlewares, e

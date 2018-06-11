@@ -27,12 +27,17 @@ SHELTAREXCLUDE = ['bin', 'geology']
 
 
 class HOFIXExcluder(Excluder):
+
     def __call__(self, compretype, shell=False):
         """find excluder function"""
         if not shell:
             raise TypeError('Just for shell extract')
         if compretype == 'zip':
             return self.unzip
+        elif compretype == 'gz':
+            return self.untar
+        else:
+            raise NotImplementedError('Can not extract %s file' % compretype)
 
     @staticmethod
     def unzip():
@@ -101,9 +106,9 @@ def hotfix_entitys(appendpoint,
         engine.run()
     except Exception as e:
         if LOG.isEnabledFor(logging.DEBUG):
-            LOG.exception('Task execute fail')
+            LOG.exception('Hotfix task execute fail')
         else:
-            LOG.error('Task execute fail, %s %s' % (e.__class__.__name__, str(e)))
+            LOG.error('Hotfix task execute fail, %s %s' % (e.__class__.__name__, str(e)))
     finally:
         connection.destroy_logbook(book.uuid)
     return middlewares, e
