@@ -2,6 +2,7 @@
 import os
 from simpleutil.config import cfg
 from simpleutil.log import log as logging
+from simpleutil.utils import systemutils
 from simpleutil.utils.zlibutils.excluder import Excluder
 
 from simpleflow.api import load
@@ -22,7 +23,7 @@ CONF = cfg.CONF
 
 LOG = logging.getLogger(__name__)
 
-SHELLZIPEXCLUDES = ['"bin**"', '"geology**"']
+SHELLZIPEXCLUDES = ['"bin**"', '"geology**"'] if systemutils.WINDOWS else ['bin**', 'geology**']
 SHELTAREXCLUDE = ['bin', 'geology']
 
 
