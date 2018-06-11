@@ -309,4 +309,5 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
         if objtype != common.GAMESERVER:
             raise InvalidArgument('Hotfix just for %s' % common.GAMESERVER)
         jsonutils.schema_validate(body, self.HOTFIX)
+        body.setdefault('objtype', objtype)
         return self._async_bluck_rpc('hotfix', group_id, objtype, entity, body)
