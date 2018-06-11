@@ -84,7 +84,7 @@ def hotfix_entitys(appendpoint,
         middleware = GogameMiddle(endpoint=appendpoint, entity=entity, objtype=objtype)
         middlewares.append(middleware)
         _updates.clear()
-        upgradetask = AppFileUpgradeByFile(middleware, exclude=hofixexcluer,
+        upgradetask = AppFileUpgradeByFile(middleware, native=False, exclude=hofixexcluer,
                                            rebind=['upgradefile', 'upzip_timeout'])
         app = Application(middleware, upgradetask=upgradetask)
         applications.append(app)

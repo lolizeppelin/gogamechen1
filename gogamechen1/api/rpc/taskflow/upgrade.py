@@ -90,7 +90,7 @@ def upgrade_entitys(appendpoint,
         # 更新程序文件任务
         upgradetask = None
         if common.APPFILE in objfiles:
-            upgradetask = AppFileUpgradeByFile(middleware,
+            upgradetask = AppFileUpgradeByFile(middleware, native=False,
                                                rebind=['upgradefile', 'upzip_timeout'])
         app = Application(middleware, upgradetask=upgradetask, databases=_database)
         applications.append(app)
