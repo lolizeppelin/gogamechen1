@@ -486,7 +486,7 @@ class Application(AppEndpointBase):
                     os.makedirs(logbakup)
                 except (OSError, IOError):
                     LOG.error('Make path for backup entity log fail')
-            for _filename in logpath:
+            for _filename in os.listdir(logpath):
                 _logfile = os.path.join(logpath, _filename)
                 if os.path.isfile(_logfile):
                     try:
