@@ -232,10 +232,18 @@ class Application(AppEndpointBase):
                                                                opentime=opentime,
                                                                started=False,
                                                                pid=None))
-        # find entity pid
         for entity in self.entitys:
-            _pid = self._find_from_pids(entity, self.konwn_appentitys[entity].get('objtype'),
-                                        pids)
+            # INIT backup path
+            bakpath = self.bakpath(entity)
+            if not os.path.exists(bakpath):
+                try:
+                    os.makedirs(bakpath, mode=0755)
+                except (OSError, IOError):
+                    LOG.error('Make path for backup entity log fail')
+                finally:
+                    systemutils.chown(bakpath, self.entity_user(entity), self.entity_group(entity))
+            _pid = self._find_from_pids(entity, self.konwn_appentitys[entity].get('objtype'), pids)
+            # find entity pid
             if _pid:
                 LOG.info('App entity %d is running at %d' % (entity, _pid))
                 self.konwn_appentitys[entity]['pid'] = _pid
@@ -483,9 +491,11 @@ class Application(AppEndpointBase):
             logpath = self.logpath(entity)
             if not os.path.exists(logbakup):
                 try:
-                    os.makedirs(logbakup)
+                    os.makedirs(logbakup, mode=0755)
                 except (OSError, IOError):
                     LOG.error('Make path for backup entity log fail')
+                finally:
+                    systemutils.chown(logbakup, self.entity_user(entity), self.entity_group(entity))
             for _filename in os.listdir(logpath):
                 _logfile = os.path.join(logpath, _filename)
                 if os.path.isfile(_logfile):
