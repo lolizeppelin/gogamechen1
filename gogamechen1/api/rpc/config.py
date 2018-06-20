@@ -16,7 +16,20 @@ agent_opts = [
                help='agent appcaclition affinity bitwise, '
                     '[gamesvr:1] [publicsvr:2] [gmsvr:4] '
                     '[publicsvr&gmsvr:6] '
-                    '[gamesvr&publicsvr&gmsvr:7] and so on')
+                    '[gamesvr&publicsvr&gmsvr:7] and so on'),
+    cfg.IntOpt('periodic_interval',
+               default=3,
+               min=0, max=10,
+               help='Entity process periodic check interval by min'),
+    cfg.IntOpt('auto_restart_times',
+               default=1,
+               min=0, max=5,
+               help='Auto start entity process times when entity dead, '
+                    '0 means do not auto restart dead entity process'),
+    cfg.IntOpt('pop_from_deads',
+               default=180,
+               min=30, max=600,
+               help='Entity will remove from auto restart periodic task dead process list after seconds')
 ]
 
 sources_opts = [

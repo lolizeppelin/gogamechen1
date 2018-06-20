@@ -17,6 +17,8 @@ from simpleutil.config import cfg
 from simpleutil.utils import zlibutils
 from simpleutil.utils import systemutils
 
+from simpleservice.loopingcall import IntervalLoopinTask
+
 from goperation import threadpool
 from goperation.utils import safe_fork
 from goperation.utils import umask
@@ -72,23 +74,6 @@ def count_timeout(ctxt, kwargs):
     return min(_timeout, timeout)
 
 
-class CreateResult(resultutils.AgentRpcResult):
-    def __init__(self, agent_id, ctxt,
-                 resultcode, result,
-                 connection, ports, databases):
-        super(CreateResult, self).__init__(agent_id, ctxt, resultcode, result)
-        self.connection = connection
-        self.ports = ports
-        self.databases = databases
-
-    def to_dict(self):
-        ret_dict = super(CreateResult, self).to_dict()
-        ret_dict.setdefault('databases', self.databases)
-        ret_dict.setdefault('ports', self.ports)
-        ret_dict.setdefault('connection', self.connection)
-        return ret_dict
-
-
 def AsyncActionResult(action, stores):
     def result(_entity, code, msg=None):
         entity = stores[_entity]
@@ -109,7 +94,85 @@ def AsyncActionResult(action, stores):
         return dict(detail_id=_entity,
                     resultcode=code,
                     result='%s|%s|%s' % (areas, pid, msg))
+
     return result
+
+
+class CreateResult(resultutils.AgentRpcResult):
+    def __init__(self, agent_id, ctxt,
+                 resultcode, result,
+                 connection, ports, databases):
+        super(CreateResult, self).__init__(agent_id, ctxt, resultcode, result)
+        self.connection = connection
+        self.ports = ports
+        self.databases = databases
+
+    def to_dict(self):
+        ret_dict = super(CreateResult, self).to_dict()
+        ret_dict.setdefault('databases', self.databases)
+        ret_dict.setdefault('ports', self.ports)
+        ret_dict.setdefault('connection', self.connection)
+        return ret_dict
+
+
+class EntityProcessCheckTasker(IntervalLoopinTask):
+    """
+    周期性entity进程检查
+    """
+    PROCESSATTR = ['status', 'num_fds', 'num_threads', 'name', 'pid']
+
+    def __init__(self, endpoint):
+        self.endpoint = endpoint
+        self.deads = dict()
+        conf = CONF[common.NAME]
+        super(EntityProcessCheckTasker, self).__init__(periodic_interval=conf.periodic_interval * 60,
+                                                       initial_delay=conf.pop_from_deads,
+                                                       stop_on_exception=False)
+
+    def __call__(self, *args, **kwargs):
+        entitys = []
+        for entity in self.endpoint.konwn_appentitys:
+            if self.endpoint.konwn_appentitys[entity]['started']:
+                entitys.append(entity)
+            else:
+                self.deads.pop(entity, None)
+        if entitys:
+            conf = CONF[common.NAME]
+            proc_snapshot = utils.find_process()
+            for entity in entitys:
+                if not self.endpoint.konwn_appentitys[entity]['started']:
+                    self.deads.pop(entity, None)
+                    continue
+                status = self.endpoint.konwn_appentitys[entity].get('status')
+                if status != common.OK:
+                    with self.endpoint.lock(entity):
+                        self.endpoint.konwn_appentitys[entity]['started'] = False
+                    self.deads.pop(entity, None)
+                    continue
+                if self.endpoint._entity_process(entity, proc_snapshot):
+                    info = self.deads.pop(entity, None)
+                    if info and ((int(time.time()) - info.get('time')) < conf.pop_from_deads):
+                        self.deads.setdefault(entity, info)
+                    continue
+                info = self.deads.pop(entity, None)
+                now = int(time.time())
+                if not info:
+                    info = dict(time=now, times=1)
+                else:
+                    info['times'] += 1
+                    info['time'] = now
+                if info.get('times') > conf.auto_restart_times:
+                    LOG.warning('Entity process dead over auto restart max times')
+                    # TODO notify fail
+                    with self.endpoint.lock(entity):
+                        self.endpoint.konwn_appentitys[entity]['started'] = False
+                    continue
+                self.deads.setdefault(entity, info)
+                LOG.into('Try restart entity process %d times' % info.get('times'))
+                eventlet.spawn_n(self.endpoint.start_entity, entity, proc_snapshot)
+                # eventlet.sleep(0)
+        else:
+            self.deads.clear()
 
 
 @singleton.singleton
@@ -138,7 +201,10 @@ class Application(AppEndpointBase):
 
     def pre_start(self, external_objects):
         super(AppEndpointBase, self).pre_start(external_objects)
-        external_objects.update({'gogamechen1-aff': CONF[common.NAME].agent_affinity})
+        conf = CONF[common.NAME]
+        external_objects.update({'gogamechen1-aff': conf.agent_affinity})
+        if conf.auto_restart_times:
+            self.manager.periodic_tasks.append(EntityProcessCheckTasker(self))
 
     def post_start(self):
         super(Application, self).post_start()
@@ -164,6 +230,7 @@ class Application(AppEndpointBase):
                                                                status=status,
                                                                areas=areas,
                                                                opentime=opentime,
+                                                               started=False,
                                                                pid=None))
         # find entity pid
         for entity in self.entitys:
@@ -172,6 +239,7 @@ class Application(AppEndpointBase):
             if _pid:
                 LOG.info('App entity %d is running at %d' % (entity, _pid))
                 self.konwn_appentitys[entity]['pid'] = _pid
+                self.konwn_appentitys[entity]['started'] = True
 
     def _esure(self, entity, objtype, proc):
         datadir = False
@@ -418,13 +486,13 @@ class Application(AppEndpointBase):
                     os.makedirs(logbakup)
                 except (OSError, IOError):
                     LOG.error('Make path for backup entity log fail')
-            for logfile in logpath:
-                filename = os.path.join(logpath, logfile)
-                if os.path.isfile(filename):
+            for _filename in logpath:
+                _logfile = os.path.join(logpath, _filename)
+                if os.path.isfile(_logfile):
                     try:
-                        os.rename(filename, os.path.join(logbakup, logfile))
+                        os.rename(_logfile, os.path.join(logbakup, _filename))
                     except (OSError, IOError):
-                        LOG.error('Move log file %s to back up path fail' % filename)
+                        LOG.error('Move log file %s to back up path fail' % _filename)
             # TODO logbak zip
             pid = safe_fork(user=user, group=group)
             if pid == 0:
@@ -439,7 +507,7 @@ class Application(AppEndpointBase):
                         # exec关闭日志文件描述符
                         systemutils.set_cloexec_flag(f.fileno())
                         # 小陈的so放在bin目录中
-                        os.execve(EXEC, args, {'LD_LIBRARY_PATH': os.path.join(pwd, 'bin')})
+                        os.execve(EXEC, args, {'LD_LIBRARY_PATH': os.path.join(pwd, 'bin'), 'GOTRACEBACK': 'crash'})
                 else:
                     os._exit(0)
             else:
@@ -535,6 +603,7 @@ class Application(AppEndpointBase):
                                                           status=kwargs.pop('status'),
                                                           areas=kwargs.pop('areas'),
                                                           opentime=kwargs.pop('opentime', None),
+                                                          started=False,
                                                           pid=None))
         except KeyError:
             LOG.error('Fail setdefault for entity by KeyError')
@@ -730,6 +799,7 @@ class Application(AppEndpointBase):
                 detail.update(formater(entity, manager_common.RESULT_ERROR,
                                        'start entity %d fail, process not exist after start' % entity))
             else:
+                self.konwn_appentitys[entity]['started'] = True
                 # 写入PID
                 results = detail['result'].split('|')
                 results[1] = str(self.konwn_appentitys[entity]['pid'])
@@ -764,6 +834,7 @@ class Application(AppEndpointBase):
         formater = AsyncActionResult('stop', self.konwn_appentitys)
 
         def safe_wapper(__entity):
+            self.konwn_appentitys[__entity]['started'] = False
             try:
                 if delay and not kill:
                     with self.lock(entity):
