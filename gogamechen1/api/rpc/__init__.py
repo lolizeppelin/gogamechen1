@@ -173,7 +173,7 @@ class EntityProcessCheckTasker(IntervalLoopinTask):
                         self.endpoint.konwn_appentitys[entity]['started'] = False
                     continue
                 self.deads.setdefault(entity, info)
-                LOG.into('Try restart entity process %d times' % info.get('times'))
+                LOG.info('Try restart entity process %d times' % info.get('times'))
                 eventlet.spawn_n(self.endpoint.start_entity, entity, proc_snapshot)
                 # eventlet.sleep(0)
         else:
