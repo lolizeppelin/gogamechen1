@@ -18,6 +18,23 @@
 # Allowed values: 1, 2, 3, 4, 5, 6, 7
 #agent_affinity = 1
 
+# Entity process periodic check interval by min (integer value)
+# Minimum value: 0
+# Maximum value: 10
+#periodic_interval = 3
+
+# Auto start entity process times when entity dead, 0 means do not auto restart
+# dead entity process (integer value)
+# Minimum value: 0
+# Maximum value: 5
+#auto_restart_times = 1
+
+# Entity will remove from auto restart periodic task dead process list after
+# seconds (integer value)
+# Minimum value: 30
+# Maximum value: 600
+#pop_from_deads = 180
+
 
 [gogamechen1.gamesvr]
 
