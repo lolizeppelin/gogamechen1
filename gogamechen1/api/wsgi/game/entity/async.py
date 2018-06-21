@@ -310,4 +310,33 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
             raise InvalidArgument('Hotfix just for %s' % common.GAMESERVER)
         jsonutils.schema_validate(body, self.HOTFIX)
         body.setdefault('objtype', objtype)
-        return self._async_bluck_rpc('hotfix', group_id, objtype, entity, body)
+        session = endpoint_session(readonly=True)
+        query = model_query(session, AppEntity,
+                            filter=and_(AppEntity.objtype == common.GMSERVER,
+                                        AppEntity.group_id == group_id))
+        gm = query.one_or_none()
+        if not gm:
+            return resultutils.results(result='No %s found' % common.GMSERVER,
+                                       resultcode=manager_common.RESULT_ERROR)
+        if gm.status != common.OK:
+            return resultutils.results(result='%s not active' % common.GMSERVER,
+                                       resultcode=manager_common.RESULT_ERROR)
+        entityinfo = entity_controller.show(req=req, entity=gm.entity,
+                                            endpoint=common.NAME,
+                                            body={'ports': True})['data'][0]
+        port = entityinfo.get('ports')[0]
+        metadata = entityinfo.get('metadata')
+        if not metadata:
+            return resultutils.results(result='%s.%d is off line, can not stop by %s' %
+                                              (gm.objtype, gm.entity, gm.objtype),
+                                       resultcode=manager_common.RESULT_ERROR)
+        ipaddr = metadata.get('local_ip')
+        try:
+            return self._async_bluck_rpc('hotfix', group_id, objtype, entity, body)
+        finally:
+            url = 'http://%s:%d/hotupdateconfig' % (ipaddr, port)
+            jdata = jsonutils.dumps_as_bytes(OrderedDict(RealSvrIds=0))
+            try:
+                requests.post(url, data=jdata, timeout=5)
+            except (ConnectionError, ReadTimeout):
+                LOG.error('Notify %s hotfix fail' % common.GMSERVER)
