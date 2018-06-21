@@ -531,12 +531,15 @@ class Application(AppEndpointBase):
                         os.dup2(f.fileno(), sys.stderr.fileno())
                         # exec关闭日志文件描述符
                         systemutils.set_cloexec_flag(f.fileno())
-                        # 小陈的so放在bin目录中
+                        # 设置环境变量
+                        environment = {'LD_LIBRARY_PATH': os.path.join(pwd, 'bin'),  # 小陈的so放在bin目录中
+                                       'GOTRACEBACK': 'crash'}  # 允许go调用c崩溃时生成core
                         try:
-                            os.execve(EXEC, args, {'LD_LIBRARY_PATH': os.path.join(pwd, 'bin'),
-                                                   'GOTRACEBACK': 'crash'})
+                            os.execve(EXEC, args, environment)
                         except (OSError, IOError) as e:
-                            f.write(e.message + '\n')
+                            sys.stderr.write('exec: ' + ' '.join(args) + '\n')
+                            sys.stderr.write('environment: ' + str(environment) + '\n')
+                            sys.stderr.write(e.message + '\n')
                             os._exit(1)
                 else:
                     os._exit(0)
