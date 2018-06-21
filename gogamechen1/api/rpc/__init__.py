@@ -5,6 +5,7 @@ import time
 import signal
 import shutil
 import json
+import re
 import contextlib
 import eventlet
 import psutil
@@ -53,6 +54,9 @@ from gogamechen1.api.rpc.taskflow import merge as taskmerge
 if systemutils.POSIX:
     from simpleutil.utils.systemutils import posix
 
+from simpleutil.utils.systemutils import unlimit_core
+from simpleutil.utils.systemutils import open_file_limit
+
 CONF = cfg.CONF
 CONF.register_group(gameserver_group)
 CONF.register_group(crossserver_group)
@@ -62,6 +66,7 @@ register_opts()
 
 LOG = logging.getLogger(__name__)
 
+COREPATEN = re.compile('^core\.[0-9]+?$', re.IGNORECASE)
 
 def count_timeout(ctxt, kwargs):
     finishtime = ctxt.get('finishtime')
@@ -503,7 +508,13 @@ class Application(AppEndpointBase):
                         os.rename(_logfile, os.path.join(logbakup, _filename))
                     except (OSError, IOError):
                         LOG.error('Move log file %s to back up path fail' % _filename)
-            # TODO logbak zip
+            for _filename in os.listdir(pwd):
+                if re.match(COREPATEN, _filename):
+                    _croefile = os.path.join(pwd, _filename)
+                    try:
+                        os.rename(_croefile, os.path.join(logbakup, _filename))
+                    except (OSError, IOError):
+                        LOG.error('Move croe file %s to back up path fail' % _filename)
             pid = safe_fork(user=user, group=group)
             if pid == 0:
                 ppid = os.fork()
@@ -511,13 +522,18 @@ class Application(AppEndpointBase):
                 if ppid == 0:
                     os.closerange(3, systemutils.MAXFD)
                     os.chdir(pwd)
+                    # cor file unlimit
+                    unlimit_core()
+                    # open file limit
+                    open_file_limit(4096)
                     with open(logfile, 'ab') as f:
                         os.dup2(f.fileno(), sys.stdout.fileno())
                         os.dup2(f.fileno(), sys.stderr.fileno())
                         # exec关闭日志文件描述符
                         systemutils.set_cloexec_flag(f.fileno())
                         # 小陈的so放在bin目录中
-                        os.execve(EXEC, args, {'LD_LIBRARY_PATH': os.path.join(pwd, 'bin'), 'GOTRACEBACK': 'crash'})
+                        os.execve(EXEC, args, {'LD_LIBRARY_PATH': os.path.join(pwd, 'bin'),
+                                               'GOTRACEBACK': 'crash'})
                 else:
                     os._exit(0)
             else:
