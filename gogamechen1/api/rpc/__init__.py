@@ -535,7 +535,8 @@ class Application(AppEndpointBase):
                         try:
                             os.execve(EXEC, args, {'LD_LIBRARY_PATH': os.path.join(pwd, 'bin'),
                                                    'GOTRACEBACK': 'crash'})
-                        except (OSError, IOError):
+                        except (OSError, IOError) as e:
+                            f.write(e.message + '\n')
                             os._exit(1)
                 else:
                     os._exit(0)
