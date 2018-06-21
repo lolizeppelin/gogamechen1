@@ -532,8 +532,11 @@ class Application(AppEndpointBase):
                         # exec关闭日志文件描述符
                         systemutils.set_cloexec_flag(f.fileno())
                         # 小陈的so放在bin目录中
-                        os.execve(EXEC, args, {'LD_LIBRARY_PATH': os.path.join(pwd, 'bin'),
-                                               'GOTRACEBACK': 'crash'})
+                        try:
+                            os.execve(EXEC, args, {'LD_LIBRARY_PATH': os.path.join(pwd, 'bin'),
+                                                   'GOTRACEBACK': 'crash'})
+                        except (OSError, IOError):
+                            os._exit(1)
                 else:
                     os._exit(0)
             else:
