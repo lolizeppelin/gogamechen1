@@ -520,6 +520,7 @@ class Application(AppEndpointBase):
                 ppid = os.fork()
                 # fork twice
                 if ppid == 0:
+                    # 关闭已经打开的文件描述符
                     os.closerange(3, systemutils.MAXFD)
                     os.chdir(pwd)
                     # cor file unlimit
@@ -529,7 +530,7 @@ class Application(AppEndpointBase):
                     with open(logfile, 'ab') as f:
                         os.dup2(f.fileno(), sys.stdout.fileno())
                         os.dup2(f.fileno(), sys.stderr.fileno())
-                        # exec关闭日志文件描述符
+                        # exec后关闭日志文件描述符
                         systemutils.set_cloexec_flag(f.fileno())
                         # 设置环境变量
                         environment = {'LD_LIBRARY_PATH': os.path.join(pwd, 'bin'),  # 小陈的so放在bin目录中
