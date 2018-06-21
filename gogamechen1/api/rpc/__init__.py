@@ -539,7 +539,7 @@ class Application(AppEndpointBase):
                         except (OSError, IOError) as e:
                             sys.stderr.write('exec: ' + ' '.join(args) + '\n')
                             sys.stderr.write('environment: ' + str(environment) + '\n')
-                            sys.stderr.write(e.message + '\n')
+                            sys.stderr.write(str(e) + '\n')
                             os._exit(1)
                 else:
                     os._exit(0)
