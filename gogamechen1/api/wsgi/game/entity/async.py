@@ -1,6 +1,7 @@
 # -*- coding:utf-8 -*-
 import requests
 import inspect
+import eventlet
 from collections import OrderedDict
 
 from requests.exceptions import ConnectionError
@@ -336,7 +337,12 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
         finally:
             url = 'http://%s:%d/hotupdateconfig' % (ipaddr, port)
             jdata = jsonutils.dumps_as_bytes(OrderedDict(RealSvrIds=0))
-            try:
-                requests.post(url, data=jdata, timeout=5)
-            except (ConnectionError, ReadTimeout):
-                LOG.error('Notify %s hotfix fail' % common.GMSERVER)
+
+            def wapper():
+                eventlet.sleep(15)
+                try:
+                    requests.post(url, data=jdata, timeout=5)
+                except (ConnectionError, ReadTimeout):
+                    LOG.error('Notify %s hotfix fail' % common.GMSERVER)
+
+            threadpool.add_thread(safe_func_wrapper, wapper, LOG)
