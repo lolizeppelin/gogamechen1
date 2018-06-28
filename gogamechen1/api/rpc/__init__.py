@@ -204,6 +204,14 @@ class Application(AppEndpointBase):
     def logbakup(self, entity):
         return os.path.join(self.bakpath(entity), 'logbak-%d' % entity)
 
+    def clean_expired(self):
+        super(Application, self).clean_expired()
+        eventlet.sleep(0)
+        for entity in self.entitys:
+            backup = self.bakpath(entity)
+            self.clean(backup, 864000)
+            eventlet.sleep(0)
+
     def pre_start(self, external_objects):
         super(AppEndpointBase, self).pre_start(external_objects)
         conf = CONF[common.NAME]
