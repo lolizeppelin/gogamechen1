@@ -174,7 +174,7 @@ class EntityProcessCheckTasker(IntervalLoopinTask):
                     continue
                 self.deads.setdefault(entity, info)
                 LOG.info('Try restart entity process %d times when it is dead' % info.get('times'))
-                eventlet.spawn_n(self.endpoint.start_entity, entity, proc_snapshot)
+                eventlet.spawn_n(self.endpoint.start_entity, entity)
                 # eventlet.sleep(0)
         else:
             self.deads.clear()
