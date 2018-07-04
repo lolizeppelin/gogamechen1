@@ -12,6 +12,7 @@ from simpleutil.utils import uuidutils
 from simpleutil.config import cfg
 
 from simpleservice.ormdb.api import model_query
+from simpleservice.ormdb.api import model_count_with_key
 
 from goperation import threadpool
 from goperation.manager import common as manager_common
@@ -36,6 +37,7 @@ from gogamechen1.api import endpoint_session
 from gogamechen1.models import Group
 from gogamechen1.models import AppEntity
 from gogamechen1.models import AreaDatabase
+from gogamechen1.models import PackageArea
 
 from .base import AppEntityReuestBase
 
@@ -203,12 +205,19 @@ class AppEntitySyncReuest(AppEntityReuestBase):
         if not resource_id:
             raise InvalidArgument('Entity can not find package or package resource is None')
         query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
+        query = query.options(joinedload(AppEntity.areas, innerjoin=False))
         with session.begin():
             _entity = query.one()
             if _entity.objtype != objtype:
                 raise InvalidArgument('Objtype not match')
             if _entity.group_id != group_id:
                 raise InvalidArgument('Group id not match')
+            if not model_count_with_key(session, PackageArea.package_id,
+                                        filter=and_(PackageArea.package_id == package_id,
+                                                    PackageArea.area_id.in_([area.area_id
+                                                                             for area in _entity.areas])
+                                                    )):
+                raise InvalidArgument('Entity area not in package areas')
             versions = jsonutils.loads_as_bytes(_entity.versions) if _entity.versions else {}
             str_key = str(package_id)
             if str_key in versions:

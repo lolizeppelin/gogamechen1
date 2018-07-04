@@ -168,12 +168,12 @@ class EntityProcessCheckTasker(IntervalLoopinTask):
                     info['time'] = now
                 if info.get('times') > conf.auto_restart_times:
                     LOG.warning('Entity process dead over auto restart max times')
-                    # TODO notify fail
+                    self.endpoint.notify(entity, 'dead')
                     with self.endpoint.lock(entity):
                         self.endpoint.konwn_appentitys[entity]['started'] = False
                     continue
                 self.deads.setdefault(entity, info)
-                LOG.info('Try restart entity process %d times' % info.get('times'))
+                LOG.info('Try restart entity process %d times when it is dead' % info.get('times'))
                 eventlet.spawn_n(self.endpoint.start_entity, entity, proc_snapshot)
                 # eventlet.sleep(0)
         else:
