@@ -335,13 +335,14 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
         try:
             return self._async_bluck_rpc('hotfix', group_id, objtype, entity, body)
         finally:
-            url = 'http://%s:%d/hotupdateconfig' % (ipaddr, port)
-            jdata = jsonutils.dumps_as_bytes(OrderedDict(RealSvrIds=0))
+            url = 'http://%s:%d/hotupdateconfig?RealSvrIds=0' % (ipaddr, port)
+
+            # jdata = jsonutils.dumps_as_bytes(OrderedDict(RealSvrIds=0))
 
             def wapper():
                 eventlet.sleep(15)
                 try:
-                    requests.post(url, data=jdata, timeout=5)
+                    requests.post(url, timeout=5)
                 except (ConnectionError, ReadTimeout):
                     LOG.error('Notify %s hotfix fail' % common.GMSERVER)
 
