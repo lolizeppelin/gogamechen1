@@ -6,7 +6,7 @@ from collections import OrderedDict
 
 __version__ = 1
 
-GAMESERVER_DBPOOL_SIZE = 3
+GAMESERVER_DBPOOL_SIZE = 5
 CROSSSERVER_DBPOOL_SIZE = 5
 
 MAPS = {common.DATADB: 'DB',

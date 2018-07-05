@@ -814,7 +814,7 @@ class Application(AppEndpointBase):
                 details.append(formater(__entity, manager_common.RESULT_ERROR,
                                         'start entity %d fail, %s' % (__entity, e.message)))
             except Exception as e:
-                details.append(formater(entity, manager_common.RESULT_ERROR,
+                details.append(formater(__entity, manager_common.RESULT_ERROR,
                                         'start entity %d fail: %s' % (__entity, e.__class__.__name__)))
                 LOG.exception('Start entity %d fail' % __entity)
 
@@ -879,10 +879,10 @@ class Application(AppEndpointBase):
             self.konwn_appentitys[__entity]['started'] = False
             try:
                 if delay and not kill:
-                    with self.lock(entity):
-                        if self._entity_process(entity, proc_snapshot_before):
+                    with self.lock(__entity):
+                        if self._entity_process(__entity, proc_snapshot_before):
                             details.append(formater(__entity, manager_common.RESULT_ERROR,
-                                                    'entity %d still running, stop fail' % entity))
+                                                    'entity %d still running, stop fail' % __entity))
                         else:
                             details.append(formater(__entity, manager_common.RESULT_SUCCESS))
                 else:
