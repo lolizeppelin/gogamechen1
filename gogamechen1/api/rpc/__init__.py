@@ -869,7 +869,7 @@ class Application(AppEndpointBase):
                                               result='stop entitys fail, no entitys found')
         delay = kwargs.get('delay')
         if delay:
-            eventlet.sleep(min(delay, 60) + 5)
+            eventlet.sleep(min(delay, 65))
         details = []
         # 停止前进程快照
         proc_snapshot_before = utils.find_process()

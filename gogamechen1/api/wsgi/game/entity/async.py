@@ -20,6 +20,7 @@ from simpleservice.ormdb.api import model_query
 from goperation import threadpool
 from goperation.utils import safe_func_wrapper
 from goperation.manager import common as manager_common
+from goperation.manager.api import rpcfinishtime
 from goperation.manager.utils import resultutils
 from goperation.manager.utils import targetutils
 from goperation.manager.wsgi.entity.controller import EntityReuest
@@ -208,7 +209,10 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
                                                 endpoint=common.NAME,
                                                 body={'ports': True})['data'][0]
             message = body.pop('message', '') or ''
-            delay = body.pop('delay', 10) or 10
+            delay = min(int(body.pop('delay', 3)), 60)
+            if delay:
+                finishtime = rpcfinishtime()[0] + delay + 5
+                body.update({'finishtime': finishtime, 'delay': delay + 5})
             port = entityinfo.get('ports')[0]
             metadata = entityinfo.get('metadata')
             if not metadata:
@@ -225,7 +229,6 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
                 return resultutils.results(result='Stop request catch %s error, %s is closed?' % (e.__class__.__name__,
                                                                                                   common.GMSERVER),
                                            resultcode=manager_common.RESULT_ERROR)
-            body.update({'delay': delay})
         else:
             body.pop('delay', None)
         return self._async_bluck_rpc('stop', group_id, objtype, entity, body)
