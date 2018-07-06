@@ -867,6 +867,8 @@ class Application(AppEndpointBase):
                                               resultcode=manager_common.RESULT_ERROR,
                                               ctxt=ctxt,
                                               result='stop entitys fail, no entitys found')
+        for entity in entitys:
+            self.konwn_appentitys[entity]['started'] = False
         delay = kwargs.get('delay')
         if delay:
             eventlet.sleep(min(delay, 65))
@@ -876,7 +878,6 @@ class Application(AppEndpointBase):
         formater = AsyncActionResult('stop', self.konwn_appentitys)
 
         def safe_wapper(__entity):
-            self.konwn_appentitys[__entity]['started'] = False
             try:
                 if delay and not kill:
                     with self.lock(__entity):
