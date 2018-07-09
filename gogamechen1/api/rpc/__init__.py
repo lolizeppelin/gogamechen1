@@ -130,11 +130,14 @@ class EntityProcessCheckTasker(IntervalLoopinTask):
         self.endpoint = endpoint
         self.deads = dict()
         conf = CONF[common.NAME]
+        self.pop_from_deads = conf.pop_from_deads
+        self.auto_restart_times = conf.auto_restart_times
         super(EntityProcessCheckTasker, self).__init__(periodic_interval=conf.periodic_interval * 60,
-                                                       initial_delay=conf.pop_from_deads,
+                                                       initial_delay=self.pop_from_deads,
                                                        stop_on_exception=False)
 
     def __call__(self, *args, **kwargs):
+        now = int(time.time())
         entitys = []
         for entity in self.endpoint.konwn_appentitys:
             if self.endpoint.konwn_appentitys[entity]['started']:
@@ -142,7 +145,6 @@ class EntityProcessCheckTasker(IntervalLoopinTask):
             else:
                 self.deads.pop(entity, None)
         if entitys:
-            conf = CONF[common.NAME]
             proc_snapshot = utils.find_process()
             for entity in entitys:
                 if not self.endpoint.konwn_appentitys[entity]['started']:
@@ -156,17 +158,16 @@ class EntityProcessCheckTasker(IntervalLoopinTask):
                     continue
                 if self.endpoint._entity_process(entity, proc_snapshot):
                     info = self.deads.pop(entity, None)
-                    if info and ((int(time.time()) - info.get('time')) < conf.pop_from_deads):
+                    if info and (now - info.get('time') < self.pop_from_deads):
                         self.deads.setdefault(entity, info)
                     continue
                 info = self.deads.pop(entity, None)
-                now = int(time.time())
                 if not info:
                     info = dict(time=now, times=1)
                 else:
                     info['times'] += 1
                     info['time'] = now
-                if info.get('times') > conf.auto_restart_times:
+                if info.get('times') > self.auto_restart_times:
                     LOG.warning('Entity process dead over auto restart max times')
                     self.endpoint.notify(entity, 'dead')
                     with self.endpoint.lock(entity):
@@ -177,7 +178,11 @@ class EntityProcessCheckTasker(IntervalLoopinTask):
                 eventlet.spawn_n(self.endpoint.start_entity, entity)
                 # eventlet.sleep(0)
         else:
-            self.deads.clear()
+            for entity in self.deads.keys():
+                info = self.deads[entity]
+                if now - info.get('time') >= self.pop_from_deads:
+                    self.deads.pop(entity, None)
+
 
 
 @singleton.singleton
