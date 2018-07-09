@@ -124,10 +124,10 @@ class EntityProcessCheckTasker(IntervalLoopinTask):
     """
     周期性entity进程检查
     """
-    PROCESSATTR = ['status', 'num_fds', 'num_threads', 'name', 'pid']
 
     def __init__(self, endpoint):
         self.endpoint = endpoint
+        # 有死过进程的entity列表
         self.deads = dict()
         conf = CONF[common.NAME]
         self.pop_from_deads = conf.pop_from_deads
@@ -180,6 +180,7 @@ class EntityProcessCheckTasker(IntervalLoopinTask):
         else:
             for entity in self.deads.keys():
                 info = self.deads[entity]
+                # 存活时间足够长,从死亡列表中移除
                 if now - info.get('time') >= self.pop_from_deads:
                     self.deads.pop(entity, None)
 
