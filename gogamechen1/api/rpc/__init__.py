@@ -211,6 +211,10 @@ class Application(AppEndpointBase):
         return os.path.join(self.bakpath(entity), 'logbak-%d' % entity)
 
     def clean_expired(self):
+        """
+        重写清理函数
+        同时清理endpoint备份目录和entity备份目录
+        """
         super(Application, self).clean_expired()
         eventlet.sleep(0)
         for entity in self.entitys:
