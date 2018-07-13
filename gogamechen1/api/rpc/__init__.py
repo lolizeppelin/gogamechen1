@@ -313,7 +313,7 @@ class Application(AppEndpointBase):
         with open(vfile, 'r') as f:
             lines = f.readlines()
             try:
-                version = lines[7].strip()
+                version = '%s %s' % (lines[7].strip(), lines[-2].strip())
             except IndexError:
                 return 'unkonwn'
             else:
@@ -965,9 +965,8 @@ class Application(AppEndpointBase):
         formater = AsyncActionResult('status', self.konwn_appentitys)
         for entity in entitys:
             self._entity_process(entity, proc_snapshot)
-            version = self._entity_version(entity)
             if self._objtype(entity) == common.GAMESERVER:
-                msg = '%s.%d ~ %s' % (common.GAMESERVER, entity, version)
+                msg = self._entity_version(entity)
             else:
                 msg = None
             details.append(formater(entity, manager_common.RESULT_SUCCESS, msg))
