@@ -313,7 +313,7 @@ class Application(AppEndpointBase):
         with open(vfile, 'r') as f:
             lines = f.readlines()
             try:
-                version = '%s %s' % (lines[7].strip(), lines[-2].strip())
+                version = '%s %s %s' % (lines[7].strip(), lines[-3].strip(), lines[-2].strip())
             except IndexError:
                 return 'unkonwn'
             else:
