@@ -68,6 +68,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                                         'description': '开服时间, gameserver专用参数'},
                            'cross_id': {'type': 'integer', 'minimum': 1,
                                         'description': '跨服程序的实体id,gameserver专用参数'},
+                           'show_id': {'type': 'integer', 'minimum': 1, 'description': '区服area显示id'},
                            'areaname': {'type': 'string', 'description': '区服名称, gameserver专用参数'},
                            'platform': {'type': 'string', 'description': '平台类型, gameserver专用参数'},
                            'packages': {'type': 'array', 'items': {'type': 'integer', 'minimum': 1},
@@ -153,6 +154,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                 _areas = []
                 for area in areas:
                     _area = dict(area_id=area.area_id,
+                                 show_id=area.show_id,
                                  areaname=area.areaname)
                     if packages:
                         _area.setdefault('packages', [parea.package_id for parea in area.packages])
@@ -181,6 +183,8 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         cross_id = body.pop('cross_id', None)
         # 开服时间, gameserver专用
         opentime = body.pop('opentime', None)
+        # 区服显示id, gameserver专用
+        show_id = body.pop('show_id', None)
         # 区服显示民称, gameserver专用
         areaname = body.pop('areaname', None)
         # 平台类型
@@ -189,8 +193,8 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         session = endpoint_session()
         if objtype == common.GAMESERVER:
             platform = common.PlatformTypeMap.get(platform)
-            if not areaname or not opentime or not platform:
-                raise InvalidArgument('%s need opentime and areaname and platform' % objtype)
+            if not areaname or not opentime or not platform or not show_id:
+                raise InvalidArgument('%s need opentime and areaname and platform and show_id' % objtype)
         # 安装文件信息
         appfile = body.pop(common.APPFILE)
         LOG.info('Try find agent and database for entity')
@@ -353,7 +357,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                     # area id插入渠道包包含列表中
                     if packages:
                         for package_id in packages:
-                            session.add(PackageArea(package_id=package_id, area_id=gamearea.area_id))
+                            session.add(PackageArea(package_id=package_id, area_id=gamearea.area_id, show_id=show_id))
                             session.flush()
                 # 插入数据库绑定信息
                 if rpc_result.get('databases'):
@@ -370,7 +374,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
 
             areas = []
             if objtype == common.GAMESERVER:
-                areas = [dict(area_id=gamearea.area_id, areaname=areaname)]
+                areas = [dict(area_id=gamearea.area_id, areaname=areaname, show_id=show_id)]
                 _result.setdefault('areas', areas)
                 _result.setdefault('cross_id', cross_id)
                 _result.setdefault('opentime', opentime)
@@ -430,6 +434,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                                               versions=jsonutils.loads_as_bytes(_entity.versions)
                                               if _entity.versions else None,
                                               areas=[dict(area_id=area.area_id,
+                                                          show_id=area.show_id,
                                                           areaname=area.areaname.encode('utf-8'),
                                                           ) for area in _entity.areas],
                                               databases=databases,

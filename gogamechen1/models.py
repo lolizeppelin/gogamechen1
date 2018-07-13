@@ -143,6 +143,7 @@ class GameArea(TableBase):
                         autoincrement=True)
     group_id = sa.Column(sa.ForeignKey('groups.group_id', ondelete="RESTRICT", onupdate='RESTRICT'),
                          nullable=False)
+    show_id = sa.Column(INTEGER(unsigned=True), nullable=False)
     areaname = sa.Column(VARCHAR(128), nullable=False)
     entity = sa.Column(sa.ForeignKey('appentitys.entity', ondelete="RESTRICT", onupdate='RESTRICT'),
                        nullable=False)

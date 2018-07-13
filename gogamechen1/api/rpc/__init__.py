@@ -304,6 +304,21 @@ class Application(AppEndpointBase):
             objtype = self._objtype(entity)
         return os.path.join(self.apppath(entity), 'conf', '%s.json' % objtype)
 
+    def _entity_version(self, entity):
+        vfile = os.path.join(self.apppath(entity), 'config', 'version.json')
+        if not os.path.exists(vfile) or not os.path.isfile(vfile):
+            return 'unkonwn'
+        if os.path.getsize(vfile) > 1000:
+            return 'oversize'
+        with open(vfile, 'r') as f:
+            lines = f.readlines()
+            try:
+                version = lines[7].strip()
+            except IndexError:
+                return 'unkonwn'
+            else:
+                return version
+
     def local_database_info(self, entity, subtype):
         return gconfig.deacidizing(self._objconf(entity), common.DATADB)
 
@@ -950,7 +965,12 @@ class Application(AppEndpointBase):
         formater = AsyncActionResult('status', self.konwn_appentitys)
         for entity in entitys:
             self._entity_process(entity, proc_snapshot)
-            details.append(formater(entity, manager_common.RESULT_SUCCESS))
+            version = self._entity_version(entity)
+            if self._objtype(entity) == common.GAMESERVER:
+                msg = '%s.%d ~ %s' % (common.GAMESERVER, entity, version)
+            else:
+                msg = None
+            details.append(formater(entity, manager_common.RESULT_SUCCESS, msg))
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                           ctxt=ctxt,
                                           resultcode=manager_common.RESULT_SUCCESS,
@@ -1227,33 +1247,25 @@ class Application(AppEndpointBase):
         appfile = kwargs.pop(common.APPFILE)
         databases = kwargs.pop('databases')
         timeout = count_timeout(ctxt, kwargs)
-
-        try:
-            middleware = self._create_entity(entity, common.GAMESERVER, appfile, databases, timeout, ports)
-        except NoFileFound:
-            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
-                                              resultcode=manager_common.RESULT_ERROR,
-                                              ctxt=ctxt,
-                                              result='merge to %d fail, appfile not find' % entity)
+        # 创建合并后实体
+        middleware = self._create_entity(entity, common.GAMESERVER, appfile, databases, timeout, ports)
 
         def _merge_process():
-            success = False
             try:
                 taskmerge.merge_entitys(self, uuid, entitys, middleware.databases)
             except Exception:
                 LOG.exception('prepare merge taskflow error')
-
-            if middleware.waiter is not None:
-                success = False
-                try:
-                    middleware.waiter.stop()
-                except Exception as e:
-                    LOG.error('Stop waiter catch error %s' % e.__class__.__name__)
-                finally:
-                    middleware.waiter = None
-                LOG.error('Extract overtime')
-            if success:
-                self.flush_config(entity, middleware.databases, opentime, chiefs)
+            else:
+                if middleware.waiter is not None:
+                    try:
+                        middleware.waiter.stop()
+                    except Exception as e:
+                        LOG.error('Stop waiter catch error %s' % e.__class__.__name__)
+                    finally:
+                        middleware.waiter = None
+                    LOG.error('Wait extract overtime')
+                else:
+                    self.flush_config(entity, middleware.databases, opentime, chiefs)
 
         # 执行合服工作流
         threadpool.add_thread(_merge_process)

@@ -1,4 +1,8 @@
 # -*- coding:utf-8 -*-
+import os
+import six
+import cPickle
+
 from simpleutil.config import cfg
 from simpleutil.log import log as logging
 
@@ -24,6 +28,30 @@ CONF = cfg.CONF
 
 LOG = logging.getLogger(__name__)
 
+SWALLOW = 'SWALLOW'
+SWALLOWED = 'SWALLOWED'
+DUMPING = 'DUMPING'
+INSERT = 'INSERT'
 
-def merge_entitys(*args, **kwargs):
-    raise NotImplementedError
+
+def merge_entitys(endpoint, uuid, entitys, databases):
+    mergepath = 'merge-%s' % uuid
+    mergeroot = os.path.join(endpoint.endpoint_backup, mergepath)
+    if not os.path.exists(mergeroot):
+        os.makedirs(mergeroot)
+    stepsfile = os.path.join(mergeroot, 'steps.dat')
+    if not os.path.exists(stepsfile):
+        steps = {}
+        for entity in entitys:
+            steps[entity] = SWALLOW
+        with open(stepsfile, 'wb') as f:
+            cPickle.dump(steps, f)
+    steps = cPickle.load(stepsfile)
+    if set(steps.keys()) != set(entitys):
+        raise
+    prepares = []
+    for entity, step in six.iteritems(steps):
+        if step != INSERT:
+            prepares.append(entity)
+    if prepares:
+        pass

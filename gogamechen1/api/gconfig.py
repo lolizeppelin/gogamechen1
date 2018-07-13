@@ -147,8 +147,8 @@ def conf_type_1(logpath, local_ip, ports, entity, areas, databases, opentime, ch
     conf.setdefault('TCPAddr', '%s:%d' % ('0.0.0.0', ports[0]))
     conf.setdefault('ListenAddr', '%s:%d' % (local_ip, ports[1]))
     conf.setdefault('RealServerId', entity)
-    # conf.setdefault('ShowServerIds', [area.get('area_id') for area in areas])
     conf.setdefault('ShowServers', [dict(Id=area.get('area_id'),
+                                         show_id=area.get('show_id'),
                                          Name=area.get('areaname')) for area in areas])
     if flag is not None:
         conf.setdefault('ServerFlag', flag)

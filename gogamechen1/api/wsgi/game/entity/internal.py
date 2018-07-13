@@ -59,7 +59,7 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                        'required': [common.APPFILE, 'entitys', 'group_id'],
                        'properties': {
                            'entitys': {'type': 'array',
-                                       'items': {'type': 'integer', 'minimum': 1},
+                                       'items': {'type': 'integer', 'minimum': 2},
                                        'description': '需要合并的实体列表'},
                            common.APPFILE: {'type': 'string', 'format': 'md5',
                                             'description': '程序文件md5'},
@@ -114,9 +114,12 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                                               status=_entity.status,
                                               opentime=_entity.opentime,
                                               areas=[dict(area_id=area.area_id,
+                                                          show_id=area.show_id,
                                                           areaname=area.areaname)
                                                      for area in _entity.areas],
                                               objtype=_entity.objtype) for _entity in query])
+
+    # -----------------------以下为合服相关代码--------------------------------
 
     def merge(self, req, body=None):
         """合服接口,用于合服"""
@@ -214,6 +217,8 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                         # 区服平台不相同, 位操作合并platform
                         platform = platform | appentity.platform
                     appentitys.append(appentity)
+                    if not opentime:
+                        opentime = appentity.opentime
                 if len(appentitys) != len(entitys):
                     raise InvalidArgument('Can not match entitys count')
                 # 完整的rpc数据包,准备发送合服命令到agent
@@ -315,10 +320,14 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                                        passwd=database['passwd'],
                                        character_set=database['character_set']) for database in appentity.databases]))
             areas = [dict(area_id=area.area_id,
+                          show_id=area.show_id,
                           areaname=area.areaname)
                      for area in appentity.areas]
             if not databases or not areas:
                 LOG.error('Entity no areas or databases record')
+                return resultutils.results(result='swallow entity fail, '
+                                                  'target entity can not found database or areas',
+                                           resultcode=manager_common.RESULT_ERROR)
             with glock.grouplock(group=appentity.group_id):
                 # 发送吞噬命令到目标区服agent
                 metadata, ports = self._entityinfo(req=req, entity=entity)
@@ -396,7 +405,3 @@ class AppEntityInternalReuest(AppEntityReuestBase):
             return resultutils.results(result='swallowed entity is success',
                                        data=[dict(databases=jsonutils.loads_as_bytes(_entity.databases),
                                                   areas=jsonutils.loads_as_bytes(_entity.areas))])
-
-    def spit(self, req, entity, body=None):
-        """合服内部接口,用于新实体在失败时候吐出旧实体的区服"""
-        raise NotImplementedError
