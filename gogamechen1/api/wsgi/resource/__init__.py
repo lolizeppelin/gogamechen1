@@ -441,6 +441,7 @@ class PackageReuest(BaseContorller):
             if areas:
                 info.setdefault('areas', [
                     dict(area_id=area_id,
+                         show_id=areas_maps[area_id].get('show_id'),
                          areaname=areas_maps[area_id].get('areaname'),
                          entity=areas_maps[area_id].get('entity'),
                          status=areas_maps[area_id].get('status'),

@@ -85,22 +85,21 @@ def areas_map(group_id):
     maps = {}
     for _area in query:
         try:
-            maps[_area.entity].append(dict(area_id=_area.area_id, areaname=_area.areaname))
+            maps[_area.entity].append(dict(area_id=_area.area_id, areaname=_area.areaname, show_id=_area.show_id))
         except KeyError:
-            maps[_area.entity] = [dict(area_id=_area.area_id, areaname=_area.areaname), ]
+            maps[_area.entity] = [dict(area_id=_area.area_id, areaname=_area.areaname, show_id=_area.show_id), ]
     session.close()
     return maps
 
 
 @singleton.singleton
 class GroupReuest(BaseContorller):
-
-    AREA = {'type': 'object',
-            'required': ['area_id'],
-            'properties': {
-                'area_id': {'type': 'integer', 'minimum': 1, 'description': '游戏区服ID'},
-                'areaname': {'type': 'string', 'description': '游戏区服显示名称'}}
-            }
+    # AREA = {'type': 'object',
+    #         'required': ['area_id'],
+    #         'properties': {
+    #             'area_id': {'type': 'integer', 'minimum': 1, 'description': '游戏区服ID'},
+    #             'areaname': {'type': 'string', 'description': '游戏区服显示名称'}}
+    #         }
 
     def index(self, req, body=None):
         body = body or {}
@@ -126,7 +125,7 @@ class GroupReuest(BaseContorller):
             areas = column.get('areas', [])
             column['areas'] = []
             for area in areas:
-                column['areas'].append(dict(area_id=area.area_id, areaname=area.areaname))
+                column['areas'].append(dict(area_id=area.area_id, areaname=area.areaname, show_id=area.show_id))
         return results
 
     def create(self, req, body=None):
@@ -166,7 +165,8 @@ class GroupReuest(BaseContorller):
                 entityinfo = dict(entity=entity.entity, status=entity.status)
                 if objtype == common.GAMESERVER:
                     entityinfo.setdefault('areas', [dict(area_id=area.area_id,
-                                                         areaname=area.areaname)
+                                                         areaname=area.areaname,
+                                                         show_id=area.show_id)
                                                     for area in entity.areas])
                 try:
                     _entitys[objtype].append(entityinfo)
@@ -202,7 +202,8 @@ class GroupReuest(BaseContorller):
             raise InvalidArgument('Group id value error')
         area_id = body.get('area_id')
         areaname = body.get('areaname')
-        if not areaname:
+        show_id = body.get('show_id')
+        if not areaname and not show_id:
             raise InvalidArgument('No value change')
         rpc = get_client()
         session = endpoint_session()
@@ -226,6 +227,8 @@ class GroupReuest(BaseContorller):
                                                     GameArea.areaname == areaname)):
                     raise InvalidArgument('Area name duplicate in group %d' % group_id)
                 area.areaname = areaname
+            if show_id:
+                area.show_id = show_id
             target = targetutils.target_agent_by_string(metadata.get('agent_type'), metadata.get('host'))
             target.namespace = common.NAME
             finishtime, timeout = rpcfinishtime()
@@ -233,6 +236,7 @@ class GroupReuest(BaseContorller):
                                msg={'method': 'change_entity_area',
                                     'args': dict(entity=area.entity,
                                                  area_id=area.area_id,
+                                                 show_id=area.show_id,
                                                  areaname=area.areaname)},
                                timeout=timeout)
             if not rpc_ret:
@@ -298,6 +302,7 @@ class GroupReuest(BaseContorller):
             if entity.objtype == common.GAMESERVER:
                 for area in entity.areas:
                     info = dict(area_id=area.area_id,
+                                show_id=area.show_id,
                                 areaname=area.areaname,
                                 entity=entity.entity,
                                 group_id=entity.group_id,
