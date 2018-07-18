@@ -197,7 +197,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                 raise InvalidArgument('%s need opentime and areaname and platform and show_id' % objtype)
         # 安装文件信息
         appfile = body.pop(common.APPFILE)
-        LOG.info('Try find agent and database for entity')
+        LOG.debug('Try find agent and database for entity')
         # 选择实例运行服务器
         agent_id = self._agentselect(req, objtype, **body)
         # 选择实例运行数据库
