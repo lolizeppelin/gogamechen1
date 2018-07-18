@@ -355,7 +355,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                                         entity=appentity.entity)
                     session.add(gamearea)
                     session.flush()
-                    # area id插入渠道包包含列表中
+                    # area id插入渠道包包含列表中,批量操作
                     if packages:
                         for package_id in packages:
                             session.add(PackageArea(package_id=package_id, area_id=gamearea.area_id))
