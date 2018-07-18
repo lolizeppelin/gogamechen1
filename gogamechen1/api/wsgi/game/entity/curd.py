@@ -351,6 +351,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                     gamearea = GameArea(areaname=areaname.decode('utf-8')
                     if isinstance(areaname, six.binary_type) else areaname,
                                         group_id=_group.group_id,
+                                        show_id=show_id,
                                         entity=appentity.entity)
                     session.add(gamearea)
                     session.flush()
