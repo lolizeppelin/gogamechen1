@@ -205,7 +205,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         # 校验数据库信息
         if not self._validate_databases(objtype, databases):
             raise InvalidArgument('Miss some database')
-        LOG.info('Find agent and database for entity success')
+        LOG.info('Find agent and database for entity success, to agent %d, to databse %s' % (agent_id, str(databases)))
         query = model_query(session, Group, filter=Group.group_id == group_id)
         joins = joinedload(Group.entitys, innerjoin=False)
         joins = joins.joinedload(AppEntity.databases, innerjoin=False)
@@ -337,7 +337,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                     raise InvalidArgument(e.message)
                 entity = create_result.get('entity')
                 rpc_result = create_result.get('notify')
-                LOG.info('Entity controller create rpc result %s' % str(rpc_result))
+                LOG.debug('Entity controller create rpc result %s', str(rpc_result))
                 # 插入实体信息
                 appentity = AppEntity(entity=entity,
                                       agent_id=agent_id,
