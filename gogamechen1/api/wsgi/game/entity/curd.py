@@ -358,7 +358,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                     # area id插入渠道包包含列表中
                     if packages:
                         for package_id in packages:
-                            session.add(PackageArea(package_id=package_id, area_id=gamearea.area_id, show_id=show_id))
+                            session.add(PackageArea(package_id=package_id, area_id=gamearea.area_id))
                             session.flush()
                 # 插入数据库绑定信息
                 if rpc_result.get('databases'):
