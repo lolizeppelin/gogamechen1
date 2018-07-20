@@ -208,11 +208,9 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
             @contextlib.contextmanager
             def context(reqeust_id, entitys, agents):
                 pre_run = {'executer': 'http',
-                             'ekwargs': {'url': url,
-                                         'method': 'POST',
-                                         'async': False,
-                                         'data': OrderedDict(RealSvrIds=list(entitys), Msg=message, DelayTime=delay)
-                                         }}
+                           'ekwargs': {'url': url, 'method': 'POST', 'async': False,
+                                       'data': OrderedDict(RealSvrIds=list(entitys), Msg=message, DelayTime=delay)}
+                           }
                 body.update({'pre_run': pre_run})
                 yield
 
