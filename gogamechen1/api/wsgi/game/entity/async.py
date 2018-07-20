@@ -215,6 +215,7 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
                                          }}
                 body.update({'pre_run': pre_run})
                 yield
+
         else:
             context = None
             body.pop('delay', None)
@@ -306,7 +307,7 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
 
         @contextlib.contextmanager
         def context(reqeust_id, entitys, agents):
-            after_run = {'executer': 'http',
+            post_run = {'executer': 'http',
                          'ekwargs': {'url': url, 'method': 'POST'},
                          'condition': 'entitys',
                          'ckwargs': {'all': False,
@@ -315,8 +316,8 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
                                      'counter': '>',
                                      'count': 0
                                      }
-                         }
-            body.update({'post_urn': after_run})
+                        }
+            body.update({'post_run': post_run})
             yield
 
         return self._async_bluck_rpc('hotfix', group_id, objtype, entity, body, context)
