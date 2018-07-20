@@ -277,9 +277,6 @@ class ObjtypeFileReuest(BaseContorller):
         """
         body = body or {}
         objtype = body.get('objtype')
-        pre_run = body.pop('pre_run', None)
-        after_run = body.pop('after_run', None)
-        post_run = body.pop('post_run', None)
         if body.pop('all', True):
             # 发文件到所有匹配的agent
             includes = ['metadata.agent_type=application', ]
@@ -303,15 +300,18 @@ class ObjtypeFileReuest(BaseContorller):
         agents = list(set(agents))
         asyncrequest = self.create_asyncrequest(body)
         target = targetutils.target_endpoint(common.NAME)
+        async_ctxt = dict(pre_run=body.pop('pre_run', None),
+                          after_run=body.pop('after_run', None),
+                          post_run=body.pop('post_run', None))
         target.namespace = manager_common.NAME
+        rpc_ctxt = {}
+        rpc_ctxt.setdefault('agents', agents)
         rpc_method = 'getfile'
         rpc_args = {'md5': md5, 'timeout': asyncrequest.deadline - 1}
-        rpc_ctxt = dict(pre_run=pre_run, after_run=after_run, post_run=post_run)
-        rpc_ctxt.setdefault('agents', agents)
 
         def wapper():
             self.send_asyncrequest(asyncrequest, target,
-                                   rpc_ctxt, rpc_method, rpc_args)
+                                   rpc_ctxt, rpc_method, rpc_args, async_ctxt)
 
         goperation.threadpool.add_thread(safe_func_wrapper, wapper, LOG)
         return resultutils.results(result='Send file to %s agents thread spawning' % common.NAME,

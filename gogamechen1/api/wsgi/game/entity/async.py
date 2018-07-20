@@ -166,19 +166,18 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
                     agents.add(emaps[entity])
 
         with context(asyncrequest.request_id, entitys, agents):
-
-            rpc_ctxt = dict(agents=list(agents),
-                            pre_run=body.pop('pre_run', None),
-                            after_run=body.pop('after_run', None),
-                            post_run=body.pop('post_run', None))
-
+            async_ctxt = dict(pre_run=body.pop('pre_run', None),
+                              after_run=body.pop('after_run', None),
+                              post_run=body.pop('post_run', None))
+            rpc_ctxt = {}
+            rpc_ctxt.setdefault('agents', agents)
             rpc_method = '%s_entitys' % action
             rpc_args = dict(entitys=list(entitys))
             rpc_args.update(body)
 
             def wapper():
                 self.send_asyncrequest(asyncrequest, target,
-                                       rpc_ctxt, rpc_method, rpc_args)
+                                       rpc_ctxt, rpc_method, rpc_args, async_ctxt)
 
             threadpool.add_thread(safe_func_wrapper, wapper, LOG)
             return resultutils.results(result='gogamechen1 %s entitys %s spawning' % (objtype, caller),
