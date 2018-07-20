@@ -95,12 +95,12 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                    AppEntity.status,
                    AppEntity.objtype]
 
-        option = None
+        joins = None
         if objtype == common.GAMESERVER:
             columns.append(AppEntity.areas)
-            option = joinedload(AppEntity.areas, innerjoin=False)
+            joins = joinedload(AppEntity.areas, innerjoin=False)
             if packages:
-                option = option.joinedload(GameArea.packages, innerjoin=False)
+                joins = joins.joinedload(GameArea.packages, innerjoin=False)
 
 
 
@@ -125,7 +125,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                                            columns=columns,
                                            counter=AppEntity.entity,
                                            order=order, desc=desc,
-                                           option=option,
+                                           option=joins,
                                            filter=and_(AppEntity.group_id == group_id,
                                                        AppEntity.objtype == objtype),
                                            page_num=page_num)

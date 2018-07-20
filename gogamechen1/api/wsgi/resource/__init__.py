@@ -54,6 +54,7 @@ from gogamechen1.models import PackageRemark
 from gogamechen1.api.wsgi.game import GroupReuest
 from gogamechen1.api.wsgi.caches import resource_cache_map
 from gogamechen1.api.wsgi.caches import map_resources
+from gogamechen1.api.wsgi.utils import gmurl
 
 LOG = logging.getLogger(__name__)
 
@@ -276,6 +277,9 @@ class ObjtypeFileReuest(BaseContorller):
         """
         body = body or {}
         objtype = body.get('objtype')
+        pre_run = body.pop('pre_run', None)
+        after_run = body.pop('after_run', None)
+        post_run = body.pop('post_run', None)
         if body.pop('all', True):
             # 发文件到所有匹配的agent
             includes = ['metadata.agent_type=application', ]
@@ -302,7 +306,7 @@ class ObjtypeFileReuest(BaseContorller):
         target.namespace = manager_common.NAME
         rpc_method = 'getfile'
         rpc_args = {'md5': md5, 'timeout': asyncrequest.deadline - 1}
-        rpc_ctxt = {}
+        rpc_ctxt = dict(pre_run=pre_run, after_run=after_run, post_run=post_run)
         rpc_ctxt.setdefault('agents', agents)
 
         def wapper():
@@ -811,8 +815,14 @@ class PackageReuest(BaseContorller):
         detail = body.pop('detail', None) or {}
         detail.setdefault('endpoint', common.NAME)
         body.setdefault('detail', detail)
-        result = cdnresource_controller.upgrade(req, resource_id=package.resource_id, body=body)
-        return result
+
+        if body.pop('notify', False):
+            url = gmurl(group_id, 'clientupdate')
+            post_run = {'executer': 'http',
+                        'ekwargs': {'url': url, 'method': 'POST'},
+                        }
+            body.update({'post_run': post_run})
+        return cdnresource_controller.upgrade(req, resource_id=package.resource_id, body=body)
 
     def add_remark(self, req, group_id, package_id, body=None):
         body = body or {}

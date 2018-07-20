@@ -1,11 +1,8 @@
 # -*- coding:utf-8 -*-
-import requests
 import inspect
-import eventlet
+import time
+import contextlib
 from collections import OrderedDict
-
-from requests.exceptions import ConnectionError
-from requests.exceptions import ReadTimeout
 
 from sqlalchemy.sql import and_
 
@@ -19,7 +16,6 @@ from simpleservice.ormdb.api import model_query
 
 from goperation import threadpool
 from goperation.utils import safe_func_wrapper
-from goperation.manager import common as manager_common
 from goperation.manager.api import rpcfinishtime
 from goperation.manager.utils import resultutils
 from goperation.manager.utils import targetutils
@@ -29,6 +25,8 @@ from gogamechen1 import common
 from gogamechen1.api import endpoint_session
 from gogamechen1.models import AppEntity
 
+from gogamechen1.api.wsgi.utils import gmurl
+
 from .base import AppEntityReuestBase
 
 LOG = logging.getLogger(__name__)
@@ -36,6 +34,11 @@ LOG = logging.getLogger(__name__)
 entity_controller = EntityReuest()
 
 CONF = cfg.CONF
+
+
+@contextlib.contextmanager
+def empty_context(*args, **kwargs):
+    yield
 
 
 class AppEntityAsyncReuest(AppEntityReuestBase):
@@ -125,10 +128,13 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
                                      }},}
               }
 
-    def _async_bluck_rpc(self, action, group_id, objtype, entity, body):
+    def _async_bluck_rpc(self, action, group_id, objtype, entity, body=None, context=None):
         caller = inspect.stack()[0][3]
         body = body or {}
         group_id = int(group_id)
+
+        context = context or empty_context
+
         if entity == 'all':
             entitys = 'all'
         else:
@@ -158,18 +164,24 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
                 if entity in entitys:
                     agents.add(emaps[entity])
 
-        rpc_ctxt = dict(agents=list(agents))
-        rpc_method = '%s_entitys' % action
-        rpc_args = dict(entitys=list(entitys))
-        rpc_args.update(body)
+        with context(asyncrequest.request_id, entitys, agents):
 
-        def wapper():
-            self.send_asyncrequest(asyncrequest, target,
-                                   rpc_ctxt, rpc_method, rpc_args)
+            rpc_ctxt = dict(agents=list(agents),
+                            pre_run=body.pop('pre_run', None),
+                            after_run=body.pop('after_run', None),
+                            post_run=body.pop('post_run', None))
 
-        threadpool.add_thread(safe_func_wrapper, wapper, LOG)
-        return resultutils.results(result='gogamechen1 %s entitys %s spawning' % (objtype, caller),
-                                   data=[asyncrequest.to_dict()])
+            rpc_method = '%s_entitys' % action
+            rpc_args = dict(entitys=list(entitys))
+            rpc_args.update(body)
+
+            def wapper():
+                self.send_asyncrequest(asyncrequest, target,
+                                       rpc_ctxt, rpc_method, rpc_args)
+
+            threadpool.add_thread(safe_func_wrapper, wapper, LOG)
+            return resultutils.results(result='gogamechen1 %s entitys %s spawning' % (objtype, caller),
+                                       data=[asyncrequest.to_dict()])
 
     def start(self, req, group_id, objtype, entity, body=None):
         return self._async_bluck_rpc('start', group_id, objtype, entity, body)
@@ -183,55 +195,27 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
         kill = body.get('kill', False)
         notify = body.pop('notify', False)
         if objtype == common.GAMESERVER and notify and not kill:
-            session = endpoint_session(readonly=True)
-            entitys = set()
-            gm = None
-            for _entity in model_query(session, AppEntity,
-                                       filter=and_(AppEntity.objtype.in_([common.GAMESERVER, common.GMSERVER]),
-                                                   AppEntity.group_id == group_id)):
-                if _entity.status == common.DELETED:
-                    continue
-                if _entity.objtype == common.GMSERVER:
-                    gm = _entity
-                    continue
-                entitys.add(_entity.entity)
-            if not gm:
-                return resultutils.results(result='No %s found or status is not acitve' % common.GMSERVER,
-                                           resultcode=manager_common.RESULT_ERROR)
-            if entity == 'all':
-                entitys = list(entitys)
-            else:
-                targits = argutils.map_to_int(entity)
-                if targits - entitys:
-                    raise InvalidArgument('Entity not exist or not mark as deleted')
-                entitys = targits
-            entityinfo = entity_controller.show(req=req, entity=gm.entity,
-                                                endpoint=common.NAME,
-                                                body={'ports': True})['data'][0]
             message = body.pop('message', '') or ''
             delay = min(int(body.pop('delay', 3)), 60)
             if delay:
                 finishtime = rpcfinishtime()[0] + delay + 5
                 body.update({'finishtime': finishtime, 'delay': delay + 5})
-            port = entityinfo.get('ports')[0]
-            metadata = entityinfo.get('metadata')
-            if not metadata:
-                return resultutils.results(result='%s.%d is off line, can not stop by %s' %
-                                                  (gm.objtype, gm.entity, gm.objtype),
-                                           resultcode=manager_common.RESULT_ERROR)
-            ipaddr = metadata.get('local_ip')
-            url = 'http://%s:%d/closegameserver' % (ipaddr, port)
-            jdata = jsonutils.dumps_as_bytes(OrderedDict(RealSvrIds=list(entitys),
-                                                         Msg=message, DelayTime=delay))
-            try:
-                requests.post(url, data=jdata, timeout=5)
-            except (ConnectionError, ReadTimeout) as e:
-                return resultutils.results(result='Stop request catch %s error, %s is closed?' % (e.__class__.__name__,
-                                                                                                  common.GMSERVER),
-                                           resultcode=manager_common.RESULT_ERROR)
+            url = gmurl(group_id, interface='closegameserver')
+
+            @contextlib.contextmanager
+            def context(reqeust_id, entitys, agents):
+                after_run = {'executer': 'http',
+                             'ekwargs': {'url': url,
+                                         'method': 'POST',
+                                         'data': OrderedDict(RealSvrIds=list(entitys), Msg=message, DelayTime=delay)
+                                         }}
+                body.update({'after_urn': after_run})
+                yield
         else:
+            context = None
             body.pop('delay', None)
-        return self._async_bluck_rpc('stop', group_id, objtype, entity, body)
+
+        return self._async_bluck_rpc('stop', group_id, objtype, entity, body, context)
 
     def status(self, req, group_id, objtype, entity, body=None):
         return self._async_bluck_rpc('status', group_id, objtype, entity, body)
@@ -314,39 +298,13 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
             raise InvalidArgument('Hotfix just for %s' % common.GAMESERVER)
         jsonutils.schema_validate(body, self.HOTFIX)
         body.setdefault('objtype', objtype)
-        session = endpoint_session(readonly=True)
-        query = model_query(session, AppEntity,
-                            filter=and_(AppEntity.objtype == common.GMSERVER,
-                                        AppEntity.group_id == group_id))
-        gm = query.one_or_none()
-        if not gm:
-            return resultutils.results(result='No %s found' % common.GMSERVER,
-                                       resultcode=manager_common.RESULT_ERROR)
-        if gm.status != common.OK:
-            return resultutils.results(result='%s not active' % common.GMSERVER,
-                                       resultcode=manager_common.RESULT_ERROR)
-        entityinfo = entity_controller.show(req=req, entity=gm.entity,
-                                            endpoint=common.NAME,
-                                            body={'ports': True})['data'][0]
-        port = entityinfo.get('ports')[0]
-        metadata = entityinfo.get('metadata')
-        if not metadata:
-            return resultutils.results(result='%s.%d is off line, can not stop by %s' %
-                                              (gm.objtype, gm.entity, gm.objtype),
-                                       resultcode=manager_common.RESULT_ERROR)
-        ipaddr = metadata.get('local_ip')
-        try:
-            return self._async_bluck_rpc('hotfix', group_id, objtype, entity, body)
-        finally:
-            url = 'http://%s:%d/hotupdateconfig?RealSvrIds=0' % (ipaddr, port)
+        url = gmurl(group_id, interface='hotupdateconfig?RealSvrIds=0')
 
-            # jdata = jsonutils.dumps_as_bytes(OrderedDict(RealSvrIds=0))
+        @contextlib.contextmanager
+        def context(reqeust_id, entitys, agents):
+            after_run = {'executer': 'http',
+                         'ekwargs': {'url': url, 'method': 'POST'}}
+            body.update({'post_urn': after_run})
+            yield
 
-            def wapper():
-                eventlet.sleep(15)
-                try:
-                    requests.post(url, timeout=5)
-                except (ConnectionError, ReadTimeout):
-                    LOG.error('Notify %s hotfix fail' % common.GMSERVER)
-
-            threadpool.add_thread(safe_func_wrapper, wapper, LOG)
+        return self._async_bluck_rpc('hotfix', group_id, objtype, entity, body, context)
