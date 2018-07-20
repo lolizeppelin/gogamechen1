@@ -16,6 +16,7 @@ from simpleservice.ormdb.api import model_query
 
 from goperation import threadpool
 from goperation.utils import safe_func_wrapper
+from goperation.manager import common as manager_common
 from goperation.manager.api import rpcfinishtime
 from goperation.manager.utils import resultutils
 from goperation.manager.utils import targetutils
@@ -303,7 +304,15 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
         @contextlib.contextmanager
         def context(reqeust_id, entitys, agents):
             after_run = {'executer': 'http',
-                         'ekwargs': {'url': url, 'method': 'POST'}}
+                         'ekwargs': {'url': url, 'method': 'POST'},
+                         'condition': 'entitys',
+                         'ckwargs': {'all': False,
+                                     'operator': '=',
+                                     'value': manager_common.RESULT_SUCCESS,
+                                     'counter': '>',
+                                     'count': 0
+                                     }
+                         }
             body.update({'post_urn': after_run})
             yield
 

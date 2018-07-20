@@ -820,6 +820,11 @@ class PackageReuest(BaseContorller):
             url = gmurl(group_id, 'clientupdate')
             post_run = {'executer': 'http',
                         'ekwargs': {'url': url, 'method': 'POST'},
+                        'condition': 'entitys',
+                        'ckwargs': {'all': True,
+                                    'operator': '=',
+                                    'value': manager_common.RESULT_SUCCESS,
+                                    }
                         }
             body.update({'post_run': post_run})
         return cdnresource_controller.upgrade(req, resource_id=package.resource_id, body=body)
