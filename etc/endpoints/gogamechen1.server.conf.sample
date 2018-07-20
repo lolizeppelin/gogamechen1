@@ -7,8 +7,11 @@
 # From gogamechen1
 #
 
-# Manager extend route module string (multi import string)
+# Extend route module string (multi import string)
 #routes = gogamechen1.api.wsgi.routers
+
+# Authentication route module string (multi import string)
+#auths =
 
 # Gopcdn resource for objfile (integer value)
 #objfile_resource = 0
