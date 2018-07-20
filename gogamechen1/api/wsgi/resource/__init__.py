@@ -817,7 +817,7 @@ class PackageReuest(BaseContorller):
         body.setdefault('detail', detail)
 
         if body.pop('notify', False):
-            url = gmurl(group_id, 'clientupdate')
+            url = gmurl(req, group_id, 'clientupdate')
             post_run = {'executer': 'http',
                         'ekwargs': {'url': url, 'method': 'POST'},
                         'condition': 'entitys',

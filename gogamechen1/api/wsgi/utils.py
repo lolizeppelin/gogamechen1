@@ -13,7 +13,7 @@ from gogamechen1.models import AppEntity
 entity_controller = EntityReuest()
 
 
-def gmurl(group_id, interface):
+def gmurl(req, group_id, interface):
     session = endpoint_session(readonly=True)
     query = model_query(session, AppEntity,
                         filter=and_(AppEntity.objtype == common.GMSERVER,

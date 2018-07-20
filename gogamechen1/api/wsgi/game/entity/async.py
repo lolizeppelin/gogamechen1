@@ -201,7 +201,7 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
             if delay:
                 finishtime = rpcfinishtime()[0] + delay + 5
                 body.update({'finishtime': finishtime, 'delay': delay + 5})
-            url = gmurl(group_id, interface='closegameserver')
+            url = gmurl(req, group_id, interface='closegameserver')
 
             @contextlib.contextmanager
             def context(reqeust_id, entitys, agents):
@@ -300,7 +300,7 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
             raise InvalidArgument('Hotfix just for %s' % common.GAMESERVER)
         jsonutils.schema_validate(body, self.HOTFIX)
         body.setdefault('objtype', objtype)
-        url = gmurl(group_id, interface='hotupdateconfig?RealSvrIds=0')
+        url = gmurl(req, group_id, interface='hotupdateconfig?RealSvrIds=0')
 
         @contextlib.contextmanager
         def context(reqeust_id, entitys, agents):
