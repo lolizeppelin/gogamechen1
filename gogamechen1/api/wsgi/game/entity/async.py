@@ -208,6 +208,7 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
                 after_run = {'executer': 'http',
                              'ekwargs': {'url': url,
                                          'method': 'POST',
+                                         'async': False,
                                          'data': OrderedDict(RealSvrIds=list(entitys), Msg=message, DelayTime=delay)
                                          }}
                 body.update({'after_urn': after_run})
