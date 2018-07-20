@@ -196,21 +196,24 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
         notify = body.pop('notify', False)
         if objtype == common.GAMESERVER and notify and not kill:
             message = body.pop('message', '') or ''
-            delay = min(int(body.pop('delay', 3)), 60)
+            delay = body.pop('delay', 3)
             if delay:
+                if not isinstance(delay, (int, long)) or delay < 3:
+                    raise InvalidArgument('Delay value error')
+                delay = min(delay, 60)
                 finishtime = rpcfinishtime()[0] + delay + 5
                 body.update({'finishtime': finishtime, 'delay': delay + 5})
             url = gmurl(req, group_id, interface='closegameserver')
 
             @contextlib.contextmanager
             def context(reqeust_id, entitys, agents):
-                after_run = {'executer': 'http',
+                pre_run = {'executer': 'http',
                              'ekwargs': {'url': url,
                                          'method': 'POST',
                                          'async': False,
                                          'data': OrderedDict(RealSvrIds=list(entitys), Msg=message, DelayTime=delay)
                                          }}
-                body.update({'after_urn': after_run})
+                body.update({'pre_run': pre_run})
                 yield
         else:
             context = None
