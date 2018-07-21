@@ -180,8 +180,9 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
                                        rpc_ctxt, rpc_method, rpc_args, async_ctxt)
 
             threadpool.add_thread(safe_func_wrapper, wapper, LOG)
-            return resultutils.results(result='gogamechen1 %s entitys %s spawning' % (objtype, caller),
-                                       data=[asyncrequest.to_dict()])
+
+        return resultutils.results(result='gogamechen1 %s entitys %s spawning' % (objtype, caller),
+                                   data=[asyncrequest.to_dict()])
 
     def start(self, req, group_id, objtype, entity, body=None):
         return self._async_bluck_rpc('start', group_id, objtype, entity, body)
