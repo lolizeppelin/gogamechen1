@@ -272,6 +272,10 @@ class AppEntityInternalReuest(AppEntityReuestBase):
         """中途失败的合服任务再次运行"""
         raise NotImplementedError
 
+    def finish(req, uuid, body=None):
+        """合服完成标记"""
+        raise NotImplementedError
+
     def swallow(self, req, entity, body=None):
         """合服内部接口,一般由agent调用
         用于新实体吞噬旧实体的区服和数据库"""
@@ -289,6 +293,9 @@ class AppEntityInternalReuest(AppEntityReuestBase):
             etask = query.one_or_none()
             if not etask:
                 raise InvalidArgument('Not task exit with %s' % uuid)
+            # 新实体不匹配
+            if etask.entity != body.get('entity'):
+                raise InvalidArgument('New entity not %d' % etask.entity)
             # 找到目标实体
             appentity = None
             for _entity in etask.entitys:
@@ -314,6 +321,8 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                 raise InvalidArgument('find status error, when swallowing')
             databases = dict(zip([database['subtype'] for database in appentity.databases],
                                  [dict(database_id=database['database_id'],
+                                       schema='%s_%s_%s_%d' % (common.NAME, common.GAMESERVER,
+                                                               common.DATADB, entity),
                                        host=database['host'],
                                        port=database['port'],
                                        user=database['user'],

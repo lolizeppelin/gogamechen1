@@ -1250,21 +1250,22 @@ class Application(AppEndpointBase):
         middleware = self._create_entity(entity, common.GAMESERVER, appfile, databases, timeout, ports)
 
         def _merge_process():
-            try:
-                taskmerge.merge_entitys(self, uuid, entitys, middleware.databases)
-            except Exception:
-                LOG.exception('prepare merge taskflow error')
-            else:
-                if middleware.waiter is not None:
-                    try:
-                        middleware.waiter.stop()
-                    except Exception as e:
-                        LOG.error('Stop waiter catch error %s' % e.__class__.__name__)
-                    finally:
-                        middleware.waiter = None
-                    LOG.error('Wait extract overtime')
+            with self.lock(entity):
+                try:
+                    taskmerge.create_merge(self, uuid, entitys, middleware)
+                except Exception:
+                    LOG.exception('prepare merge taskflow error')
                 else:
-                    self.flush_config(entity, middleware.databases, opentime, chiefs)
+                    if middleware.waiter is not None:
+                        try:
+                            middleware.waiter.stop()
+                        except Exception as e:
+                            LOG.error('Stop waiter catch error %s' % e.__class__.__name__)
+                        finally:
+                            middleware.waiter = None
+                        LOG.error('Wait extract overtime')
+                    else:
+                        self.flush_config(entity, middleware.databases, opentime, chiefs)
 
         # 执行合服工作流
         threadpool.add_thread(_merge_process)
