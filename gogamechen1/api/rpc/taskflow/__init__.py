@@ -39,7 +39,7 @@ class GogameAppBackupFile(AppLocalBackupFile):
 
     def __init__(self, destination, objtype):
         super(GogameAppBackupFile, self).__init__(destination,
-                                                  exclude=gfile.exclude,
+                                                  exclude=gfile.CompressConfAndLogExcluder(),
                                                   topdir=False,
                                                   native=True)
         self.objtype = objtype

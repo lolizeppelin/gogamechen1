@@ -3,25 +3,61 @@ import re
 import eventlet
 import zipfile
 import tarfile
+
+from simpleutil.utils.zlibutils.excluder import Excluder
+
 from gogamechen1 import common
 
 
 exclude_regx = re.compile('(.*?/)*?conf(/.*)?$|.*?\.log$')
 
-REGEX = {common.GAMESERVER: re.compile('^bin(/|/libbehaviac.so|/libgointerface.so|/gamesvr)?$|'
-                                       '^behaviac(/|/(?!.*?[\.])[\S]+?|/[\S]+?\.xml)?$|'
-                                       '^(config|geology)(/|/[\S]+?\.json)?$'),
-         common.CROSSSERVER: re.compile('^bin(/|/%s)?$' % common.CROSSSERVER),
-         common.GMSERVER: re.compile('^bin(/|/%s)?$' % common.GMSERVER),
-         }
+REGEX = {
+    common.GAMESERVER: re.compile('^bin(/|/libbehaviac.so|/libgointerface.so|/gamesvr)?$|'
+                                  '^behaviac(/|/(?!.*?[\.])[\S]+?|/[\S]+?\.xml)?$|'
+                                  '^(config|geology)(/|/[\S]+?\.json)?$'),
+    common.CROSSSERVER: re.compile('^bin(/|/%s)?$' % common.CROSSSERVER),
+    common.GMSERVER: re.compile('^bin(/|/%s)?$' % common.GMSERVER),
+}
 
 
-def exclude(pathname):
+def exclude_by_name(pathname):
     if not pathname:
         return False
     if re.match(exclude_regx, pathname):
         return True
     return False
+
+
+class CompressConfAndLogExcluder(Excluder):
+    def __call__(self, compretype, shell=False):
+        """find excluder function"""
+        if shell:
+            raise TypeError('No shell excluder for %s' % self.__class__.__name__)
+        if compretype not in ('gz', 'bz', 'zip'):
+            raise TypeError('No excluder for %s' % compretype)
+        return exclude_by_name
+
+
+class ExtractConfAndLogExcluder(Excluder):
+    @staticmethod
+    def gz_excluder(gzinfo):
+        return exclude_by_name(gzinfo.name)
+
+    @staticmethod
+    def zip_excluder(zipinfo):
+        return exclude_by_name(zipinfo.filename)
+
+    def __call__(self, compretype, shell=False):
+        """find excluder function"""
+        if shell:
+            raise TypeError('No shell excluder for %s' % self.__class__.__name__)
+        if compretype == 'gz':
+            return self.gz_excluder
+        elif common == 'bz':
+            return self.gz_excluder
+        elif compretype == 'zip':
+            return self.zip_excluder
+        raise TypeError('No excluder for %s' % compretype)
 
 
 def objtype_checker(objtype, filename):
