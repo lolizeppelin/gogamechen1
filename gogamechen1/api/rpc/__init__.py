@@ -1042,7 +1042,7 @@ class Application(AppEndpointBase):
                 details.append(formater(middleware.entity, manager_common.RESULT_SUCCESS))
             elif middleware.notexecuted:
                 details.append(formater(middleware.entity, manager_common.RESULT_ERROR,
-                                        'upgrade entity %d not executed'))
+                                        'upgrade entity %d not executed' % middleware.entity))
             else:
                 details.append(formater(middleware.entity, manager_common.RESULT_ERROR,
                                         'upgrade entity %d fail, check agent log for more' % middleware.entity))
