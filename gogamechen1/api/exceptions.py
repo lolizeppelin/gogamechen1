@@ -12,3 +12,7 @@ class GmSvrNotifyCancel(GmSvrNotifyError):
 
 class GmSvrNotifyNotExec(GmSvrNotifyError):
     """Notify not Execute, async reqpone fail?"""
+
+
+class MergeException(Exception):
+    """Merge fail exception"""

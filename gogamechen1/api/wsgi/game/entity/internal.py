@@ -32,6 +32,7 @@ from gopcdn.api.wsgi.resource import CdnResourceReuest
 from gogamechen1 import common
 from gogamechen1.api import get_gamelock
 from gogamechen1.api import endpoint_session
+from gogamechen1.api import exceptions
 
 from gogamechen1.models import AppEntity
 from gogamechen1.models import GameArea
@@ -120,6 +121,18 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                                               objtype=_entity.objtype) for _entity in query])
 
     # -----------------------以下为合服相关代码--------------------------------
+
+    @staticmethod
+    def _database_to_dict(appentity):
+        return dict(zip([database['subtype'] for database in appentity.databases],
+                        [dict(database_id=database['database_id'],
+                              schema='%s_%s_%s_%d' % (common.NAME, common.GAMESERVER, common.DATADB, appentity.entity),
+                              host=database['host'],
+                              port=database['port'],
+                              user=database['user'],
+                              passwd=database['passwd'],
+                              character_set=database['character_set'])
+                         for database in appentity.databases]))
 
     def merge(self, req, body=None):
         """合服接口,用于合服"""
@@ -262,19 +275,67 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                     session.flush()
                 # 修改被合并服的状态
                 query.update({'status': common.MERGEING})
+                port_controller.unsafe_create(agent_id, common.NAME,
+                                              mergetd_entity, rpc_result.get('ports'))
+                # agent 后续通知
+                threadpool.add_thread(entity_controller.post_create_entity,
+                                      _appentity.entity, common.NAME, objtype=common.GAMESERVER,
+                                      status=common.UNACTIVE,
+                                      opentime=opentime,
+                                      group_id=group_id, areas=[])
         # 添加端口
-        threadpool.add_thread(port_controller.unsafe_create,
-                              agent_id, common.NAME, mergetd_entity, rpc_result.get('ports'))
+        # threadpool.add_thread(port_controller.unsafe_create,
+        #                       agent_id, common.NAME, mergetd_entity, rpc_result.get('ports'))
         return resultutils.results(result='entitys is mergeing',
                                    data=[dict(uuid=uuid, entitys=entitys, entity=mergetd_entity)])
 
-    def continues(req, uuid, body=None):
+    def continues(self, req, uuid, body=None):
         """中途失败的合服任务再次运行"""
-        raise NotImplementedError
+        session = endpoint_session()
+        query = model_query(session, MergeTask, filter=MergeTask.uuid == uuid)
+        query = query.options(joinedload(MergeTask.entitys, innerjoin=False))
+        etask = query.one()
+        if etask.status == common.MERGEFINISH:
+            raise InvalidArgument('Merge task has all ready finished')
+        _query = model_query(session, AppEntity, filter=AppEntity.entity == etask.entity)
+        _query = _query.options(joinedload(AppEntity.databases, innerjoin=False))
+        appentity = _query.one_or_none()
+        if not appentity or not appentity.databases or appentity.objtype != common.GAMESERVER:
+            LOG.error('Etask entity can not be found or type/database error')
+            raise exceptions.MergeException('Etask entity can not be found or type/database error')
+        databases = self._database_to_dict(appentity)
+        rpc = get_client()
+        metadata, ports = self._entityinfo(req=req, entity=appentity.entity)
+        target = targetutils.target_agent_by_string(metadata.get('agent_type'), metadata.get('host'))
+        target.namespace = common.NAME
+        rpc_ret = rpc.call(target, ctxt={'agents': [appentity.agent_id, ]},
+                           msg={'method': 'continue_merge',
+                                'args': dict(entity=etask.entity, uuid=uuid, databases=databases)})
+        if not rpc_ret:
+            raise RpcResultError('swallowed entity result is None')
+        if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
+            raise RpcResultError('swallowed entity fail %s' % rpc_ret.get('result'))
+        return resultutils.results(result='continue merge task command has been send',
+                                   data=[dict(uuid=etask.uuid, entity=etask.entity)])
 
-    def finish(req, uuid, body=None):
+    def finish(self, req, uuid, body=None):
         """合服完成标记"""
-        raise NotImplementedError
+        session = endpoint_session()
+        query = model_query(session, MergeTask, filter=MergeTask.uuid == uuid)
+        query = query.options(joinedload(MergeTask.entitys, innerjoin=False))
+        etask = query.one()
+        if etask.status == common.MERGEFINISH:
+            return resultutils.results(result='swallowed finished',
+                                       data=[dict(uuid=etask.uuid,
+                                                  entity=etask.entity)])
+        for _entity in etask.entitys:
+            if _entity.status != common.MERGEED:
+                raise InvalidArgument('Entity %d status is not mergeed' % _entity.entity)
+        etask.status = common.MERGEFINISH
+        session.flush()
+        return resultutils.results(result='swallowed finished',
+                                   data=[dict(uuid=etask.uuid,
+                                              entity=etask.entity)])
 
     def swallow(self, req, entity, body=None):
         """合服内部接口,一般由agent调用
@@ -319,18 +380,8 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                 raise InvalidArgument('objtype error, entity not %s' % common.GAMESERVER)
             if appentity.status != common.MERGEING:
                 raise InvalidArgument('find status error, when swallowing')
-            databases = dict(zip([database['subtype'] for database in appentity.databases],
-                                 [dict(database_id=database['database_id'],
-                                       schema='%s_%s_%s_%d' % (common.NAME, common.GAMESERVER,
-                                                               common.DATADB, entity),
-                                       host=database['host'],
-                                       port=database['port'],
-                                       user=database['user'],
-                                       passwd=database['passwd'],
-                                       character_set=database['character_set']) for database in appentity.databases]))
-            areas = [dict(area_id=area.area_id,
-                          show_id=area.show_id,
-                          areaname=area.areaname)
+            databases = self._database_to_dict(appentity)
+            areas = [area.to_dict()
                      for area in appentity.areas]
             if not databases or not areas:
                 LOG.error('Entity no areas or databases record')
@@ -343,7 +394,7 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                 target = targetutils.target_agent_by_string(metadata.get('agent_type'), metadata.get('host'))
                 target.namespace = common.NAME
                 rpc_ret = rpc.call(target, ctxt={'agents': [appentity.agent_id, ]},
-                                   msg={'method': 'swallow',
+                                   msg={'method': 'swallow_entity',
                                         'args': dict(entity=entity)})
                 if not rpc_ret:
                     raise RpcResultError('swallow entity result is None')
@@ -358,9 +409,11 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                                        data=[dict(databases=databases, areas=areas)])
 
     def swallowed(self, req, entity, body=None):
-        """合服内部接口,一般由agent调用
+        """
+        合服内部接口,一般由agent调用
         用于新实体吞噬旧实体的区服完成后调用
-        调用后将设置appentity为deleted状态"""
+        调用后将设置appentity为deleted状态
+        """
         body = body or {}
         entity = int(entity)
         uuid = body.get('uuid')
@@ -396,7 +449,7 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                 target = targetutils.target_agent_by_string(metadata.get('agent_type'), metadata.get('host'))
                 target.namespace = common.NAME
                 rpc_ret = rpc.call(target, ctxt={'agents': [appentity.agent_id, ]},
-                                   msg={'method': 'swallowed',
+                                   msg={'method': 'swallowed_entity',
                                         'args': dict(entity=entity)})
                 if not rpc_ret:
                     raise RpcResultError('swallowed entity result is None')
@@ -409,7 +462,7 @@ class AppEntityInternalReuest(AppEntityReuestBase):
             session.flush()
             # area绑定新实体
             _query = model_query(session, GameArea, filter=GameArea.entity == entity)
-            _query.update({'entity': _entity.entity})
+            _query.update({'entity': etask.entity})
             session.flush()
             return resultutils.results(result='swallowed entity is success',
                                        data=[dict(databases=jsonutils.loads_as_bytes(_entity.databases),

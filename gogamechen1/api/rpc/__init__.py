@@ -10,6 +10,8 @@ import contextlib
 import eventlet
 import psutil
 
+from eventlet.semaphore import Semaphore
+
 from simpleutil.utils import argutils
 from simpleutil.utils import singleton
 from simpleutil.log import log as logging
@@ -196,6 +198,8 @@ class Application(AppEndpointBase):
         self.client = GogameChen1DBClient(get_http())
         self.delete_tokens = {}
         self.konwn_appentitys = {}
+        # Merger lock
+        self.mlock = Semaphore(1)
 
     @property
     def apppathname(self):
@@ -1277,3 +1281,8 @@ class Application(AppEndpointBase):
                             connection=self.manager.local_ip,
                             ports=self._get_ports(entity),
                             databases=middleware.databases)
+
+    def rpc_continue_merge(self, ctxt, entity, uuid, **kwargs):
+        databases = kwargs.get('databases')
+        with self.lock(entity):
+            taskmerge.merge_entitys(self, uuid, databases)
