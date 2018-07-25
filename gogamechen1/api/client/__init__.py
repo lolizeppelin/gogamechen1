@@ -24,6 +24,7 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
 
     merge_path = '/gogamechen1/merge'
     continue_merge_path = '/gogamechen1/merge/%s'
+    finsh_merge_path = '/gogamechen1/finsh/%s'
     mergeing_path = '/gogamechen1/mergeing/%s/%s'
 
     appentitys_path = '/gogamechen1/group/%s/%s/entitys'
@@ -225,6 +226,14 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
         resp, results = self.put(action=self.continue_merge_path % uuid, body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='continue merge entitys fail',
+                                            code=resp.status_code,
+                                            resone=results['result'])
+        return results
+
+    def finish_merge(self, uuid):
+        resp, results = self.put(action=self.finsh_merge_path % uuid)
+        if results['resultcode'] != common.RESULT_SUCCESS:
+            raise ServerExecuteRequestError(message='finish merge entitys fail',
                                             code=resp.status_code,
                                             resone=results['result'])
         return results

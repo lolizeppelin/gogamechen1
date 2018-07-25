@@ -379,7 +379,7 @@ def merge_entitys(appendpoint, uuid, database):
             steps[entity] = FINISHED
         with open(stepsfile, 'wb') as f:
             cPickle.dump(steps, f)
-        appendpoint.client.swallowe_finish(uuid)
+        appendpoint.client.finish_merge(uuid)
     finally:
         connection.session = None
         taskflow_session.close()

@@ -121,6 +121,10 @@ class Routers(router.RoutersBase):
                            put_action='continues')
 
         self._add_resource(mapper, game_controller,
+                           path='/%s/finish/{uuid}' % common.NAME,
+                           put_action='continues')
+
+        self._add_resource(mapper, game_controller,
                            path='/%s/mergeing/{entity}/swallow' % common.NAME,
                            post_action='swallow')
 
