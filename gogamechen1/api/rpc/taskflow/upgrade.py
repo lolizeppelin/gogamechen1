@@ -76,6 +76,7 @@ def upgrade_entitys(appendpoint,
                 try:
                     update = _updates[subtype]
                 except KeyError:
+                    LOG.debug('New %s update file' % subtype)
                     update = DbUpdateFile(md5, revertable, rollback)
                     _updates[subtype] = update
                 # 数据库备份文件
@@ -86,7 +87,6 @@ def upgrade_entitys(appendpoint,
                     backup = DbBackUpFile(outfile)
                 _database.append(GogameDatabase(backup=backup, update=update,
                                                 timeout=timeout, **dbinfo))
-        _updates.clear()
         # 更新程序文件任务
         upgradetask = None
         if common.APPFILE in objfiles:
@@ -94,6 +94,7 @@ def upgrade_entitys(appendpoint,
                                                rebind=['upgradefile', 'upzip_timeout'])
         app = Application(middleware, upgradetask=upgradetask, databases=_database)
         applications.append(app)
+    _updates.clear()
 
     book = LogBook(name='upgrade_%s' % appendpoint.namespace)
     store = dict(download_timeout=download_time, upzip_timeout=upzip_timeout)
