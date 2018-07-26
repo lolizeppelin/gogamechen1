@@ -433,6 +433,9 @@ class AppEntityInternalReuest(AppEntityReuestBase):
             etask = query.one_or_none()
             if not etask:
                 raise InvalidArgument('Not task exit with %s' % uuid)
+            # 新实体不匹配
+            if etask.entity != body.get('entity'):
+                raise InvalidArgument('New entity not %d' % etask.entity)
             for _entity in etask.entitys:
                 if _entity.entity == entity:
                     if _entity.status != common.SWALLOWING:

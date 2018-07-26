@@ -1284,5 +1284,14 @@ class Application(AppEndpointBase):
 
     def rpc_continue_merge(self, ctxt, entity, uuid, **kwargs):
         databases = kwargs.get('databases')
-        with self.lock(entity):
-            taskmerge.merge_entitys(self, uuid, databases)
+
+        def wapper():
+            with self.lock(entity):
+                taskmerge.merge_entitys(self, uuid, entity, databases)
+
+        threadpool.add_thread(wapper)
+
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          resultcode=manager_common.RESULT_SUCCESS,
+                                          ctxt=ctxt,
+                                          result='continue merge task %s spawned' % uuid)

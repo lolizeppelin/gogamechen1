@@ -81,6 +81,7 @@ def cleandb(host, port, user, passwd, schema):
 
 
 class Swallow(Task):
+
     def __init__(self, uuid, steps, entity, endpoint):
         self.endpoint = endpoint
         self.entity = entity
@@ -88,11 +89,11 @@ class Swallow(Task):
         self.uuid = uuid
         super(Swallow, self).__init__(name='swallow_%d' % entity, provides='db_%d' % entity)
 
-    def execute(self, timeout):
+    def execute(self, entity, timeout):
         step = self.stpes[self.entity]
         if step in (DUMPING, SWALLOW):
             with self.endpoint.mlock:
-                result = self.endpoint.client.swallow_entity(self.entity, self.uuid)
+                result = self.endpoint.client.swallow_entity(self.entity, self.uuid, entity)
             if result.get('resultcode') != manager_common.RESULT_SUCCESS or not result.get('data'):
                 return None
             self.stpes[self.entity] = DUMPING
@@ -162,6 +163,7 @@ class DumpData(Task):
 
 
 class Swallowed(Task):
+
     def __init__(self, uuid, steps, entity, endpoint):
         self.endpoint = endpoint
         self.entity = entity
@@ -169,11 +171,11 @@ class Swallowed(Task):
         self.uuid = uuid
         super(Swallowed, self).__init__(name='swallowed_%d' % entity)
 
-    def execute(self, timeout):
+    def execute(self, entity, timeout):
         step = self.stpes[self.entity]
         if step == SWALLOWED:
             with self.endpoint.mlock:
-                result = self.endpoint.client.swallowed_entity(self.entity, self.uuid)
+                result = self.endpoint.client.swallowed_entity(self.entity, self.uuid, entity)
             data = result.get('data')
             try:
                 areas = data[0].get('areas')
@@ -186,6 +188,7 @@ class Swallowed(Task):
 
 
 class SafeCleanDb(Task):
+
     def __init__(self):
         super(SafeCleanDb, self).__init__(name='cleandb')
 
@@ -302,10 +305,10 @@ def create_merge(appendpoint, uuid, entitys, middleware):
         steps[_entity] = SWALLOW
     with open(stepsfile, 'wb') as f:
         cPickle.dump(steps, f)
-    merge_entitys(appendpoint, uuid, middleware.databases)
+    merge_entitys(appendpoint, uuid, middleware.entity, middleware.databases)
 
 
-def merge_entitys(appendpoint, uuid, databases):
+def merge_entitys(appendpoint, uuid, entity, databases):
     datadb = databases[common.DATADB]
     mergepath = 'merge-%s' % uuid
     mergeroot = os.path.join(appendpoint.endpoint_backup, mergepath)
@@ -316,11 +319,11 @@ def merge_entitys(appendpoint, uuid, databases):
     with open(stepsfile, 'rb') as f:
         steps = cPickle.load(f)
     prepares = []
-    for entity, step in six.iteritems(steps):
+    for _entity, step in six.iteritems(steps):
         if step == FINISHED:
             raise exceptions.MergeException('Steps is finish?')
         if step != INSERT:
-            prepares.append(entity)
+            prepares.append(_entity)
     if prepares:
         name = 'prepare-merge-at-%d' % int(time.time())
         book = LogBook(name=name)
@@ -352,18 +355,18 @@ def merge_entitys(appendpoint, uuid, databases):
             with open(stepsfile, 'wb') as f:
                 cPickle.dump(steps, f)
 
-    for entity, step in six.iteritems(steps):
+    for _entity, step in six.iteritems(steps):
         if step != INSERT:
             raise exceptions.MergeException('Some step not on %s' % INSERT)
-        if not os.path.exists(mergeroot, sqlfile(entity)):
-            raise exceptions.MergeException('Entity %d sql file not exist' % entity)
+        if not os.path.exists(mergeroot, sqlfile(_entity)):
+            raise exceptions.MergeException('Entity %d sql file not exist' % _entity)
 
     if not os.path.exists(initfile):
         raise exceptions.MergeException('Init database file not exist')
 
     name = 'merge-at-%d' % int(time.time())
     book = LogBook(name=name)
-    store = dict(timeout=5, mergeroot=mergeroot, database=datadb)
+    store = dict(timeout=5, mergeroot=mergeroot, database=datadb, entity=entity)
     taskflow_session = build_session('sqlite:///%s' % os.path.join(mergeroot, '%s.db' % name))
     connection = Connection(taskflow_session)
 
@@ -371,8 +374,8 @@ def merge_entitys(appendpoint, uuid, databases):
     merge_flow.add(InitDb())
     merge_flow.add(SafeCleanDb())
     insert_uflow = uf.Flow('insert-db')
-    for entity in steps:
-        insert_uflow.add(InserDb(entity))
+    for _entity in steps:
+        insert_uflow.add(InserDb(_entity))
     merge_flow.add(insert_uflow)
     merge_flow.add(PostDo(uuid, appendpoint))
 
@@ -387,8 +390,8 @@ def merge_entitys(appendpoint, uuid, databases):
         else:
             LOG.error('Merge database task execute fail, %s %s' % (e.__class__.__name__, str(e)))
     else:
-        for entity in steps:
-            steps[entity] = FINISHED
+        for _entity in steps:
+            steps[_entity] = FINISHED
         with open(stepsfile, 'wb') as f:
             cPickle.dump(steps, f)
         appendpoint.client.finish_merge(uuid)

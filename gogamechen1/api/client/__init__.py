@@ -238,16 +238,18 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
                                             resone=results['result'])
         return results
 
-    def swallow_entity(self, entity, uuid):
-        resp, results = self.post(action=self.mergeing_path % (str(entity), 'swallow'), body={'uuid': uuid})
+    def swallow_entity(self, entity, uuid, newentity):
+        resp, results = self.post(action=self.mergeing_path % (str(entity), 'swallow'),
+                                  body={'uuid': uuid, 'entity': newentity})
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='swallow entity fail',
                                             code=resp.status_code,
                                             resone=results['result'])
         return results
 
-    def swallowed_entity(self, entity, uuid):
-        resp, results = self.post(action=self.mergeing_path % (str(entity), 'swallowed'), body={'uuid': uuid})
+    def swallowed_entity(self, entity, uuid, newentity):
+        resp, results = self.post(action=self.mergeing_path % (str(entity), 'swallowed'),
+                                  body={'uuid': uuid, 'entity': newentity})
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='swallowed entity fail',
                                             code=resp.status_code,
