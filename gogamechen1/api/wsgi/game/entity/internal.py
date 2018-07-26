@@ -405,6 +405,7 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                 if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
                     raise RpcResultError('swallow entity fail %s' % rpc_ret.get('result'))
             # 修改实体在合服任务中的状态,存储areas以及databases
+            appentity.status = common.SWALLOWING
             _entity.status = common.SWALLOWING
             _entity.areas = jsonutils.dumps(areas)
             _entity.databases = jsonutils.dumps(databases)

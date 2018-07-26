@@ -113,6 +113,7 @@ class DumpData(Task):
         self.entity = entity
         self.stpes = steps
         self.uuid = uuid
+        self.endpoint = endpoint
         super(DumpData, self).__init__(name='dump_%d' % entity,
                                        rebind=['mergeroot', 'dtimeout', 'db_%d' % entity])
 
@@ -153,13 +154,15 @@ class DumpData(Task):
             initfile = os.path.join(root, 'init.sql')
             if not os.path.exists(initfile):
                 try:
-                    mysqldump(initfile,
-                              database.get('host'), database.get('port'),
-                              database.get('user'), database.get('passwd'),
-                              database.get('schema'),
-                              character_set=None, extargs=['-R -d'],
-                              logfile=None, callable=safe_fork,
-                              timeout=timeout)
+                    with self.endpoint.mlock:
+                        if not os.path.exists(initfile):
+                            mysqldump(initfile,
+                                      database.get('host'), database.get('port'),
+                                      database.get('user'), database.get('passwd'),
+                                      database.get('schema'),
+                                      character_set=None, extargs=['-R', '-d'],
+                                      logfile=None, callable=safe_fork,
+                                      timeout=timeout)
                 except (ExitBySIG, UnExceptExit):
                     if os.path.exists(initfile):
                         try:
