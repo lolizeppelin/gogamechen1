@@ -337,6 +337,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                     raise InvalidArgument(e.message)
                 entity = create_result.get('entity')
                 rpc_result = create_result.get('notify')
+                LOG.info('Create new entity %d' % entity)
                 LOG.debug('Entity controller create rpc result %s', str(rpc_result))
                 # 插入实体信息
                 appentity = AppEntity(entity=entity,
@@ -382,17 +383,18 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                 _result.setdefault('platform', platform)
                 _result.setdefault('packages', [package.package_id for package in _packages])
 
-            # 添加端口
-            threadpool.add_thread(port_controller.unsafe_create,
-                                  agent_id, common.NAME, entity, rpc_result.get('ports'))
-            # agent 后续通知
-            threadpool.add_thread(entity_controller.post_create_entity,
-                                  entity, common.NAME, objtype=objtype,
-                                  status=common.UNACTIVE,
-                                  opentime=opentime,
-                                  group_id=group_id, areas=areas)
-            return resultutils.results(result='create %s entity success' % objtype,
-                                       data=[_result, ])
+        # 添加端口
+        # threadpool.add_thread(port_controller.unsafe_create,
+        #                       agent_id, common.NAME, entity, rpc_result.get('ports'))
+        port_controller.unsafe_create(agent_id, common.NAME, entity, rpc_result.get('ports'))
+        # agent 后续通知
+        threadpool.add_thread(entity_controller.post_create_entity,
+                              entity, common.NAME, objtype=objtype,
+                              status=common.UNACTIVE,
+                              opentime=opentime,
+                              group_id=group_id, areas=areas)
+        return resultutils.results(result='create %s entity success' % objtype,
+                                   data=[_result, ])
 
     def show(self, req, group_id, objtype, entity, body=None):
         body = body or {}

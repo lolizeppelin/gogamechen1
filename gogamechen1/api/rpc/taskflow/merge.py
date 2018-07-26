@@ -332,7 +332,7 @@ def merge_entitys(appendpoint, uuid, databases):
         for _entity in prepares:
             entity_flow = lf.Flow('prepare-%d' % _entity)
             entity_flow.add(Swallow(uuid, steps, _entity, appendpoint))
-            entity_flow.add(DumpData(uuid, _entity, steps, appendpoint))
+            entity_flow.add(DumpData(uuid, steps, _entity, appendpoint))
             entity_flow.add(Swallowed(uuid, steps, _entity, appendpoint))
             prepare_uflow.add(entity_flow)
         engine = load(connection, prepare_uflow, store=store,

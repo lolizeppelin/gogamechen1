@@ -251,7 +251,8 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                     raise InvalidArgument(e.message)
                 mergetd_entity = create_result.get('entity')
                 rpc_result = create_result.get('notify')
-                LOG.info('Entity controller merge rpc result %s' % str(rpc_result))
+                LOG.info('Merge to entity %d, agent %d' % (mergetd_entity, agent_id))
+                LOG.debug('Entity controller merge rpc result %s' % str(rpc_result))
                 # 插入实体信息
                 appentity = AppEntity(entity=mergetd_entity,
                                       agent_id=agent_id,
@@ -273,16 +274,18 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                 for _appentity in appentitys:
                     session.add(MergeEntity(entity=_appentity.entity, uuid=uuid))
                     session.flush()
-                # 修改被合并服的状态
-                query.update({'status': common.MERGEING})
-                port_controller.unsafe_create(agent_id, common.NAME,
-                                              mergetd_entity, rpc_result.get('ports'))
-                # agent 后续通知
-                threadpool.add_thread(entity_controller.post_create_entity,
-                                      _appentity.entity, common.NAME, objtype=common.GAMESERVER,
-                                      status=common.UNACTIVE,
-                                      opentime=opentime,
-                                      group_id=group_id, areas=[])
+                # 批量修改被合并服的状态
+                query.update({'status': common.MERGEING},
+                             synchronize_session=False)
+                session.flush()
+            port_controller.unsafe_create(agent_id, common.NAME,
+                                          mergetd_entity, rpc_result.get('ports'))
+            # agent 后续通知
+            threadpool.add_thread(entity_controller.post_create_entity,
+                                  _appentity.entity, common.NAME, objtype=common.GAMESERVER,
+                                  status=common.UNACTIVE,
+                                  opentime=opentime,
+                                  group_id=group_id, areas=[])
         # 添加端口
         # threadpool.add_thread(port_controller.unsafe_create,
         #                       agent_id, common.NAME, mergetd_entity, rpc_result.get('ports'))
