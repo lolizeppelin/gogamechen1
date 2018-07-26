@@ -313,7 +313,8 @@ def merge_entitys(appendpoint, uuid, databases):
     initfile = os.path.join(mergeroot, 'init.sql')
     if not os.path.exists(stepsfile):
         raise exceptions.MergeException('Steps file not exist')
-    steps = cPickle.load(stepsfile)
+    with open(stepsfile, 'rb') as f:
+        steps = cPickle.load(f)
     prepares = []
     for entity, step in six.iteritems(steps):
         if step == FINISHED:

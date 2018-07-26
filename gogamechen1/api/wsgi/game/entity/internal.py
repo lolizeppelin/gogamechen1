@@ -178,7 +178,7 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                 else:
                     crosss.append(appentity)
             if not gm:
-                raise InvalidArgument('Group gm not active?')
+                raise InvalidArgument('Group not exist or gm not active/exist?')
             if not crosss:
                 raise InvalidArgument('Group has no cross server?')
             if not body.get('cross_id'):
@@ -255,8 +255,8 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                 # 插入实体信息
                 appentity = AppEntity(entity=mergetd_entity,
                                       agent_id=agent_id,
-                                      objtype=common.GAMESERVER,
-                                      cross_id=cross.cross_id,
+                                      group_id=group_id, objtype=common.GAMESERVER,
+                                      cross_id=cross.entity,
                                       opentime=opentime,
                                       platform=platform)
                 session.add(appentity)
@@ -338,6 +338,7 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                                               entity=etask.entity)])
 
     def swallow(self, req, entity, body=None):
+
         """合服内部接口,一般由agent调用
         用于新实体吞噬旧实体的区服和数据库"""
         body = body or {}

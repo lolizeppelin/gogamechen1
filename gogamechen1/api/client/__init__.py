@@ -214,7 +214,7 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
         return results
 
     # -----------merge api-----------------
-    def merge_entitys(self, group_id, body):
+    def merge_entitys(self, body):
         resp, results = self.post(action=self.merge_path, body=body, timeout=30)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='merge entitys fail',

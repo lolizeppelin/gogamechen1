@@ -22,7 +22,7 @@ config.configure('test', [a, b])
 wsgi_url = '172.31.0.110'
 wsgi_port = 7999
 
-httpclient = ManagerClient(wsgi_url, wsgi_port, timeout=30)
+httpclient = ManagerClient(wsgi_url, wsgi_port, timeout=30, token='938lhsaposg433tsdlfasjlgk938')
 
 client = GogameChen1DBClient(httpclient)
 
@@ -105,6 +105,20 @@ def game_start(entitys):
     print client.game_start(group_id=1, entitys=entitys, body={'request_time': int(time.time()),})
 
 
+def game_merge(appfile, group_id, entitys):
+    try:
+        r = client.merge_entitys(body={'entitys': entitys,
+                                       'group_id': group_id,
+                                       'appfile': appfile})
+    except Exception as e:
+        print e.message
+        try:
+            print e.resone
+        except:
+            pass
+    else:
+        print r
+
 
 
 # group_create_test()
@@ -141,3 +155,4 @@ def game_start(entitys):
 
 
 # print client.async_show(request_id='70b979ef-e3be-4ed9-8e1c-16484019fe3c', body={'details': True})
+game_merge('25000d1488e589752b70fb36e78df046', 97, [3, 4])
