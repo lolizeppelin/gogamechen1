@@ -120,6 +120,19 @@ def game_merge(appfile, group_id, entitys):
         print r
 
 
+def continue_merge(uuid):
+    try:
+        r = client.continue_merge(uuid)
+    except Exception as e:
+        print e.message
+        try:
+            print e.resone
+        except:
+            pass
+    else:
+        print r
+
+
 
 # group_create_test()
 # group_index_test()
@@ -155,4 +168,5 @@ def game_merge(appfile, group_id, entitys):
 
 
 # print client.async_show(request_id='70b979ef-e3be-4ed9-8e1c-16484019fe3c', body={'details': True})
-game_merge('25000d1488e589752b70fb36e78df046', 97, [3, 4])
+# game_merge('25000d1488e589752b70fb36e78df046', 97, [3, 4])
+continue_merge('d613aa4a-e823-406f-bb94-5195941abb5b')

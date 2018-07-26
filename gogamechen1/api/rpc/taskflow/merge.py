@@ -86,7 +86,7 @@ class Swallow(Task):
         self.entity = entity
         self.stpes = steps
         self.uuid = uuid
-        super(Swallow, self).__init__(name='swallo_%d' % entity, provides='db_%d' % entity)
+        super(Swallow, self).__init__(name='swallow_%d' % entity, provides='db_%d' % entity)
 
     def execute(self, timeout):
         step = self.stpes[self.entity]
@@ -167,7 +167,7 @@ class Swallowed(Task):
         self.entity = entity
         self.stpes = steps
         self.uuid = uuid
-        super(Swallowed, self).__init__(name='swallo_%d' % entity)
+        super(Swallowed, self).__init__(name='swallowed_%d' % entity)
 
     def execute(self, timeout):
         step = self.stpes[self.entity]
@@ -345,6 +345,7 @@ def merge_entitys(appendpoint, uuid, databases):
                 LOG.exception('Prepare merge task execute fail')
             else:
                 LOG.error('Prepare merge task execute fail, %s %s' % (e.__class__.__name__, str(e)))
+            raise
         finally:
             connection.session = None
             taskflow_session.close()
