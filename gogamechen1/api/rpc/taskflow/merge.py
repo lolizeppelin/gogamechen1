@@ -95,9 +95,15 @@ class Swallow(Task):
             with self.endpoint.mlock:
                 result = self.endpoint.client.swallow_entity(self.entity, self.uuid, entity)
             if result.get('resultcode') != manager_common.RESULT_SUCCESS or not result.get('data'):
+                LOG.error('Swallow success, but can not find database from result')
+                return None
+            data = result.get('data')
+            databases = data[0].get('databases')
+            if not databases:
+                LOG.error('Swallow success, databases is empty')
                 return None
             self.stpes[self.entity] = DUMPING
-            return result.get('data')[0]
+            return databases
         return None
 
 
@@ -176,8 +182,11 @@ class Swallowed(Task):
         if step == SWALLOWED:
             with self.endpoint.mlock:
                 result = self.endpoint.client.swallowed_entity(self.entity, self.uuid, entity)
-            data = result.get('data')
             try:
+                if result.get('resultcode') != manager_common.RESULT_SUCCESS or not result.get('data'):
+                    LOG.error('Swallowed success, but can not find areas from result')
+                    return None
+                data = result.get('data')
                 areas = data[0].get('areas')
                 if not areas:
                     raise KeyError('Not areas found')
