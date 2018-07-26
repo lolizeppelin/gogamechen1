@@ -2,6 +2,7 @@
 import os
 import time
 import six
+import eventlet
 import cPickle
 import contextlib
 
@@ -198,7 +199,9 @@ class Swallowed(Task):
                 LOG.error('Get areas fail %s' % e.message)
             else:
                 self.stpes[self.entity] = INSERT
-                self.endpoint.konwn_appentitys[self.entity]['areas'].extend(areas)
+                if entity not in self.endpoint.konwn_appentitys:
+                    eventlet.sleep(3)
+                self.endpoint.konwn_appentitys[entity]['areas'].extend(areas)
 
 
 class SafeCleanDb(Task):
