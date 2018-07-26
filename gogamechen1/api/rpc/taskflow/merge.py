@@ -193,10 +193,11 @@ class Swallowed(Task):
                 areas = data[0].get('areas')
                 if not areas:
                     raise KeyError('Not areas found')
-                self.entity.konwn_appentitys[self.entity]['areas'].extend(areas)
             except KeyError as e:
                 LOG.error('Get areas fail %s' % e.message)
-            self.stpes[self.entity] = INSERT
+            else:
+                self.stpes[self.entity] = INSERT
+                self.endpoint.konwn_appentitys[self.entity]['areas'].extend(areas)
 
 
 class SafeCleanDb(Task):
