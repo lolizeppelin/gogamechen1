@@ -314,13 +314,15 @@ def create_merge(appendpoint, uuid, entitys, middleware, opentime, chiefs):
     stepsfile = os.path.join(mergeroot, 'steps.dat')
     if os.path.exists(stepsfile):
         raise exceptions.MergeException('Steps file exist, can not merge')
+    data = {}
     steps = {}
     for _entity in entitys:
         steps[_entity] = SWALLOW
-    steps['opentime'] = opentime
-    steps['chiefs'] = chiefs
+    data['opentime'] = opentime
+    data['chiefs'] = chiefs
+    data['steps'] = steps
     with open(stepsfile, 'wb') as f:
-        cPickle.dump(steps, f)
+        cPickle.dump(data, f)
     merge_entitys(appendpoint, uuid, middleware.entity, middleware.databases)
 
 
@@ -333,7 +335,8 @@ def merge_entitys(appendpoint, uuid, entity, databases):
     if not os.path.exists(stepsfile):
         raise exceptions.MergeException('Steps file not exist')
     with open(stepsfile, 'rb') as f:
-        steps = cPickle.load(f)
+        data = cPickle.load(f)
+        steps = data['steps']
     prepares = []
     for _entity, step in six.iteritems(steps):
         if step == FINISHED:
@@ -369,7 +372,7 @@ def merge_entitys(appendpoint, uuid, entity, databases):
             connection.session = None
             taskflow_session.close()
             with open(stepsfile, 'wb') as f:
-                cPickle.dump(steps, f)
+                cPickle.dump(data, f)
 
     for _entity, step in six.iteritems(steps):
         if step != INSERT:
@@ -409,11 +412,11 @@ def merge_entitys(appendpoint, uuid, entity, databases):
         for _entity in steps:
             steps[_entity] = FINISHED
         with open(stepsfile, 'wb') as f:
-            cPickle.dump(steps, f)
+            cPickle.dump(data, f)
         appendpoint.client.finish_merge(uuid)
     finally:
         connection.session = None
         taskflow_session.close()
         appendpoint.flush_config(entity, databases,
-                                 opentime=steps['opentime'],
-                                 chiefs=steps['chiefs'])
+                                 opentime=data['opentime'],
+                                 chiefs=data['chiefs'])
