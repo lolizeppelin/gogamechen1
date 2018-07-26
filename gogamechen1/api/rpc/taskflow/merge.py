@@ -156,6 +156,7 @@ class DumpData(Task):
                 try:
                     with self.endpoint.mlock:
                         if not os.path.exists(initfile):
+                            LOG.info('Dump init sql from entity %d, schema %s' % (self.entity, database.get('schema')))
                             mysqldump(initfile,
                                       database.get('host'), database.get('port'),
                                       database.get('user'), database.get('passwd'),
@@ -305,7 +306,7 @@ class PostDo(Task):
             self.endpoint.client.swallowe_finish(self.uuid)
 
 
-def create_merge(appendpoint, uuid, entitys, middleware):
+def create_merge(appendpoint, uuid, entitys, middleware, opentime, chiefs):
     mergepath = 'merge-%s' % uuid
     mergeroot = os.path.join(appendpoint.endpoint_backup, mergepath)
     if not os.path.exists(mergeroot):
@@ -316,6 +317,8 @@ def create_merge(appendpoint, uuid, entitys, middleware):
     steps = {}
     for _entity in entitys:
         steps[_entity] = SWALLOW
+    steps['opentime'] = opentime
+    steps['chiefs'] = chiefs
     with open(stepsfile, 'wb') as f:
         cPickle.dump(steps, f)
     merge_entitys(appendpoint, uuid, middleware.entity, middleware.databases)
@@ -411,3 +414,6 @@ def merge_entitys(appendpoint, uuid, entity, databases):
     finally:
         connection.session = None
         taskflow_session.close()
+        appendpoint.flush_config(entity, databases,
+                                 opentime=steps['opentime'],
+                                 chiefs=steps['chiefs'])

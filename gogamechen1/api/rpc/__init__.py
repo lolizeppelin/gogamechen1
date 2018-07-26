@@ -415,7 +415,8 @@ class Application(AppEndpointBase):
             databases = gconfig.format_databases(objtype, cfile, databases)
             chiefs = gconfig.format_chiefs(objtype, cfile, chiefs)
             flag = gconfig.server_flag(objtype, cfile)
-            opentime = gconfig.format_opentime(objtype, cfile, opentime) if not opentime else opentime
+            opentime = self.konwn_appentitys[entity].get('opentime') if not opentime else opentime
+            opentime = gconfig.format_opentime(objtype, cfile, opentime)
             confobj = gconfig.make(objtype, self.logpath(entity),
                                    self.manager.local_ip, ports,
                                    entity, areas,
@@ -1256,7 +1257,7 @@ class Application(AppEndpointBase):
         def _merge_process():
             with self.lock(entity):
                 try:
-                    taskmerge.create_merge(self, uuid, entitys, middleware)
+                    taskmerge.create_merge(self, uuid, entitys, middleware, opentime, chiefs)
                 except Exception:
                     LOG.exception('prepare merge taskflow error')
                 else:
