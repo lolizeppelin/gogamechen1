@@ -1284,12 +1284,15 @@ class Application(AppEndpointBase):
                             ports=self._get_ports(entity),
                             databases=middleware.databases)
 
-    def rpc_continue_merge(self, ctxt, entity, uuid, **kwargs):
-        databases = kwargs.get('databases')
+    def rpc_continue_merge(self, ctxt, entity, uuid, databases,
+                           **kwargs):
 
         def wapper():
             with self.lock(entity):
-                taskmerge.merge_entitys(self, uuid, entity, databases)
+                try:
+                    taskmerge.merge_entitys(self, uuid, entity, databases)
+                except Exception as e:
+                    LOG.error(e.message)
 
         threadpool.add_thread(wapper)
 
