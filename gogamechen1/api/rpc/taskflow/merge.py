@@ -159,7 +159,7 @@ class DumpData(Task):
                           logfile=None, callable=safe_fork,
                           timeout=timeout)
             except (ExitBySIG, UnExceptExit):
-                LOG.error('Dump from mysql fail')
+                LOG.error('Dump database of entity %d fail' % self.entity)
                 if os.path.exists(_file):
                     try:
                         os.remove(_file)
@@ -219,7 +219,7 @@ class Swallowed(Task):
                 if entity not in self.endpoint.konwn_appentitys:
                     eventlet.sleep(3)
                 self.endpoint.konwn_appentitys[entity]['areas'].extend(areas)
-                LOG.info('Extend new areas of konwn appentitys success')
+                LOG.debug('Extend new areas of konwn appentitys success')
 
 
 class SafeCleanDb(Task):
@@ -229,15 +229,17 @@ class SafeCleanDb(Task):
 
     def execute(self, root, database):
         """清空前备份数据库,正常情况下备份内容为空"""
+        LOG.debug('Try backup database before clean')
         safebak = os.path.join(root, 'safebak.%d.gz' % time.time())
         # back up database
-        mysqlload(safebak,
+        mysqldump(safebak,
                   database.get('host'), database.get('port'),
                   database.get('user'), database.get('passwd'),
                   database.get('schema'),
                   character_set=None, extargs=['-R'],
                   logfile=None, callable=safe_fork,
                   timeout=15)
+        LOG.debug('Backup database before clean success, try clean it')
         # drop all table
         cleandb(host=database.get('host'), port=database.get('port'),
                 user=database.get('user'), passwd=database.get('passwd'),
@@ -262,7 +264,7 @@ class InitDb(Task):
                       timeout=30)
 
     def execute(self, root, database):
-        LOG.info('Try init databases')
+        LOG.debug('Try init databases')
         initfile = os.path.join(root, 'init.sql')
         mysqlload(initfile,
                   database.get('host'), database.get('port'),
@@ -271,7 +273,7 @@ class InitDb(Task):
                   character_set=None, extargs=None,
                   logfile=None, callable=safe_fork,
                   timeout=15)
-        LOG.info('Init databases success, try call pre.sql')
+        LOG.debug('Init databases success, try call pre.sql')
         self._predo(root, database)
 
 
@@ -282,7 +284,7 @@ class InserDb(Task):
         super(InserDb, self).__init__(name='insert-%d' % entity)
 
     def execute(self, root, database):
-        LOG.info('Insert database of entity %d' % self.entity)
+        LOG.debug('Insert database of entity %d' % self.entity)
         _file = os.path.join(root, sqlfile(self.entity))
         mysqlload(_file,
                   database.get('host'), database.get('port'),
@@ -415,8 +417,8 @@ def merge_entitys(appendpoint, uuid, entity, databases):
     connection = Connection(taskflow_session)
 
     merge_flow = lf.Flow('merge-to')
-    merge_flow.add(InitDb())
     merge_flow.add(SafeCleanDb())
+    merge_flow.add(InitDb())
     insert_uflow = uf.Flow('insert-db')
     for _entity in steps:
         insert_uflow.add(InserDb(_entity))
