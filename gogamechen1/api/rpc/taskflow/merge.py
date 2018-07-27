@@ -111,7 +111,8 @@ class Swallow(Task):
 class DumpData(Task):
 
     NODUMPTABLES = [
-        'player_mining',
+        'mining_area',
+        'timer_boss',
         'pvp_arena_rank',
         'pvp_arena_pet_rank',
         'var_world'
@@ -218,6 +219,7 @@ class Swallowed(Task):
                 if entity not in self.endpoint.konwn_appentitys:
                     eventlet.sleep(3)
                 self.endpoint.konwn_appentitys[entity]['areas'].extend(areas)
+                LOG.info('Extend new areas of konwn appentitys success')
 
 
 class SafeCleanDb(Task):
@@ -260,6 +262,7 @@ class InitDb(Task):
                       timeout=30)
 
     def execute(self, root, database):
+        LOG.info('Try init databases')
         initfile = os.path.join(root, 'init.sql')
         mysqlload(initfile,
                   database.get('host'), database.get('port'),
@@ -278,6 +281,7 @@ class InserDb(Task):
         super(InserDb, self).__init__(name='insert-%d' % entity)
 
     def execute(self, root, database):
+        LOG.info('Insert database of entity %d' % self.entity)
         _file = os.path.join(root, sqlfile(self.entity))
         mysqlload(_file,
                   database.get('host'), database.get('port'),
@@ -290,6 +294,7 @@ class InserDb(Task):
     def revert(self, result, database, **kwargs):
         """插入失败清空数据库"""
         if isinstance(result, failure.Failure):
+            LOG.warning('Insert database of entity %d fail, try clean database' % self.entity)
             cleandb(host=database.get('host'), port=database.get('port'),
                     user=database.get('user'), passwd=database.get('passwd'),
                     schema=database.get('schema'))
@@ -400,7 +405,9 @@ def merge_entitys(appendpoint, uuid, entity, databases):
             raise exceptions.MergeException('Entity %d sql file not exist' % _entity)
 
     if not os.path.exists(initfile):
+        LOG.error('Init database file not exist')
         raise exceptions.MergeException('Init database file not exist')
+    LOG.info('Prepare merge success, try insert datadatabase')
 
     name = 'merge-at-%d' % int(time.time())
     book = LogBook(name=name)
