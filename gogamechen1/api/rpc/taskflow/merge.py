@@ -389,9 +389,7 @@ def merge_entitys(appendpoint, uuid, entity, databases):
         except Exception as e:
             if LOG.isEnabledFor(logging.DEBUG):
                 LOG.exception('Prepare merge task execute fail')
-            else:
-                LOG.error('Prepare merge task execute fail, %s %s' % (e.__class__.__name__, str(e)))
-            raise
+            raise exceptions.MergeException('Prepare merge task execute fail, %s %s' % (e.__class__.__name__, str(e)))
         finally:
             connection.session = None
             taskflow_session.close()
@@ -432,8 +430,7 @@ def merge_entitys(appendpoint, uuid, entity, databases):
     except Exception as e:
         if LOG.isEnabledFor(logging.DEBUG):
             LOG.exception('Merge database task execute fail')
-        else:
-            LOG.error('Merge database task execute fail, %s %s' % (e.__class__.__name__, str(e)))
+        raise exceptions.MergeException('Merge database task execute fail, %s %s' % (e.__class__.__name__, str(e)))
     else:
         for _entity in steps:
             steps[_entity] = FINISHED

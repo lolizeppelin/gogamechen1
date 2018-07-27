@@ -41,6 +41,7 @@ from gogamechen1 import utils
 
 from gogamechen1.api import gconfig
 from gogamechen1.api import gfile
+from gogamechen1.api.exceptions import MergeException
 from gogamechen1.api.client import GogameChen1DBClient
 from gogamechen1.api.rpc.config import gameserver_group
 from gogamechen1.api.rpc.config import crossserver_group
@@ -1259,8 +1260,13 @@ class Application(AppEndpointBase):
             with self.lock(entity):
                 try:
                     taskmerge.create_merge(self, uuid, entitys, middleware, opentime, chiefs)
-                except Exception:
-                    LOG.exception('prepare merge taskflow error')
+                except MergeException as e:
+                    LOG.error('First merge fail, %s' % e.message)
+                except Exception as e:
+                    if LOG.isEnabledFor(logging.DEBUG):
+                        LOG.exception('First merge fail')
+                    else:
+                        LOG.error('First merge, %s %s' % (e.__class__.__name__, str(e)))
                 else:
                     if middleware.waiter is not None:
                         try:
@@ -1270,8 +1276,6 @@ class Application(AppEndpointBase):
                         finally:
                             middleware.waiter = None
                         LOG.error('Wait extract overtime')
-                    else:
-                        self.flush_config(entity, middleware.databases, opentime, chiefs)
 
         # 执行合服工作流
         threadpool.add_thread(_merge_process)
@@ -1291,8 +1295,13 @@ class Application(AppEndpointBase):
             with self.lock(entity):
                 try:
                     taskmerge.merge_entitys(self, uuid, entity, databases)
+                except MergeException as e:
+                    LOG.error('Continue merge fail, %s' % e.message)
                 except Exception as e:
-                    LOG.error(e.message)
+                    if LOG.isEnabledFor(logging.DEBUG):
+                        LOG.exception('Continue merge fail')
+                    else:
+                        LOG.error('Continue merge, %s %s' % (e.__class__.__name__, str(e)))
 
         threadpool.add_thread(wapper)
 
