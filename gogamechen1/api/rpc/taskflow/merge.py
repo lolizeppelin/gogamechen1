@@ -401,7 +401,7 @@ def merge_entitys(appendpoint, uuid, entity, databases):
     for _entity, step in six.iteritems(steps):
         if step != INSERT:
             raise exceptions.MergeException('Some step not on %s' % INSERT)
-        if not os.path.exists(mergeroot, sqlfile(_entity)):
+        if not os.path.exists(os.path.join(mergeroot, sqlfile(_entity))):
             raise exceptions.MergeException('Entity %d sql file not exist' % _entity)
 
     if not os.path.exists(initfile):
