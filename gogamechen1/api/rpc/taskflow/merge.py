@@ -286,14 +286,16 @@ class InserDb(Task):
 
     def execute(self, root, database):
         _file = os.path.join(root, sqlfile(self.entity))
+        logfile = os.path.join(root, 'error.%d.log')
         LOG.debug('Insert database of entity %d, sql file %s' % (self.entity, _file))
         mysqlload(_file,
                   database.get('host'), database.get('port'),
                   database.get('user'), database.get('passwd'),
                   database.get('schema'),
                   character_set=None, extargs=None,
-                  logfile=None, callable=safe_fork,
+                  logfile=logfile, callable=safe_fork,
                   timeout=30)
+        os.remove(logfile)
 
     def revert(self, result, database, **kwargs):
         """插入失败清空数据库"""
