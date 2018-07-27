@@ -780,7 +780,7 @@ class Application(AppEndpointBase):
                                           ctxt=ctxt,
                                           result='change entity opentime success')
 
-    def rpc_change_entity_area(self, ctxt, entity, area_id, areaname, **kwargs):
+    def rpc_change_entity_area(self, ctxt, entity, area_id, areaname, show_id, **kwargs):
         entity = int(entity)
         timeout = count_timeout(ctxt, kwargs)
         while self.frozen:
@@ -802,6 +802,7 @@ class Application(AppEndpointBase):
             for area in areas:
                 if area.get('area_id') == area_id:
                     area['areaname'] = areaname
+                    area['show_id'] = show_id
             if not running:
                 self.flush_config(entity)
         return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,

@@ -109,6 +109,13 @@ class Swallow(Task):
 
 
 class DumpData(Task):
+    NODUMPTABLES = [
+        'player_mining',
+        'pvp_arena_rank',
+        'pvp_arena_pet_rank',
+        'var_world'
+    ]
+
     def __init__(self, uuid, steps, entity,
                  endpoint=None):
         self.entity = entity
@@ -117,6 +124,10 @@ class DumpData(Task):
         self.endpoint = endpoint
         super(DumpData, self).__init__(name='dump_%d' % entity,
                                        rebind=['mergeroot', 'dtimeout', 'db_%d' % entity])
+
+    @staticmethod
+    def _ext_args():
+        pass
 
     @staticmethod
     def _prepare_database(databases):
