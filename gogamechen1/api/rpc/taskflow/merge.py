@@ -247,6 +247,7 @@ class SafeCleanDb(Task):
 
 
 class InitDb(Task):
+
     def __init__(self):
         super(InitDb, self).__init__(name='initdb')
 
@@ -263,17 +264,19 @@ class InitDb(Task):
                       logfile=None, callable=safe_fork,
                       timeout=30)
 
-    def execute(self, root, database):
+    def execute(self, timeline, root, database):
         LOG.debug('Try init databases')
         initfile = os.path.join(root, 'init.sql')
+        logfile = os.path.join(root, 'initdb.err.%d.log' % timeline)
         mysqlload(initfile,
                   database.get('host'), database.get('port'),
                   database.get('user'), database.get('passwd'),
                   database.get('schema'),
                   character_set=None, extargs=None,
-                  logfile=None, callable=safe_fork,
+                  logfile=logfile, callable=safe_fork,
                   timeout=15)
         LOG.debug('Init databases success, try call pre.sql')
+        os.remove(logfile)
         self._predo(root, database)
 
 
@@ -284,9 +287,9 @@ class InserDb(Task):
         self.entity = entity
         super(InserDb, self).__init__(name='insert-%d' % entity)
 
-    def execute(self, root, database):
+    def execute(self, timeline, root, database, timeout):
         _file = os.path.join(root, sqlfile(self.entity))
-        logfile = os.path.join(root, 'error.%d.log')
+        logfile = os.path.join(root, 'insert-%d.err.%d.log' % (self.entity, timeline))
         LOG.debug('Insert database of entity %d, sql file %s' % (self.entity, _file))
         mysqlload(_file,
                   database.get('host'), database.get('port'),
@@ -294,7 +297,8 @@ class InserDb(Task):
                   database.get('schema'),
                   character_set=None, extargs=None,
                   logfile=logfile, callable=safe_fork,
-                  timeout=30)
+                  timeout=timeout)
+        LOG.debug('Insert database of entity %d success' % self.entity)
         os.remove(logfile)
 
     def revert(self, result, database, **kwargs):
@@ -414,9 +418,10 @@ def merge_entitys(appendpoint, uuid, entity, databases):
         raise exceptions.MergeException('Init database file not exist')
     LOG.info('Prepare merge success, try merge database')
 
-    name = 'merge-at-%d' % int(time.time())
+    now = int(time.time())
+    name = 'merge-at-%d' % now
     book = LogBook(name=name)
-    store = dict(timeout=5, root=mergeroot, database=datadb)
+    store = dict(timeout=300, root=mergeroot, database=datadb, timeline=now)
     taskflow_session = build_session('sqlite:///%s' % os.path.join(mergeroot, '%s.db' % name))
     connection = Connection(taskflow_session)
 
