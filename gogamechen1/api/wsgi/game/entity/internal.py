@@ -315,9 +315,9 @@ class AppEntityInternalReuest(AppEntityReuestBase):
                            msg={'method': 'continue_merge',
                                 'args': dict(entity=etask.entity, uuid=uuid, databases=databases)})
         if not rpc_ret:
-            raise RpcResultError('swallowed entity result is None')
+            raise RpcResultError('continue entity result is None')
         if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
-            raise RpcResultError('swallowed entity fail %s' % rpc_ret.get('result'))
+            raise RpcResultError('continue entity fail %s' % rpc_ret.get('result'))
         return resultutils.results(result='continue merge task command has been send',
                                    data=[dict(uuid=etask.uuid, entity=etask.entity)])
 
