@@ -336,6 +336,7 @@ class PostDo(Task):
             self._postdo(root, database)
         except Exception:
             LOG.exception('Post databse execute fail')
+            raise
 
 
 def create_merge(appendpoint, uuid, entitys, middleware, opentime, chiefs):
@@ -372,7 +373,14 @@ def merge_entitys(appendpoint, uuid, entity, databases):
     prepares = []
     for _entity, step in six.iteritems(steps):
         if step == FINISHED:
-            raise exceptions.MergeException('Steps is finish?')
+            for _step in six.itervalues(steps):
+                if _step != FINISHED:
+                    raise exceptions.MergeException('Steps is finish?')
+            appendpoint.client.finish_merge(uuid)
+            appendpoint.flush_config(entity, databases,
+                                     opentime=data['opentime'],
+                                     chiefs=data['chiefs'])
+            return
         if step != INSERT:
             prepares.append(_entity)
     if prepares:
