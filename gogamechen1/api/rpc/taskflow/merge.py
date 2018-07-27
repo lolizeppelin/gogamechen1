@@ -285,8 +285,8 @@ class InserDb(Task):
         super(InserDb, self).__init__(name='insert-%d' % entity)
 
     def execute(self, root, database):
-        LOG.debug('Insert database of entity %d' % self.entity)
         _file = os.path.join(root, sqlfile(self.entity))
+        LOG.debug('Insert database of entity %d, sql file %s' % (self.entity, _file))
         mysqlload(_file,
                   database.get('host'), database.get('port'),
                   database.get('user'), database.get('passwd'),
@@ -302,6 +302,7 @@ class InserDb(Task):
             cleandb(host=database.get('host'), port=database.get('port'),
                     user=database.get('user'), passwd=database.get('passwd'),
                     schema=database.get('schema'))
+            LOG.info('Clean database of %s succes' % database.get('schema'))
 
 
 class PostDo(Task):
