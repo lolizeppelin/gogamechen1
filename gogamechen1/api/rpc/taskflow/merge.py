@@ -109,6 +109,7 @@ class Swallow(Task):
 
 
 class DumpData(Task):
+
     NODUMPTABLES = [
         'player_mining',
         'pvp_arena_rank',
@@ -126,8 +127,11 @@ class DumpData(Task):
                                        rebind=['mergeroot', 'dtimeout', 'db_%d' % entity])
 
     @staticmethod
-    def _ext_args():
-        pass
+    def _ext_args(schema):
+        extargs = ['-t']
+        for table in DumpData.NODUMPTABLES:
+            extargs.append('--ignore-table=%s.%s' % (schema, table))
+        return extargs
 
     @staticmethod
     def _prepare_database(databases):
@@ -149,7 +153,8 @@ class DumpData(Task):
                           database.get('host'), database.get('port'),
                           database.get('user'), database.get('passwd'),
                           database.get('schema'),
-                          character_set=None, extargs=['-t'],
+                          character_set=None,
+                          extargs=self._ext_args(database.get('schema')),
                           logfile=None, callable=safe_fork,
                           timeout=timeout)
             except (ExitBySIG, UnExceptExit):
