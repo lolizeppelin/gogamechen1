@@ -271,6 +271,7 @@ class InitDb(Task):
                   character_set=None, extargs=None,
                   logfile=None, callable=safe_fork,
                   timeout=15)
+        LOG.info('Init databases success, try call pre.sql')
         self._predo(root, database)
 
 
@@ -405,7 +406,7 @@ def merge_entitys(appendpoint, uuid, entity, databases):
     if not os.path.exists(initfile):
         LOG.error('Init database file not exist')
         raise exceptions.MergeException('Init database file not exist')
-    LOG.info('Prepare merge success, try insert datadatabase')
+    LOG.info('Prepare merge success, try merge database')
 
     name = 'merge-at-%d' % int(time.time())
     book = LogBook(name=name)
@@ -437,9 +438,9 @@ def merge_entitys(appendpoint, uuid, entity, databases):
         with open(stepsfile, 'wb') as f:
             cPickle.dump(data, f)
         appendpoint.client.finish_merge(uuid)
-    finally:
-        connection.session = None
-        taskflow_session.close()
         appendpoint.flush_config(entity, databases,
                                  opentime=data['opentime'],
                                  chiefs=data['chiefs'])
+    finally:
+        connection.session = None
+        taskflow_session.close()
