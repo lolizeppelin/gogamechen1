@@ -302,7 +302,7 @@ class InserDb(Task):
             cleandb(host=database.get('host'), port=database.get('port'),
                     user=database.get('user'), passwd=database.get('passwd'),
                     schema=database.get('schema'))
-            LOG.info('Clean database of %s succes' % database.get('schema'))
+            LOG.info('Clean database of %s sucess, revert success' % database.get('schema'))
 
 
 class PostDo(Task):
