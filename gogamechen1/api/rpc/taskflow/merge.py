@@ -74,10 +74,10 @@ def cleandb(host, port, user, passwd, schema):
                    schema=schema) as conn:
         cursor = conn.cursor()
         cursor.execute('show tables')
-        talbes = cursor.fetchall()
-        for table in talbes:
+        tables = cursor.fetchall()
+        for table in tables:
             cursor.execute('drop table %s' % table[0])
-            cursor.fetchall()
+            # cursor.fetchall()
         cursor.close()
 
 
