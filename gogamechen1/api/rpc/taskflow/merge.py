@@ -409,7 +409,7 @@ def merge_entitys(appendpoint, uuid, entity, databases):
 
     name = 'merge-at-%d' % int(time.time())
     book = LogBook(name=name)
-    store = dict(timeout=5, mergeroot=mergeroot, database=datadb)
+    store = dict(timeout=5, root=mergeroot, database=datadb)
     taskflow_session = build_session('sqlite:///%s' % os.path.join(mergeroot, '%s.db' % name))
     connection = Connection(taskflow_session)
 
