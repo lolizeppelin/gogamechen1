@@ -336,9 +336,6 @@ class PostDo(Task):
             self._postdo(root, database)
         except Exception:
             LOG.exception('Post databse execute fail')
-        else:
-            # 通知合服完毕
-            self.endpoint.client.swallowe_finish(self.uuid)
 
 
 def create_merge(appendpoint, uuid, entitys, middleware, opentime, chiefs):
