@@ -24,7 +24,7 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
 
     merge_path = '/gogamechen1/merge'
     continue_merge_path = '/gogamechen1/merge/%s'
-    finsh_merge_path = '/gogamechen1/finsh/%s'
+    finsh_merge_path = '/gogamechen1/finish/%s'
     mergeing_path = '/gogamechen1/mergeing/%s/%s'
 
     appentitys_path = '/gogamechen1/group/%s/%s/entitys'
