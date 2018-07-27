@@ -281,6 +281,7 @@ class InserDb(Task):
     """插入各个实体的数据库"""
 
     def __init__(self, entity):
+        self.entity = entity
         super(InserDb, self).__init__(name='insert-%d' % entity)
 
     def execute(self, root, database):
