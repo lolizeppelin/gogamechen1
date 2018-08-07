@@ -53,6 +53,7 @@ from .entity.curd import AppEntityCURDRequest
 from .entity.async import AppEntityAsyncReuest
 from .entity.sync import AppEntitySyncReuest
 from .entity.internal import AppEntityInternalReuest
+from .entity.merge import AppEntityMergeReuest
 
 
 LOG = logging.getLogger(__name__)
@@ -365,9 +366,11 @@ class GroupReuest(BaseContorller):
         return resultutils.results(result='list group areas success',
                                    data=[dict(chiefs=chiefs, areas=areas)])
 
+
 @singleton.singleton
 class AppEntityReuest(AppEntityCURDRequest,
                       AppEntityAsyncReuest,
                       AppEntitySyncReuest,
-                      AppEntityInternalReuest):
+                      AppEntityInternalReuest,
+                      AppEntityMergeReuest):
     """Appentity request class"""

@@ -114,3 +114,15 @@ class AppEntityReuestBase(BaseContorller):
                                      )
                         )
             session.flush()
+
+    @staticmethod
+    def _database_to_dict(appentity):
+        return dict(zip([database['subtype'] for database in appentity.databases],
+                        [dict(database_id=database['database_id'],
+                              schema='%s_%s_%s_%d' % (common.NAME, common.GAMESERVER, common.DATADB, appentity.entity),
+                              host=database['host'],
+                              port=database['port'],
+                              user=database['user'],
+                              passwd=database['passwd'],
+                              character_set=database['character_set'])
+                         for database in appentity.databases]))
