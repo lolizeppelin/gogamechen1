@@ -88,7 +88,7 @@ def AsyncActionResult(action, stores):
         if not entity.get('areas'):
             areas = 'N/A'
         else:
-            areas = ['%d:%s:%d' % (area.get('show_id'), area.get('areaname'), area.get('area_id'))
+            areas = ['%d:%s' % (area.get('show_id'), area.get('areaname'))
                      for area in entity.get('areas')]
             areas = ','.join(areas)
         if not entity.get('pid'):
