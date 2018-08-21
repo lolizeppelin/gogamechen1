@@ -66,12 +66,15 @@ ANY = 'any'
 ANDROID = 'android'
 IOS = 'ios'
 
+android = 1
+iso = 2
+
 PlatformTypeMap = {
-    ANDROID: 1,
-    IOS: 2,
+    ANDROID: android,
+    IOS: ios,
 }
 
-InvertPlatformTypeMap = dict([(v, k) for k, v in PlatformTypeMap.iteritems()])
+#InvertPlatformTypeMap = dict([(v, k) for k, v in PlatformTypeMap.iteritems()])
 
 SMALL_PACKAGE = 'small'
 UPDATE_PACKAGE = 'update'

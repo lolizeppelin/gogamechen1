@@ -192,7 +192,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         packages = list(set(body.pop('packages', [])))
         session = endpoint_session()
         if objtype == common.GAMESERVER:
-            platform = common.PlatformTypeMap.get(platform)
+            platform = common.PlatformTypeMap.get(platform, common.android | common.ios)
             if not areaname or not opentime or not platform or not show_id:
                 raise InvalidArgument('%s need opentime and areaname and platform and show_id' % objtype)
         # 安装文件信息
@@ -213,7 +213,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         _group = query.one()
         glock = get_gamelock()
         with glock.grouplock(group_id):
-            if packages:
+            if objtype == common.GAMESERVER and packages:
                 _packages = model_query(session, Package, filter=Package.package_id.in_(packages)).all()
                 if len(_packages) != len(packages):
                     raise InvalidArgument('Package can not be found when create entity')
