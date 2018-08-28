@@ -70,7 +70,8 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                                         'description': '跨服程序的实体id,gameserver专用参数'},
                            'show_id': {'type': 'integer', 'minimum': 1, 'description': '区服area显示id'},
                            'areaname': {'type': 'string', 'description': '区服名称, gameserver专用参数'},
-                           'platform': {'type': 'string', 'description': '平台类型, gameserver专用参数'},
+                           'platform': {'type': 'string', 'enum': [common.ANDROID, common.IOS, common.ANY],
+                                        'description': '平台类型, gameserver专用参数'},
                            'packages': {'type': 'array', 'items': {'type': 'integer', 'minimum': 1},
                                         'description': '新建实体对指定包可见'},
                            'databases': {'type': 'object', 'description': '程序使用的数据库,不填自动分配'}}
@@ -188,11 +189,11 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         # 区服显示民称, gameserver专用
         areaname = body.pop('areaname', None)
         # 平台类型
-        platform = body.pop('platform', None)
+        platform = body.get('platform')
         packages = list(set(body.pop('packages', [])))
         session = endpoint_session()
         if objtype == common.GAMESERVER:
-            platform = common.PlatformTypeMap.get(platform, common.android | common.ios)
+            platform = common.PlatformTypeMap.get(platform)
             if not areaname or not opentime or not platform or not show_id:
                 raise InvalidArgument('%s need opentime and areaname and platform and show_id' % objtype)
         # 安装文件信息

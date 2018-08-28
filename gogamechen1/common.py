@@ -67,11 +67,12 @@ ANDROID = 'android'
 IOS = 'ios'
 
 android = 1
-iso = 2
+ios = 2
 
 PlatformTypeMap = {
     ANDROID: android,
     IOS: ios,
+    ANY: ios | android,
 }
 
 #InvertPlatformTypeMap = dict([(v, k) for k, v in PlatformTypeMap.iteritems()])

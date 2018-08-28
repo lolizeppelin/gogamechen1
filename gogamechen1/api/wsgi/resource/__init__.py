@@ -330,7 +330,8 @@ class PackageReuest(BaseContorller):
                                 'description': '安装包关联的游戏cdn资源'},
                 'package_name': {'type': 'string'},
                 'mark': {'type': 'string', 'description': '渠道标记名'},
-                'platform': {'type': 'string', 'description': '平台类型'},
+                'platform': {'type': 'string', 'enum': [common.ANDROID, common.IOS],
+                             'description': '平台类型'},
                 'clone': {'type': 'integer', 'minimum': 1,
                           'description': '克隆包id,用于复制包可显示区服列表'},
                 'magic': {'oneOf': [{'type': 'object'},
@@ -576,7 +577,7 @@ class PackageReuest(BaseContorller):
         jsonutils.schema_validate(body, self.CREATESCHEMA)
         resource_id = int(body.pop('resource_id'))
         package_name = body.pop('package_name')
-        platform = common.PlatformTypeMap.get(body.pop('platform'))
+        platform = common.PlatformTypeMap.get(body.get('platform'))
         if not platform:
             raise InvalidArgument('platform value error')
         group_id = int(group_id)
