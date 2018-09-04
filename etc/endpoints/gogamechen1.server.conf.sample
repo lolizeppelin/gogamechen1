@@ -10,8 +10,8 @@
 # Extend route module string (multi import string)
 #routes = gogamechen1.api.wsgi.routers
 
-# Authentication route module string (multi import string)
-#auths =
+# Public open route module string (multi import string)
+#publics =
 
 # Gopcdn resource for objfile (integer value)
 #objfile_resource = 0

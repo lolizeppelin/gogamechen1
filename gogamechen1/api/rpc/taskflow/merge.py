@@ -11,8 +11,6 @@ import mysql.connector
 
 from simpleutil.config import cfg
 from simpleutil.log import log as logging
-from simpleutil.utils import systemutils
-from simpleutil.utils.systemutils import posix
 from simpleutil.utils.systemutils import ExitBySIG
 from simpleutil.utils.systemutils import UnExceptExit
 
