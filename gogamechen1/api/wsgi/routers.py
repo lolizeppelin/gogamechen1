@@ -12,6 +12,8 @@ MEMBER_ACTIONS = ['show', 'update', 'delete']
 
 class Routers(router.RoutersBase):
 
+    resource_name = 'gogamechen1'
+
     def append_routers(self, mapper, routers=None):
 
         resource_name = 'objfile'

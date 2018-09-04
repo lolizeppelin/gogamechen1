@@ -525,7 +525,7 @@ class Application(AppEndpointBase):
         if not os.path.exists(EXEC):
             raise ValueError('Execute targe %s not exist' % EXEC)
         if not os.access(EXEC, os.X_OK):
-            os.chmod(EXEC, 0744)
+            os.chmod(EXEC, 0o744)
         args = [EXEC, ]
         with self.lock(entity):
             if self._entity_process(entity, pids=pids):
