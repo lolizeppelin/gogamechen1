@@ -265,7 +265,7 @@ class Application(AppEndpointBase):
             bakpath = self.bakpath(entity)
             if not os.path.exists(bakpath):
                 try:
-                    os.makedirs(bakpath, mode=0755)
+                    os.makedirs(bakpath, mode=0o755)
                 except (OSError, IOError):
                     LOG.error('Make path for backup entity log fail')
                 finally:
@@ -438,7 +438,7 @@ class Application(AppEndpointBase):
                 raise RpcEntityError(endpoint=common.NAME, entity=entity, reason='Entity duplicate')
             with self._prepare_entity_path(entity):
                 confdir = os.path.split(self._objconf(entity, objtype))[0]
-                os.makedirs(confdir, mode=0755)
+                os.makedirs(confdir, mode=0o755)
                 systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
                 with self._allocate_port(entity, objtype, ports):
                     try:
@@ -535,7 +535,7 @@ class Application(AppEndpointBase):
             logpath = self.logpath(entity)
             if not os.path.exists(logbakup):
                 try:
-                    os.makedirs(logbakup, mode=0755)
+                    os.makedirs(logbakup, mode=0o755)
                 except (OSError, IOError):
                     LOG.error('Make path for backup entity log fail')
                 finally:
@@ -713,11 +713,11 @@ class Application(AppEndpointBase):
                         oldcf = json.load(f)
                 LOG.info('Remove path %s' % apppath)
                 shutil.rmtree(apppath)
-                os.makedirs(apppath, 0755)
+                os.makedirs(apppath, 0o755)
                 systemutils.chown(apppath, self.entity_user(entity), self.entity_group(entity))
                 if oldcf:
                     LOG.debug('Write back old config from %s' % cfile)
-                    os.makedirs(confdir, 0755)
+                    os.makedirs(confdir, 0o755)
                     systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
                     with open(cfile, 'wb') as f:
                         json.dump(oldcf, f, indent=4, ensure_ascii=False)
