@@ -113,7 +113,10 @@ class DumpData(Task):
         'timer_boss',
         'pvp_arena_rank',
         'pvp_arena_pet_rank',
-        'var_world'
+        'var_world',
+        'oper_record_plot',
+        'pve_campaign_log',
+        'pvp_cupmatch_fight_log',
     ]
 
     def __init__(self, uuid, steps, entity,
