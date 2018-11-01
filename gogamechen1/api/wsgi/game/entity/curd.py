@@ -61,8 +61,8 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                        'properties': {
                            common.APPFILE: {'type': 'string', 'format': 'md5',
                                             'description': '程序文件md5'},
-                           'agent_id': {'type': 'integer', 'minimum': 1,
-                                        'description': '程序安装的目标机器,不填自动分配'},
+                           'agent_id': {'type': 'integer', 'minimum': 0,
+                                        'description': '程序安装的目标机器,不填或0自动分配'},
                            'zone': {'type': 'string', 'description': '自动分配的安装区域,默认zone为all'},
                            'opentime': {'type': 'integer', 'minimum': 1514736000,
                                         'description': '开服时间, gameserver专用参数'},
@@ -200,7 +200,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         appfile = body.pop(common.APPFILE)
         LOG.debug('Try find agent and database for entity')
         # 选择实例运行服务器
-        agent_id = self._agentselect(req, objtype, **body)
+        agent_id = body.get('agent_id') or self._agentselect(req, objtype, **body)
         # 选择实例运行数据库
         databases = self._dbselect(req, objtype, **body)
         # 校验数据库信息

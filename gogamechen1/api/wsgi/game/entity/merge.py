@@ -64,7 +64,7 @@ class AppEntityMergeReuest(AppEntityReuestBase):
                                        'description': '需要合并的实体列表'},
                            common.APPFILE: {'type': 'string', 'format': 'md5',
                                             'description': '程序文件md5'},
-                           'agent_id': {'type': 'integer', 'minimum': 1,
+                           'agent_id': {'type': 'integer', 'minimum': 0,
                                         'description': '合并后程序运行服务器,不填自动分配'},
                            'zone': {'type': 'string', 'description': '自动分配的安装区域,默认zone为all'},
                            'opentime': {'type': 'integer', 'minimum': 1514736000,
@@ -91,7 +91,7 @@ class AppEntityMergeReuest(AppEntityReuestBase):
         # 安装文件信息
         appfile = body.pop(common.APPFILE)
         # 选择合并后实例运行服务器
-        agent_id = self._agentselect(req, common.GAMESERVER, **body)
+        agent_id = body.get('agent_id') or self._agentselect(req, common.GAMESERVER, **body)
         # 选择合并后实体数据库
         databases = self._dbselect(req, common.GAMESERVER, **body)
         opentime = body.get('opentime')
