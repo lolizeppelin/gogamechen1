@@ -441,11 +441,11 @@ def merge_entitys(appendpoint, uuid, entity, databases):
     merge_flow = lf.Flow('merge-to')
     merge_flow.add(SafeCleanDb())
     merge_flow.add(InitDb())
-    insert_uflow = uf.Flow('insert-db')
+    insert_lflow = lf.Flow('insert-db')
     stoper = [0]
     for _entity in steps:
-        insert_uflow.add(InserDb(_entity, stoper))
-    merge_flow.add(insert_uflow)
+        insert_lflow.add(InserDb(_entity, stoper))
+    merge_flow.add(insert_lflow)
     merge_flow.add(PostDo(uuid, appendpoint))
 
     engine = load(connection, merge_flow, store=store,
