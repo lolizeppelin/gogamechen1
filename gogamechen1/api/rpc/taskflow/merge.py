@@ -466,6 +466,7 @@ def merge_entitys(appendpoint, uuid, entity, databases):
         appendpoint.flush_config(entity, databases,
                                  opentime=data['opentime'],
                                  chiefs=data['chiefs'])
+        LOG.info('Merge task %s all finish' % uuid)
     finally:
         connection.session = None
         taskflow_session.close()
