@@ -329,6 +329,11 @@ class PostDo(Task):
     def _postdo(root, database):
         """合并完成后特殊处理"""
         postfile = os.path.join(root, 'post.sql')
+        if not os.path.exists(postfile):
+            with open(postfile, 'w') as f:
+                f.wirte('delete from var_player where `key` = 100;\n')
+                f.wirte('update guilds set is_change_name = 0;\n')
+
         if os.path.exists(postfile):
             mysqlload(postfile,
                       database.get('host'), database.get('port'),
