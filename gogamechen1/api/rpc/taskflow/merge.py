@@ -298,7 +298,7 @@ class InserDb(Task):
             raise exceptions.MergeException('Stop mark is true')
         _file = os.path.join(root, sqlfile(self.entity))
         logfile = os.path.join(root, 'insert-%d.err.%d.log' % (self.entity, timeline))
-        LOG.debug('Insert database of entity %d, sql file %s' % (self.entity, _file))
+        LOG.info('Insert database of entity %d, sql file %s' % (self.entity, _file))
         mysqlload(_file,
                   database.get('host'), database.get('port'),
                   database.get('user'), database.get('passwd'),
@@ -306,7 +306,7 @@ class InserDb(Task):
                   character_set=None, extargs=None,
                   logfile=logfile, callable=safe_fork,
                   timeout=timeout)
-        LOG.debug('Insert database of entity %d success' % self.entity)
+        LOG.info('Insert database of entity %d success' % self.entity)
         os.remove(logfile)
 
     def revert(self, result, database, **kwargs):
