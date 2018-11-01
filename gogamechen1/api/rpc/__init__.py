@@ -669,7 +669,7 @@ class Application(AppEndpointBase):
                             databases=middleware.databases)
 
     def rpc_post_create_entity(self, ctxt, entity, **kwargs):
-        LOG.info('Get post create command with %s' % str(kwargs))
+        LOG.info('Get post create %d command with %s' % (entity, str(kwargs)))
         try:
             self.konwn_appentitys.setdefault(entity, dict(objtype=kwargs.pop('objtype'),
                                                           # group_id=kwargs.pop('group_id'),

@@ -226,7 +226,7 @@ class AppEntityMergeReuest(AppEntityReuestBase):
                                           mergetd_entity, rpc_result.get('ports'))
             # agent 后续通知
             threadpool.add_thread(entity_controller.post_create_entity,
-                                  _appentity.entity, common.NAME, objtype=common.GAMESERVER,
+                                  appentity.entity, common.NAME, objtype=common.GAMESERVER,
                                   status=common.UNACTIVE,
                                   opentime=opentime,
                                   group_id=group_id, areas=[])
