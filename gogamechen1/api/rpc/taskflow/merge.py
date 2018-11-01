@@ -313,10 +313,10 @@ class InserDb(Task):
         """插入失败清空数据库"""
         if isinstance(result, failure.Failure):
             if not self.stoper[0]:
-                LOG.warning('Insert database of entity %d get stop mark' % self.entity)
+                LOG.warning('Insert database of entity %d fail' % self.entity)
                 self.stoper[0] = 1
             else:
-                LOG.warning('Insert database of entity %d fail' % self.entity)
+                LOG.warning('Insert database of entity %d get stop mark' % self.entity)
 
 
 class PostDo(Task):
