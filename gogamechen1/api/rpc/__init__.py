@@ -1293,6 +1293,7 @@ class Application(AppEndpointBase):
 
         def wapper():
             with self.lock(entity):
+                LOG.info('Get lock success, Try call taskmerge merge_entitys!')
                 try:
                     taskmerge.merge_entitys(self, uuid, entity, databases)
                 except MergeException as e:
