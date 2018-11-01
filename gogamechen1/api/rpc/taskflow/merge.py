@@ -217,9 +217,13 @@ class Swallowed(Task):
                 LOG.error('Get areas fail %s' % e.message)
             else:
                 self.stpes[self.entity] = INSERT
-                if entity not in self.endpoint.konwn_appentitys:
-                    eventlet.sleep(3)
-                self.endpoint.konwn_appentitys[entity]['areas'].extend(areas)
+                for i in range(5):
+                    if entity not in self.endpoint.konwn_appentitys:
+                        eventlet.sleep(3)
+                try:
+                    self.endpoint.konwn_appentitys[entity]['areas'].extend(areas)
+                except KeyError:
+                    raise exceptions.MergeException('Target entity %d not in konwn appentitys' % entity)
                 LOG.debug('Extend new areas of konwn appentitys success')
 
 
@@ -284,11 +288,14 @@ class InitDb(Task):
 class InserDb(Task):
     """插入各个实体的数据库"""
 
-    def __init__(self, entity):
+    def __init__(self, entity, stoper):
         self.entity = entity
+        self.stoper = stoper
         super(InserDb, self).__init__(name='insert-%d' % entity)
 
     def execute(self, timeline, root, database, timeout):
+        if self.stoper[0]:
+            raise exceptions.MergeException('Stop mark is true')
         _file = os.path.join(root, sqlfile(self.entity))
         logfile = os.path.join(root, 'insert-%d.err.%d.log' % (self.entity, timeline))
         LOG.debug('Insert database of entity %d, sql file %s' % (self.entity, _file))
@@ -305,11 +312,11 @@ class InserDb(Task):
     def revert(self, result, database, **kwargs):
         """插入失败清空数据库"""
         if isinstance(result, failure.Failure):
-            LOG.warning('Insert database of entity %d fail, try clean database' % self.entity)
-            cleandb(host=database.get('host'), port=database.get('port'),
-                    user=database.get('user'), passwd=database.get('passwd'),
-                    schema=database.get('schema'))
-            LOG.info('Clean database of %s sucess, revert success' % database.get('schema'))
+            if not self.stoper[0]:
+                LOG.warning('Insert database of entity %d get stop mark' % self.entity)
+                self.stoper[0] = 1
+            else:
+                LOG.warning('Insert database of entity %d fail' % self.entity)
 
 
 class PostDo(Task):
@@ -435,8 +442,9 @@ def merge_entitys(appendpoint, uuid, entity, databases):
     merge_flow.add(SafeCleanDb())
     merge_flow.add(InitDb())
     insert_uflow = uf.Flow('insert-db')
+    stoper = [0]
     for _entity in steps:
-        insert_uflow.add(InserDb(_entity))
+        insert_uflow.add(InserDb(_entity, stoper))
     merge_flow.add(insert_uflow)
     merge_flow.add(PostDo(uuid, appendpoint))
 
