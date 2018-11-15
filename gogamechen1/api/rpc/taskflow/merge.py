@@ -331,8 +331,8 @@ class PostDo(Task):
         postfile = os.path.join(root, 'post.sql')
         if not os.path.exists(postfile):
             with open(postfile, 'w') as f:
-                f.wirte('delete from var_player where `key` = 100;\n')
-                f.wirte('update guilds set is_change_name = 0;\n')
+                f.write('delete from var_player where `key` = 100;\n')
+                f.write('update guilds set is_change_name = 0;\n')
 
         if os.path.exists(postfile):
             mysqlload(postfile,
@@ -385,6 +385,8 @@ def merge_entitys(appendpoint, uuid, entity, databases):
         steps = data['steps']
     prepares = []
     for _entity, step in six.iteritems(steps):
+        # 一些post sql执行错误对整体无影响情况下
+        # 可以直接讲step改为FINISHED避免重复合服步骤
         if step == FINISHED:
             for _step in six.itervalues(steps):
                 if _step != FINISHED:
