@@ -130,7 +130,7 @@ class DumpData(Task):
 
     @staticmethod
     def _ext_args(schema):
-        extargs = ['-t']
+        extargs = ['-t', '-c']
         for table in DumpData.NODUMPTABLES:
             extargs.append('--ignore-table=%s.%s' % (schema, table))
         return extargs
