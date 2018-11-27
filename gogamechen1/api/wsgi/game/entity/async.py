@@ -247,6 +247,7 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
 
     def flushconfig(self, req, group_id, objtype, entity, body=None):
         body = body or {}
+        group_id = int(group_id)
         jsonutils.schema_validate(body, self.FLUSH)
         if objtype == common.GAMESERVER:
             gm = body.pop(common.GMSERVER, 0)
@@ -297,6 +298,7 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
         return self._async_bluck_rpc('flushconfig', group_id, objtype, entity, body)
 
     def hotfix(self, req, group_id, objtype, entity, body=None):
+        group_id = int(group_id)
         body = body or {}
         if objtype != common.GAMESERVER:
             raise InvalidArgument('Hotfix just for %s' % common.GAMESERVER)
