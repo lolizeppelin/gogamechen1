@@ -411,7 +411,7 @@ class AppEntitySyncReuest(AppEntityReuestBase):
                     if chief.objtype == _objtype:
                         chiefs[_objtype] = dict(entity=chief.entity,
                                                 ports=ports,
-                                                local_ip=metadata.get('local_ip'))
+                                                local_ip=_metadata.get('local_ip'))
             if len(chiefs) != 2:
                 raise ValueError('%s.%d chiefs error' % (objtype, entity))
 
