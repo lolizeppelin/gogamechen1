@@ -262,14 +262,15 @@ class Application(AppEndpointBase):
                                                                pid=None))
         for entity in self.entitys:
             # INIT backup path
-            bakpath = self.bakpath(entity)
-            if not os.path.exists(bakpath):
-                try:
-                    os.makedirs(bakpath, mode=0o755)
-                except (OSError, IOError):
-                    LOG.error('Make path for backup entity log fail')
-                finally:
-                    systemutils.chown(bakpath, self.entity_user(entity), self.entity_group(entity))
+            if os.path.exists(self.apppath(entity)):
+                bakpath = self.bakpath(entity)
+                if not os.path.exists(bakpath):
+                    try:
+                        os.makedirs(bakpath, mode=0o755)
+                    except (OSError, IOError):
+                        LOG.error('Make path for backup entity log fail')
+                    finally:
+                        systemutils.chown(bakpath, self.entity_user(entity), self.entity_group(entity))
             _pid = self._find_from_pids(entity, self.konwn_appentitys[entity].get('objtype'), pids)
             # find entity pid
             if _pid:
@@ -437,6 +438,9 @@ class Application(AppEndpointBase):
             if entity in self.entitys:
                 raise RpcEntityError(endpoint=common.NAME, entity=entity, reason='Entity duplicate')
             with self._prepare_entity_path(entity):
+                bakpath = self.bakpath(entity)
+                os.makedirs(bakpath, mode=0o755)
+                systemutils.chown(bakpath, self.entity_user(entity), self.entity_group(entity))
                 confdir = os.path.split(self._objconf(entity, objtype))[0]
                 os.makedirs(confdir, mode=0o755)
                 systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
@@ -694,6 +698,15 @@ class Application(AppEndpointBase):
                                                   result='entity is running, can not reset')
             objtype = self.konwn_appentitys[entity].get('objtype')
             if appfile:
+                if not os.path.exists(self.entity_home(entity)):
+                    LOG.warning('Entity is full reset!')
+                    with self._prepare_entity_path(entity):
+                        bakpath = self.bakpath(entity)
+                        os.makedirs(bakpath, mode=0o755)
+                        systemutils.chown(bakpath, self.entity_user(entity), self.entity_group(entity))
+                        confdir = os.path.split(self._objconf(entity, objtype))[0]
+                        os.makedirs(confdir, mode=0o755)
+                        systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
                 try:
                     localfile = self.filemanager.find(appfile)
                 except NoFileFound:

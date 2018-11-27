@@ -7,10 +7,10 @@
 # From gogamechen1
 #
 
-# Extend route module string (multi import string)
+# Private route module string (multi import string)
 #routes = gogamechen1.api.wsgi.routers
 
-# Public open route module string (multi import string)
+# Public route module string (multi import string)
 #publics =
 
 # Gopcdn resource for objfile (integer value)
