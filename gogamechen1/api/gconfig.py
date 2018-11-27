@@ -54,6 +54,23 @@ def deacidizing(cfile, subtype):
     return info
 
 
+def format_databases(objtype, cfile, databases):
+    if not cfile and not databases:
+        raise ValueError('No databases found')
+    subtypes = common.DBAFFINITYS[objtype].keys()
+    _databases = dict()
+    if databases:
+        for subtype in subtypes:
+            database = databases[subtype]
+            _databases.setdefault(subtype, _format_database_url(database))
+    else:
+        conf = load(cfile)
+        for subtype in subtypes:
+            database = conf.pop(MAPS[subtype])
+            _databases.setdefault(subtype, database)
+    return _databases
+
+
 def _format_chiefs(cfile, chiefs):
     if os.path.exists(cfile):
         conf = load(cfile)
@@ -83,35 +100,12 @@ def _format_chiefs(cfile, chiefs):
     return _chiefs
 
 
-def format_databases(objtype, cfile, databases):
-    if not cfile and not databases:
-        raise ValueError('No databases found')
-    subtypes = common.DBAFFINITYS[objtype].keys()
-    _databases = dict()
-    if databases:
-        for subtype in subtypes:
-            database = databases[subtype]
-            _databases.setdefault(subtype, _format_database_url(database))
-    else:
-        conf = load(cfile)
-        for subtype in subtypes:
-            database = conf.pop(MAPS[subtype])
-            _databases.setdefault(subtype, database)
-    return _databases
-
-
 def format_chiefs(objtype, cfile, chiefs):
     if objtype != common.GAMESERVER:
         return None
-    if not cfile and not chiefs:
+    if not not os.path.exists(cfile) and not chiefs:
         raise ValueError('No chiefs found')
-    if chiefs:
-        return _format_chiefs(cfile, chiefs)
-    else:
-        if not os.path.exists(cfile):
-            raise ValueError('No config file found, need config of chiefs')
-        conf = load(cfile)
-        return conf.pop('ConnAddrs')
+    return _format_chiefs(cfile, chiefs)
 
 
 def server_flag(objtype, cfile, flag=None):
