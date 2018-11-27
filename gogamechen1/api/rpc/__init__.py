@@ -724,11 +724,11 @@ class Application(AppEndpointBase):
                 LOG.info('Remove path %s' % apppath)
                 if os.path.exists(apppath):
                     shutil.rmtree(apppath)
+                os.makedirs(apppath, 0o755)
+                systemutils.chown(apppath, self.entity_user(entity), self.entity_group(entity))
                 if not os.path.exists(confdir):
                     os.makedirs(confdir, mode=0o755)
                     systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
-                os.makedirs(apppath, 0o755)
-                systemutils.chown(apppath, self.entity_user(entity), self.entity_group(entity))
                 if oldcf:
                     LOG.debug('Write back old config from %s' % cfile)
                     os.makedirs(confdir, 0o755)
