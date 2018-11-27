@@ -704,9 +704,6 @@ class Application(AppEndpointBase):
                         bakpath = self.bakpath(entity)
                         os.makedirs(bakpath, mode=0o755)
                         systemutils.chown(bakpath, self.entity_user(entity), self.entity_group(entity))
-                        confdir = os.path.split(self._objconf(entity, objtype))[0]
-                        os.makedirs(confdir, mode=0o755)
-                        systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
                 try:
                     localfile = self.filemanager.find(appfile)
                 except NoFileFound:
@@ -719,13 +716,17 @@ class Application(AppEndpointBase):
                 apppath = self.apppath(entity)
                 cfile = self._objconf(entity, objtype)
                 confdir = os.path.split(cfile)[0]
+                if not os.path.exists(confdir):
+                    os.makedirs(confdir, mode=0o755)
+                    systemutils.chown(confdir, self.entity_user(entity), self.entity_group(entity))
                 oldcf = None
                 if os.path.exists(cfile):
                     LOG.debug('Read old config from %s' % cfile)
                     with open(cfile, 'rb') as f:
                         oldcf = json.load(f)
                 LOG.info('Remove path %s' % apppath)
-                shutil.rmtree(apppath)
+                if os.path.exists(apppath):
+                    shutil.rmtree(apppath)
                 os.makedirs(apppath, 0o755)
                 systemutils.chown(apppath, self.entity_user(entity), self.entity_group(entity))
                 if oldcf:
