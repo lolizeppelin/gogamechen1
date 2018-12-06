@@ -256,7 +256,7 @@ class GroupReuest(BaseContorller):
 
     @staticmethod
     def entitys(objtypes=None, group_ids=None, need_ok=False, packages=False):
-        filters = [AppEntity.objtype.in_(objtypes)]
+        filters = [AppEntity.objtype.in_(objtypes), AppEntity.status > common.DELETED]
         if group_ids:
             filters.append(AppEntity.group_id.in_(argutils.map_to_int(group_ids)))
         session = endpoint_session(readonly=True)

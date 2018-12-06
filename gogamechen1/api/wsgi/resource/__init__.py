@@ -693,7 +693,7 @@ class PackageReuest(BaseContorller):
         desc = body.get('desc')
         rversion = body.get('rversion', DEFAULTVALUE)
         gversion = body.get('gversion', DEFAULTVALUE)
-        magic = body.get('magic')
+        magic = body.get('magic', DEFAULTVALUE)
         extension = body.get('extension')
         session = endpoint_session()
         query = model_query(session, Package, filter=Package.package_id == package_id)
@@ -707,14 +707,14 @@ class PackageReuest(BaseContorller):
                 package.status = status
             if desc:
                 package.desc = desc
-            if magic is not None:
+            if magic is not DEFAULTVALUE:
                 if not magic:
                     package.magic = None
                 else:
                     default_magic = jsonutils.loads_as_bytes(package.magic) if package.magic else {}
                     default_magic.update(magic)
                     package.magic = jsonutils.dumps(default_magic)
-            if extension is not None:
+            if extension is not DEFAULTVALUE:
                 if not extension:
                     package.extension = None
                 else:
