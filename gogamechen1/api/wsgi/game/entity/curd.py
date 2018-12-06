@@ -128,7 +128,8 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                                            order=order, desc=desc,
                                            option=joins,
                                            filter=and_(AppEntity.group_id == group_id,
-                                                       AppEntity.objtype == objtype),
+                                                       AppEntity.objtype == objtype,
+                                                       AppEntity.status > common.DELETED),
                                            page_num=page_num)
         if detail:
             dbmaps = dth.wait()
