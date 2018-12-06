@@ -346,8 +346,8 @@ class PackageReuest(BaseContorller):
         'type': 'object',
         'properties':
             {
-                'magic': {'type': 'object'},
-                'extension': {'type': 'object'},
+                'magic': {'oneOf': [{'type': 'object'}, {'type': 'null'}]},
+                'extension': {'oneOf': [{'type': 'object'}, {'type': 'null'}]},
                 'desc': {'type': 'string'},
                 'gversion': {'oneOf': [{'type': 'integer'}, {'type': 'null'}]},
                 'rversion': {'oneOf': [{'type': 'string'}, {'type': 'null'}]},
