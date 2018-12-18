@@ -267,6 +267,9 @@ class GroupReuest(BaseContorller):
         for entity in appentitys:
             entitys.add(entity.entity)
 
+        if not entitys:
+            return [], []
+
         # 反查渠道
         if packages and common.GAMESERVER in objtypes:
             pmaps = {}
