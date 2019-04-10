@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 import time
+import eventlet
 
 from sqlalchemy.orm import joinedload
 from sqlalchemy.sql import and_
@@ -53,6 +54,13 @@ CONF = cfg.CONF
 
 class AppEntitySyncReuest(AppEntityReuestBase):
     """sync ext function"""
+
+    MIGRATE = {'type': 'object',
+               'required': [common.APPFILE, 'new'],
+               'properties': {
+                   common.APPFILE: {'type': 'string', 'format': 'md5', 'description': '程序文件md5'},
+                   'new': {'type': 'integer', 'minimum': 1,'description': '迁移的目标机器'}}
+               }
 
     def clean(self, req, group_id, objtype, entity, body=None):
         """彻底删除entity"""
@@ -433,3 +441,25 @@ class AppEntitySyncReuest(AppEntityReuestBase):
         if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
             raise RpcResultError('reset entity fail %s' % rpc_ret.get('result'))
         return resultutils.results(result='reset entity %d success' % entity)
+
+    def migrate(self, req, group_id, objtype, entity, body=None):
+        """Entity变更agent"""
+        body = body or {}
+        jsonutils.schema_validate(body, self.MIGRATE)
+        new = body.pop('new')
+        body.update({'databases': True, 'chiefs': True})
+        session = endpoint_session(readonly=True)
+        query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
+        query = query.options(joinedload(AppEntity.areas, innerjoin=False))
+        with entity_controller.migrate_with_out_data(common.NAME, entity, new,
+                                                     dict(token=uuidutils.generate_uuid()),
+                                                     drop_ports=True):
+            eventlet.sleep(0.001)   # 等待可能的主从同步延迟
+            _entity = query.one()
+            entity_controller.post_create_entity(
+                entity, common.NAME, objtype=objtype,
+                status=_entity.status, opentime=_entity.opentime, group_id=group_id,
+                areas=[dict(area_id=area.area_id, areaname=area.areaname, show_id=area.show_id)
+                       for area in _entity.areas])
+            LOG.info('Notify create entity in new agent success')
+            return self.reset(req, group_id, objtype, entity, body)

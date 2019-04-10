@@ -145,6 +145,7 @@ class Routers(router.RoutersBase):
         collection.member.link('quote', name='unquote_version', method='DELETE', action='unquote_version')
         collection.member.link('clean', method='DELETE')
         collection.member.link('reset', method='POST')
+        collection.member.link('migrate', method='POST')
         collection.member.link('start', method='POST')
         collection.member.link('stop', method='POST')
         collection.member.link('status', method='GET')

@@ -752,6 +752,10 @@ class Application(AppEndpointBase):
         entity = int(entity)
         token = kwargs.pop('token')
         timeout = count_timeout(ctxt, kwargs)
+        if entity not in set(self.entitys):
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt, result='delete fail, entity not exist')
         while self.frozen:
             if timeout < 1:
                 raise RpcTargetLockException(self.namespace, str(entity), 'endpoint locked')

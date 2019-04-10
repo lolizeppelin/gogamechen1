@@ -1,4 +1,6 @@
 import time
+import logging as defalut_logging
+from simpleutil.log import log as logging
 import simpleservice
 from websocket import create_connection
 
@@ -14,9 +16,34 @@ from simpleutil.utils import digestutils
 from goperation.manager import common as manager_common
 
 
-a = 'C:\\Users\\loliz_000\\Desktop\\etc\\goperation\\goperation.conf'
-b = 'C:\\Users\\loliz_000\\Desktop\\etc\\goperation\\gcenter.conf'
-config.configure('test', [a, b])
+
+CONF = cfg.CONF
+logging.register_options(CONF)
+logging.register_options(CONF)
+
+
+def configure(config_files):
+    group = cfg.OptGroup(name='test', title='group for test')
+    args = None
+    CONF(args=args,
+         project=group.name,
+         default_config_files=config_files)
+    CONF.register_group(group)
+    # set base confi
+    # reg base opts
+    # set log config
+    logging.setup(CONF, group.name)
+    defalut_logging.captureWarnings(True)
+
+
+basepath = 'C:\\Users\\loliz_000\\Desktop\\etc\\goperation'
+
+configs = [
+    os.path.join(basepath, 'goperation.conf'),
+    os.path.join(basepath, 'gcenter.conf')
+]
+
+configure(configs)
 
 # wsgi_url = '127.0.0.1'
 wsgi_url = '172.31.0.110'
