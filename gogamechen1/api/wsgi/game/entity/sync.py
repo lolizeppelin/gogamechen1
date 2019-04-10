@@ -450,6 +450,9 @@ class AppEntitySyncReuest(AppEntityReuestBase):
         body.update({'databases': True, 'chiefs': True})
         session = endpoint_session(readonly=True)
         query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
+        _entity = query.one()
+        if _entity.objtype != objtype:
+            raise InvalidArgument('Entity is not %s' % objtype)
         query = query.options(joinedload(AppEntity.areas, innerjoin=False))
         with entity_controller.migrate_with_out_data(common.NAME, entity, new,
                                                      dict(token=uuidutils.generate_uuid()),

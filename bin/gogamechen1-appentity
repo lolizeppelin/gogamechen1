@@ -117,6 +117,12 @@ reset_opts = [
                 help='Reset chiefs of entity, default not, only for %s' % common.GAMESERVER),
 ]
 
+migrate_opts = [
+    cfg.IntOpt('agent',
+               short='a', min=1,
+               help='Migrate dest agent')
+]
+
 gamesvr_create_ext_opt = [area_name_opt, logdb_opt, area_name_opt, opentime_opt, cross_opt]
 
 area_opt = cfg.IntOpt('area', help='Target area id')
@@ -448,6 +454,34 @@ def reset():
     print 'entity: %d' % CONF.entity
 
 
+def migrate():
+    appfile_opt.required = False
+    timeout_opt.default = 15
+    CONF.register_cli_opts(one_opts)
+    CONF.register_cli_opt(appfile_opt)
+    CONF.register_cli_opts(migrate_opts)
+    CONF.register_cli_opt(timeout_opt)
+    CONF(project='cmd')
+    body = dict(new=CONF.new, appfile=CONF.appfile)
+    timeout = CONF.timeout
+    if CONF.appfile:
+        timeout = max(CONF.timeout, 60)
+    _client = client(timeout=timeout)
+    code, result, data = prepare_results(_client.appentity_migrate, CONF.group_id, CONF.objtype, CONF.entity, body)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    print('\033[1;32;40m')
+    print 'Migrate entity success'
+    print('\033[0m')
+    print 'objtype: %s' % CONF.objtype
+    print 'entity: %d' % CONF.entity
+
+
 def vquote():
     CONF.register_cli_opts(one_opts)
     CONF.register_cli_opt(version_opts)
@@ -628,7 +662,7 @@ def opentime():
 def main():
     FUNCS = ['list', 'create', 'show', 'delete',
              'start', 'stop', 'status', 'flushconfig', 'upgrade',
-             'vquote', 'unvquote', 'clean', 'opentime', 'reset']
+             'vquote', 'unvquote', 'clean', 'opentime', 'reset', 'migrate']
     try:
         func = sys.argv.pop(1)
         if func not in FUNCS:
