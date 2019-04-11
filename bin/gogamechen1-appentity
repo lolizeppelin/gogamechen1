@@ -194,7 +194,7 @@ def _objtype():
 
 def client(session=None, timeout=None):
     return GogameChen1DBClient(httpclient=ManagerClient(url=CONF.gcenter, port=CONF.gcenter_port,
-                                                        retries=CONF.retries, timeout=CONF.apitimeout or timeout,
+                                                        retries=CONF.retries, timeout=timeout or CONF.apitimeout,
                                                         token=CONF.trusted, session=session))
 
 
@@ -456,7 +456,7 @@ def reset():
 
 def migrate():
     appfile_opt.required = False
-    timeout_opt.default = 15
+    timeout_opt.default = 45
     CONF.register_cli_opts(one_opts)
     CONF.register_cli_opt(appfile_opt)
     CONF.register_cli_opts(migrate_opts)
@@ -465,7 +465,8 @@ def migrate():
     body = dict(new=CONF.new, appfile=CONF.appfile)
     timeout = CONF.timeout
     if CONF.appfile:
-        timeout = max(CONF.timeout, 60)
+        timeout = min(CONF.timeout, 300)
+        timeout = max(timeout, 30)
     _client = client(timeout=timeout)
     code, result, data = prepare_results(_client.appentity_migrate, CONF.group_id, CONF.objtype, CONF.entity, body)
     if code:
