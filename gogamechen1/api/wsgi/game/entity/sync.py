@@ -451,21 +451,24 @@ class AppEntitySyncReuest(AppEntityReuestBase):
         new = body.pop('new')
         new = int(new)
         body.update({'databases': True, 'chiefs': True})
-        session = endpoint_session(readonly=True)
+        session = endpoint_session()
         query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
+        query = query.options(joinedload(AppEntity.areas, innerjoin=False))
         _entity = query.one()
         if _entity.objtype != objtype:
             raise InvalidArgument('Entity is not %s' % objtype)
-        query = query.options(joinedload(AppEntity.areas, innerjoin=False))
+        areas=[dict(area_id=area.area_id, areaname=area.areaname, show_id=area.show_id)
+               for area in _entity.areas]
         with entity_controller.migrate_with_out_data(common.NAME, entity, new,
                                                      dict(token=uuidutils.generate_uuid()),
                                                      drop_ports=True):
-            eventlet.sleep(0.001)   # 等待可能的主从同步延迟
-            _entity = query.one()
+
+            _entity.agent_id = new
+            session.commit()
+            LOG.info('Migrate finish, now call post create entity and reset entity on new agent')
             entity_controller.post_create_entity(
                 entity, common.NAME, objtype=objtype,
                 status=_entity.status, opentime=_entity.opentime, group_id=group_id,
-                areas=[dict(area_id=area.area_id, areaname=area.areaname, show_id=area.show_id)
-                       for area in _entity.areas])
+                areas=areas)
             LOG.info('Notify create entity in new agent success')
             return self.reset(req, group_id, objtype, entity, body)

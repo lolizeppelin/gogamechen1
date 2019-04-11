@@ -118,8 +118,8 @@ reset_opts = [
 ]
 
 migrate_opts = [
-    cfg.IntOpt('agent',
-               short='a', min=1,
+    cfg.IntOpt('new',
+               short='n', min=1,
                help='Migrate dest agent')
 ]
 
