@@ -767,7 +767,9 @@ class Application(AppEndpointBase):
                 return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                                   resultcode=manager_common.RESULT_ERROR,
                                                   ctxt=ctxt, result='delete fail, entity not exist')
-            if token != self._entity_token(entity):
+            _token = self._entity_token(entity)
+            if token !=_token:
+                LOG.error('Token not the same, %s != %s ' % (token, str(_token)))
                 return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
                                                   resultcode=manager_common.RESULT_ERROR,
                                                   ctxt=ctxt, result='delete fail, token error')

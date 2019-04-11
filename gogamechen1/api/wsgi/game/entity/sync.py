@@ -445,8 +445,11 @@ class AppEntitySyncReuest(AppEntityReuestBase):
     def migrate(self, req, group_id, objtype, entity, body=None):
         """Entity变更agent"""
         body = body or {}
+        entity = int(entity)
+        group_id = int(group_id)
         jsonutils.schema_validate(body, self.MIGRATE)
         new = body.pop('new')
+        new = int(new)
         body.update({'databases': True, 'chiefs': True})
         session = endpoint_session(readonly=True)
         query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
