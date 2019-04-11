@@ -30,11 +30,11 @@ def init_endpoint_session():
         LOG.warning("Do not call init_endpoint_session more then once")
 
 
-def endpoint_session(readonly=False):
+def endpoint_session(readonly=False, autocommit=True):
     if DbDriver is None:
         init_endpoint_session()
     return DbDriver.get_session(read=readonly,
-                                autocommit=True,
+                                autocommit=autocommit,
                                 expire_on_commit=False)
 
 def init_gamelock():

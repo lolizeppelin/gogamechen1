@@ -674,6 +674,10 @@ class Application(AppEndpointBase):
 
     def rpc_post_create_entity(self, ctxt, entity, **kwargs):
         LOG.info('Get post create %d command with %s' % (entity, str(kwargs)))
+        if kwargs.get('migrate'):
+            if entity in self.entitys:
+                LOG.error('Migrate find entity alreday in agent')
+                return None
         try:
             self.konwn_appentitys.setdefault(entity, dict(objtype=kwargs.pop('objtype'),
                                                           # group_id=kwargs.pop('group_id'),
@@ -684,6 +688,11 @@ class Application(AppEndpointBase):
                                                           pid=None))
         except KeyError:
             LOG.error('Fail setdefault for entity by KeyError')
+        if kwargs.get('migrate'):
+            self._placeholder(common.NAME, entity)
+
+
+
 
     def rpc_reset_entity(self, ctxt, entity, appfile,
                          databases, chiefs, **kwargs):

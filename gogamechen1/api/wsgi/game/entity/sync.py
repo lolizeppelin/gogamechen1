@@ -451,7 +451,7 @@ class AppEntitySyncReuest(AppEntityReuestBase):
         new = body.pop('new')
         new = int(new)
         body.update({'databases': True, 'chiefs': True})
-        session = endpoint_session()
+        session = endpoint_session(autocommit=False)
         query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
         query = query.options(joinedload(AppEntity.areas, innerjoin=False))
         _entity = query.one()
@@ -469,6 +469,6 @@ class AppEntitySyncReuest(AppEntityReuestBase):
             entity_controller.post_create_entity(
                 entity, common.NAME, objtype=objtype,
                 status=_entity.status, opentime=_entity.opentime, group_id=group_id,
-                areas=areas)
+                areas=areas, migrate=True)
             LOG.info('Notify create entity in new agent success')
             return self.reset(req, group_id, objtype, entity, body)
