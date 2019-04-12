@@ -457,6 +457,9 @@ class AppEntitySyncReuest(AppEntityReuestBase):
         _entity = query.one()
         if _entity.objtype != objtype:
             raise InvalidArgument('Entity is not %s' % objtype)
+        if not self._check_file(_entity.agent_id, objtype, body.get(common.APPFILE)):
+            return resultutils.results(result='migrate entity %d not run, check appfile fail')
+        LOG.debug('Check appfile success, migrate start')
         areas=[dict(area_id=area.area_id, areaname=area.areaname, show_id=area.show_id)
                for area in _entity.areas]
         with entity_controller.migrate_with_out_data(common.NAME, entity, new,

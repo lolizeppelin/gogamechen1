@@ -691,7 +691,25 @@ class Application(AppEndpointBase):
         if kwargs.get('migrate'):
             self._placeholder(common.NAME, entity)
 
-
+    def rpc_check_file(self, ctxt, appfile, objtype, **kwargs):
+        try:
+            localfile = self.filemanager.find(appfile)
+        except NoFileFound:
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='check %s file fail, appfile not find' % objtype)
+        try:
+            gfile.check(objtype, localfile.path)
+        except ValueError as e:
+            return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                              resultcode=manager_common.RESULT_ERROR,
+                                              ctxt=ctxt,
+                                              result='check %s file fail, %s' % e.message)
+        return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
+                                          ctxt=ctxt,
+                                          resultcode=manager_common.RESULT_SUCCESS,
+                                          result='check file success')
 
 
     def rpc_reset_entity(self, ctxt, entity, appfile,

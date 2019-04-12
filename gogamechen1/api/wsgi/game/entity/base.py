@@ -5,6 +5,9 @@ from simpleutil.common.exceptions import InvalidArgument
 from simpleutil.log import log as logging
 from simpleutil.config import cfg
 
+from goperation.manager import common as manager_common
+from goperation.manager.utils import targetutils
+from goperation.manager.api import get_client
 from goperation.manager.wsgi.contorller import BaseContorller
 from goperation.manager.wsgi.entity.controller import EntityReuest
 
@@ -99,6 +102,23 @@ class AppEntityReuestBase(BaseContorller):
             raise InvalidArgument('Auto select agent fail')
         LOG.debug('Auto select agent %d' % chioces[0])
         return chioces[0]
+
+    @staticmethod
+    def _check_file(agent_id, objtype, appfile):
+        metadata = BaseContorller.agent_metadata(agent_id)
+        if not metadata:
+            return False
+        target = targetutils.target_agent_by_string(metadata.get('agent_type'), metadata.get('host'))
+        rpc = get_client()
+        rpc_ret = rpc.call(target, ctxt={'agents': [agent_id, ]},
+                           msg={'method': 'check_file',
+                                'args': dict(objtype=objtype, appfile=appfile)})
+        if not rpc_ret:
+            LOG.error('Rpc call result is None')
+            return False
+        if rpc_ret.get('resultcode') != manager_common.RESULT_SUCCESS:
+            return False
+        return True
 
     @staticmethod
     def _bondto(session, entity, databases):
