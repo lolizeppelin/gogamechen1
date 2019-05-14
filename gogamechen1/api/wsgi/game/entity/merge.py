@@ -402,7 +402,10 @@ class AppEntityMergeReuest(AppEntityReuestBase):
 
         def _unquote():
             for database in appentity.databases:
-                schema_controller.unquote(req, quote_id=database.quote_id)
+                try:
+                    schema_controller.unquote(req, quote_id=database.quote_id)
+                except Exception:
+                    LOG.error('Delete database quote fail')
 
         eventlet.spawn_n(_unquote)
 
