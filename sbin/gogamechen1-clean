@@ -118,7 +118,7 @@ def main():
     schemas = get_schemas()
     if CONF.show:
         for schema in schemas:
-            print('delete schema %s' % str(schema))
+            print('will delete schema %s' % str(schema))
     else:
         delete(schemas)
 
