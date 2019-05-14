@@ -37,6 +37,7 @@ def endpoint_session(readonly=False, autocommit=True):
                                 autocommit=autocommit,
                                 expire_on_commit=False)
 
+
 def init_gamelock():
     global GameLock
     if GameLock is None:
