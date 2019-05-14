@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 import time
+import eventlet
 
 from sqlalchemy.orm import joinedload
 from sqlalchemy.sql import and_
@@ -367,6 +368,7 @@ class AppEntityMergeReuest(AppEntityReuestBase):
                     if _entity.status != common.SWALLOWING:
                         raise InvalidArgument('Swallowed entity find status error')
                     _query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
+                    _query = query.options(joinedload(AppEntity.databases, innerjoin=False))
                     appentity = _query.one_or_none()
                     break
             if not appentity:
@@ -397,9 +399,16 @@ class AppEntityMergeReuest(AppEntityReuestBase):
             _query = model_query(session, GameArea, filter=GameArea.entity == entity)
             _query.update({'entity': etask.entity})
             session.flush()
-            return resultutils.results(result='swallowed entity is success',
-                                       data=[dict(databases=jsonutils.loads_as_bytes(_entity.databases),
-                                                  areas=jsonutils.loads_as_bytes(_entity.areas))])
+
+        def _unquote():
+            for database in appentity.databases:
+                schema_controller.unquote(req, quote_id=database.quote_id)
+
+        eventlet.spawn_n(_unquote)
+
+        return resultutils.results(result='swallowed entity is success',
+                                   data=[dict(databases=jsonutils.loads_as_bytes(_entity.databases),
+                                              areas=jsonutils.loads_as_bytes(_entity.areas))])
 
     def finish(self, req, uuid, body=None):
         """合服完毕接口"""
