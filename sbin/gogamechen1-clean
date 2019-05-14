@@ -1,0 +1,127 @@
+#!/usr/bin/python
+import six
+import time
+
+from requests import sessions
+
+from simpleutil.config import cfg
+from simpleutil.log import log as logging
+from simpleutil.utils import jsonutils
+
+
+from simpleservice.plugin.exceptions import BeforeRequestError
+from simpleservice.plugin.exceptions import AfterRequestError
+
+from simpleservice.ormdb.api import model_query
+
+from gogamechen1.models import MergeEntity
+from gogamechen1.models import AppEntity
+from gogamechen1 import common
+from gogamechen1.api import endpoint_session
+
+
+from goperation.api.client import ManagerClient
+from gopdb.api.client import GopDBClient
+from goperation.api.client.config import client_opts
+from simpleservice.ormdb.config import database_opts
+
+CONF = cfg.CONF
+
+NAME = 'clean'
+
+LOG = logging.getLogger(NAME)
+
+
+_opts = [
+    cfg.BoolOpt('show',
+                short='s',
+                default=True,
+                help='Just show delete schema list'),
+    cfg.BoolOpt('force',
+                short='f',
+                default=False,
+                help='force delete schema'),
+    cfg.StrOpt('ignore',
+               short='i',
+               default='PHPWEB',
+               help='ignore quotes desc'),
+]
+
+
+def get_schemas():
+    session = endpoint_session()
+    query = model_query(session, AppEntity, filter=AppEntity.status == common.DELETED)
+    _deleted_exist_entitys = frozenset([e.entity for e in query.all()])
+    query = model_query(session, MergeEntity)
+    entitys = query.all()
+    for entity in entitys:
+        if entity.entity not in _deleted_exist_entitys:
+            LOG.error('entity %d not in deleted list' % entity.entity)
+            import sys
+            sys.exit(1)
+    schema_list = []
+    for entity in entitys:
+        databases = jsonutils.loads_as_bytes(entity.databases)
+        for name, database in six.iteritems(databases):
+            schema_list.append(database)
+    return schema_list
+
+
+def dbclient(session=None):
+    return GopDBClient(httpclient=ManagerClient(url=CONF.gcenter, port=CONF.gcenter_port,
+                                                retries=CONF.retries, timeout=CONF.apitimeout,
+                                                token=CONF.trusted, session=session))
+
+
+def delete(schemas):
+    client = dbclient(session=sessions.session())
+    body = dict()
+    if CONF.ignore:
+        body['ignores'] = [CONF.ignore]
+    if CONF.force:
+        body['force'] = True
+    for schema in schemas:
+        try:
+            result = client.schemas_delete(database_id=schema['database_id'], schema=schema['schema'], body=body)
+            if result.get('resultcode') != 0:
+                LOG.error(result)
+            else:
+                LOG.info('delete schema %s success' % str(schema))
+        except BeforeRequestError as e:
+            LOG.error('After request error, res %s' % e.message)
+        except AfterRequestError as e:
+            LOG.error(e.message)
+            LOG.error('After request error,  code %d , res %s ' % (e.code, e.resone))
+        except Exception:
+            LOG.exception('unkonwn error')
+        finally:
+            try:
+                time.sleep(0.5)
+            except KeyboardInterrupt:
+                break
+
+
+def main():
+    cfg.set_defaults(client_opts, retries=1)
+    cfg.set_defaults(client_opts, apitimeout=30)
+    logging.set_defaults()
+    CONF.register_cli_opts(_opts)
+    CONF.register_cli_opts(client_opts)
+    logging.register_options(CONF)
+    CONF(project=NAME)
+    logging.setup(CONF, NAME)
+
+    group = cfg.OptGroup(common.NAME)
+    CONF.register_group(group)
+    CONF.register_opts(database_opts, group)
+
+    schemas = get_schemas()
+    if CONF.show:
+        for schema in schemas:
+            print('delete schema %s' % str(schema))
+    else:
+        delete(schemas)
+
+
+if __name__ == '__main__':
+    main()
