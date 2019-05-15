@@ -401,6 +401,7 @@ class AppEntityMergeReuest(AppEntityReuestBase):
             session.flush()
 
         def _unquote():
+            LOG.info('Swallowed %d finish, try unquote database' % appentity.entity)
             for database in appentity.databases:
                 try:
                     schema_controller.unquote(req, quote_id=database.quote_id)
