@@ -1,12 +1,13 @@
 -- 公共数据接口
+local ffi      = require "ffi"
+local ffi_cast = ffi.cast
+local C        = ffi.C
+
 local cjson = require "cjson.safe"
 local asynclock = require "resty.lock"
 local redis = require "resty.redis"
 local mysql = require "resty.mysql"
-
-local ffi      = require "ffi"
-local ffi_cast = ffi.cast
-local C        = ffi.C
+local tbconfig = require "tbconfig"
 
 ffi.cdef[[
 typedef unsigned char u_char;
@@ -18,23 +19,10 @@ function murmurhash2(value)
 end
 
 
-
 local _M = {
     ["lock"] = ngx.null,
-    ["jdata"] = ngx.null,
     ["config"] = ngx.null,
 }
-
-function mysql_conn(config)
-    local conn = mysql:new()
-    conn:set_timeout(config.timeout or 1000)
-    local ok, err, errcode, sqlstate = conn:connect(config)  -- mysql 插件内部会自己解决是否需要新开链接还是从池中取
-    if not ok then
-        ngx.log(ngx.ERR, "failed to connect: ", err, ": ", errcode, " ", sqlstate)
-        return nil
-    end
-    return conn
-end
 
 -- redis set keepalive
 function keepalive(conn)
@@ -46,13 +34,15 @@ function keepalive(conn)
 end
 
 
-function getcache(conn, key)
+function getcache(conn, key, free)
     local buffer, _ = conn:get(key)
     if not buffer then
         ngx.log(ngx.ERR, "Get data from cache fail: " .._)
         return nil, "Get data from cache fail: " .._
     end
-    keepalive(conn)
+    if free then
+        keepalive(conn)
+    end
     if buffer == ngx.null then
         return nil, nil
     end
@@ -65,22 +55,26 @@ function getcache(conn, key)
 end
 
 
-function delcache(conn, key)
+function delcache(conn, key, free)
     local ret, _ = conn:del(key)
     if not ret then
         ngx.log(ngx.ERR, "Delete from cache fail: " .. _)
     else
-        keepalive(conn)
+        if free then
+            keepalive(conn)
+        end
     end
     return ret, _
 end
 
 
-function setcache(conn, key, data)
+function setcache(conn, key, data, free)
     local buffer = cjson.encode(data)
     if not buffer then
         ngx.log(ngx.ERR, "Set cache fail, data not json")
-        keepalive(conn)
+        if free then
+            keepalive(conn)
+        end
         return nil, 'Json encode fail'
     end
     local ok, err = conn:set(key, buffer, 'ex', '3600')
@@ -88,7 +82,9 @@ function setcache(conn, key, data)
         ngx.log(ngx.ERR, "Set cache fail: " .. err)
         return nil, "Set cache fail: " .. err
     end
-    keepalive(conn)
+    if free then
+        keepalive(conn)
+    end
     return ok, err
 end
 
@@ -114,16 +110,11 @@ function _M:init(conf)
     local config = {}
     -- 参数初始化 --
     config.prefix = conf.dict                   -- 必要参数,全局锁用到共享字典名,顺便作为前缀
-    config.timeout = conf.timeout or 1000       -- 1000  全局timeout,单位ms
     config.murmur = conf.murmur
-    -- config of redis --
-    config.path = conf.path
-    config.host = conf.host or '127.0.0.1'          -- 127.0.0.1
-    config.port = conf.port or 6379                 -- 6379
-    config.db = conf.db or 0                        -- 默认0
-    config.passwd  = conf.passwd
-    config.key  = conf.key                          -- 必要参数,servers列表所在key
-
+    -- 全局连接池参数
+    config.idle  = conf.idle or 60000               -- 60000ms
+    config.pool  = conf.pool or 20                  -- 20
+    config.timeout = conf.timeout or 1000           -- 1000  全局timeout,单位ms
     -- config of mysql --
     config.dbpath  = conf.dbpath
     config.dbhost  = conf.dbhost or '127.0.0.1'     -- 127.0.0.1
@@ -131,19 +122,11 @@ function _M:init(conf)
     config.schema  = conf.schema                    -- 必要参数
     config.dbuser  = conf.dbuser                    -- 必要参数
     config.dbpass  = conf.dbpass                    -- 必要参数
-    config.idle  = conf.idle or 60000               -- 60000ms
-    config.pool  = conf.pool or 10                  -- 10
-    -- mysql table info --
-    config.table  = conf.table                      -- areas   查询表名
-    config.coluid  = conf.coluid                    -- uid     uid列名
-    config.colsid  = conf.colsid                    -- area    area列名
-    config.coltime  = conf.coltime                  -- area    area添加时间列名
 
     -- config of caches --
     config.caches = {}
     config.murmur = conf.murmur                 -- 默认false, 是否使用murmurhash2散布uid
     if conf.caches then                         -- caches  redis配置列表
-
         for index, _conf in ipairs(conf.caches) do
             config.caches[index] = {
                 ["path"] = _conf.path,
@@ -229,64 +212,78 @@ function _M:mysqlconnect(config)
     _config.database = config.schema
     _config.user = config.dbuser
     _config.password  = config.dbpass
-    _config.timeout  = config.timeout
+    _config.charset  = 'utf8'
 
-    return mysql_conn(_config)
+    local conn = mysql:new()
+    conn:set_timeout(config.timeout or 1000)
+    local ok, err, errcode, sqlstate = conn:connect(_config)  -- mysql 插件内部会自己解决是否需要新开链接还是从池中取
+    if not ok then
+        ngx.log(ngx.ERR, "failed to connect: ", err, ": ", errcode, " ", sqlstate)
+        return nil
+    end
+    return conn
 end
 
 -- servers数据初始化
-function _M:fetchservers()
+function _M:fetchservers(flush)
     if _M.config == ngx.null then
         return nil
     end
     local lock = _M.lock
-    local key =  _M.config.prefix .. "-redis-servers-" .. ngx.worker.id()
+    local key =  _M.config.prefix .. "-all-servers"
     local elapsed, _ = lock:lock(key)
     if elapsed == nil then
         ngx.log(ngx.ERR, 'Get global lock for redis fail')
         return nil
     end
-    if _M.jdata ~= ngx.null then
+
+    local share = ngx.shared[_M.config.dict]
+    local servers, err = share:get('servers')
+
+    if not flush then
+        if not servers and err then
+            ngx.log(ngx.ERR, 'Get servers from share dict fail: ' .. err)
+            lock:unlock()
+            return nil
+        end
+        if servers and servers ~= ngx.null then
+            lock:unlock()
+            return servers
+        end
+    end
+
+    -- fetch servers from mysql
+    local db = _M:mysqlconnect(_M.config)
+    local sql = tbconfig.servers
+    ngx.log(ngx.DEBUG, "sql: " .. sql)
+    local errcode, sqlstate
+    servers, err, errcode, sqlstate = db:query(sql)
+    if not servers then
+        ngx.log(ngx.ERR, "mysql query error: ", err, ": ", errcode, ": ", sqlstate, ".")
         lock:unlock()
         return nil
     end
 
-    local conn = _M:redisconnect(_M.config)
-    if not conn then
-        lock:unlock()
-        return nil
-    end
-    local serverkey =  _M.config.prefix .. '-' .._M.config.key
-    local data, err = conn:get(serverkey)
-    conn:close()
-    if not data then
-        ngx.log(ngx.ERR, 'Get Redis key error:' .. err)
-        lock:unlock()
-        return nil
-    end
-    if data == ngx.null then
-        ngx.log(ngx.ERR, 'Redis key not found, key: ' .. serverkey)
-        lock:unlock()
-        return nil
-    end
-    local r = cjson.decode(data);
-    if r ~= nil then
-        _M.jdata = r
-    else
-        ngx.log(ngx.ERR, 'Data from redis is not json')
+    local success, _err, _ = share:set('servers', servers)
+    if not success then
+        ngx.log(ngx.ERR, 'Set servers into share dict fail: ' .. _err)
     end
     lock:unlock()
-    return nil
+    return servers
+
 end
 
 -- 从redis获取服务器列表
 function _M:getservers()
-    if _M.jdata == ngx.null then
-        _M:fetchservers()
+    local share = ngx.shared[_M.config.dict]
+    local servers = share:get('servers')
+    if not servers or servers == ngx.null then
+        return _M:fetchservers(false)
     end
-    return _M.jdata
+    return servers
 end
 
+-- 获取缓存链接对象
 function _M:getcache(uid)
     local config = _M.config
     local caches = config.caches
@@ -298,11 +295,11 @@ function _M:getcache(uid)
     if config.murmur then
         hashid = murmurhash2(tostring(uid))
     else
-        hashid = uid
+        hashid = tonumber(uid)
     end
     local index = hashid % #caches
     index = index + 1
-    local uidkey = config.prefix .. '-cache-uid-' ..hashid
+    local uidkey = config.prefix .. '-cache-uid-' ..uid
 
     local _config = caches[index]
     local conn = _M:redisconnect(_config)
@@ -313,7 +310,7 @@ function _M:getcache(uid)
 end
 
 -- 获取用户areas信息
-function _M:getareas(uid, cache)
+function _M:getuser(uid, cache)
     local config = _M.config
     if config ==  ngx.null then
         return nil, 'config not init'
@@ -323,31 +320,32 @@ function _M:getareas(uid, cache)
     local flush  = false
     local conn, key, _
 
-    -- fetch areas from redis
+    -- fetch user data from redis
     if caches ~= ngx.null then
         conn, key, _ = _M:getcache(uid)
         if not conn then
             ngx.log(ngx.ERR, "Get connection for cache fail: " .. _)
         end
         if cache and conn then
-            local res, _ = getcache(conn, key)
+            local res, _ = getcache(conn, key, false)
             if res then
+                keepalive(conn)
                 return res, nil
             end
             flush = true                   -- no cache found
-        elseif conn and not cache then     -- delete cache
-            ngx.thread.spawn(delcache, conn, key)
         end
     end
 
-    -- fetch areas from mysql
+    -- fetch user data from mysql
     local db = _M:mysqlconnect(config)
-    local sql = string.format("select %s as uid, %s as area from %s where %s = %d order by %s desc",
-            config.coluid, config.colsid, config.table, config.coluid, uid, config.coltime)
+    local sql = tbconfig.user
     ngx.log(ngx.DEBUG, "sql: " .. sql)
     local res, err, errcode, sqlstate = db:query(sql)
     if not res then
         ngx.log(ngx.ERR, "mysql query error: ", err, ": ", errcode, ": ", sqlstate, ".")
+        if conn then
+            ngx.timer.at(0, delcache, conn, key, true)
+        end
         return nil, 'Mysql execute query error'
     end
 
@@ -356,15 +354,15 @@ function _M:getareas(uid, cache)
         ngx.log(ngx.ERR, "failed to set mysql keepalive: ", _)
         db:close()
     end
-    -- flush areas into cache
+    -- flush user data into cache
     if #res > 0 and flush then
-        ngx.thread.spawn(setcache, conn, key, res)
+        ngx.timer.at(0, setcache, conn, key, res, true)
     end
     return res, nil
 end
 
 -- 注册接口调用的时候删除缓存中用户记录
-function _M:register(uid)
+function _M:deleteuser(uid)
     local config = _M.config
     if config == ngx.null then
         return
@@ -373,7 +371,7 @@ function _M:register(uid)
     if caches ~= ngx.null then
         local conn, key, _ = _M:getcache(uid)
         if conn then
-            ngx.thread.spawn(delcache, conn, key)
+            ngx.timer.at(0, delcache, conn, key, true)
         else
             ngx.log(ngx.ERR, "Get connection for cache fail: " .. _)
         end
