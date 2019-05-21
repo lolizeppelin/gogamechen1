@@ -28,7 +28,8 @@ config.dbuser = 'root'
 config.dbpass = '111111'
 -- redis caches
 config.caches = {
-    { path = '/run/redis/redis.sock', db = 1 }
+    { path = '/run/redis/redis.sock', db = 1 },
+    { shared = 'gogameroles' },
 }
 
 return analyze:filter(config)

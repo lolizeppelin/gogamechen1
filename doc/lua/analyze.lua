@@ -1,76 +1,129 @@
 -- 数据解析
 local driver = require "driver"
 
-local _ANALYZE = {}
+
+local _ANALYZE = {
+	switch = ngx.null,
+}
 
 
--- 解析数据并返回
-function _ANALYZE:fetch(uid)
-	local data
-    local servers = driver:getservers()
-    if not servers or servers == ngx.null then
-        return flase
-    end
-    local user, err = driver:getuser(uid, true)
-    if not user then
-        ngx.log(ngx.ERR, "Get areas error: " .. err)
-		return false
-    end
-	data.Servers = servers
-	data.usr = user
-    ngx.say(data)
-    return true
-end
+function _ANALYZE:init(config)
 
+	if _ANALYZE.switch ~= ngx.null then
+		return true, nil
+	end
 
-function _ANALYZE:delete(uid)
-    driver:deleteuser(uid)
-end
+	-- TODO check urlpath
+	local urlpath = config.urlpath or ''
 
-
-function _ANALYZE:filter(config)
+	-- init driver
 	local ok, err = driver:init(config)
 	if not ok then
-		ngx.log('Init lua cache driver fail:' .. err)
+		return nil, 'Init lua cache driver fail:' .. err
+	end
+
+	--usrid = 0 _123456789 & timestamp = 1557373019 & sign = MD5(usrid + "asldajldl" + timestamp)
+
+	local switch = {
+		[urlpath .. '/server.php'] = function (method)
+			if method == 'GET' then
+				return 'get-servers'
+			end
+		end,
+		[urlpath .. '/users.php'] = function (method)
+			if method == 'GET'then
+				return 'get-roles'
+			end
+		end,
+		[urlpath .. '/nuser.php'] = function (method)
+			if method == 'POST'then
+				return 'add-role'
+			end
+		end,
+		[urlpath .. '/euser.php'] = function (method)
+			if method == 'POST' then
+				return 'edit-role'
+			end
+		end,
+		[urlpath .. '/index.php'] = function (method)
+			if method == 'POST'
+					and ngx.var.arg_m == 'Admin'
+					and ngx.var.arg_c == 'Operation'
+					and ngx.var.arg_a == 'server_batch_set' then
+				return 'edit-server'
+			end
+		end,
+	}
+	_ANALYZE.switch = switch
+	return true, nil
+
+end
+
+
+function _ANALYZE:access_filter(config)
+
+	local ok, err = _ANALYZE:init(config)
+	if not ok then
+		ngx.log('Init lua analyze fail:' .. err)
 		return ngx.exit(ngx.HTTP_OK)
 	end
 
-	local uri = ngx.var.uri
-	local method = ngx.var.request_method
+	local switch = _ANALYZE.switch[ngx.var.uri]
+	if not switch then
+		return ngx.exit(ngx.HTTP_OK)
+	end
+	local action = switch(ngx.var.request_method)
+	if not action then
+		return ngx.exit(ngx.HTTP_OK)
+	end
 
-	if method == 'GET' then
+	ngx.ctx.action = action
+
+	if action == 'get-servers' then
+		local servers = driver:getservers()
+		if servers then							-- 直接返回缓存数据,不再继续nginx流程
+			ngx.header["Content-Type"] = 'application/json';
+			table.remove(ngx.ctx, 'action')
+			ngx.say(servers)
+			ngx.status = 200
+		end
+	elseif action == 'get-roles' then
 		local uid = ngx.var.arg_userid
-		if not uid then
-			return ngx.exit(ngx.HTTP_OK)	-- 返回到nginx中继续
-		end
-		if ngx.re.find(uri, [[^.*?server.php$]], "jo") then		-- 获取服务器列表
-			-- 获取服务器列表接口
-			if _ANALYZE:fetch(uid) then
+		if uid then
+			local roles = driver:getrole(uid)
+			if roles then						-- 直接返回缓存数据,不再继续nginx流程
+				table.remove(ngx.ctx, 'action')
 				ngx.header["Content-Type"] = 'application/json';
-				ngx.status = 200            -- 下面的exit直接结束http请求
+				ngx.say(roles)
+				ngx.status = 200
 			end
-			return ngx.exit(ngx.HTTP_OK)
-		end
-	elseif method == 'POST' then
-		if ngx.re.find(s, [[^.*?server.php$]], "jo") then		-- 用户创角色接口, 删除用户角色缓存
-
-			local uid = ngx.var.arg_userid
-			if not uid then
-				return ngx.exit(ngx.HTTP_OK)	-- 返回到nginx中继续
-			end
-
-			local timestamp = ngx.var.arg_timestamp
-			local sign = ngx.var.arg_sign
-			_ANALYZE.delete(uid)
-			return ngx.exit(ngx.HTTP_OK)	-- 返回到nginx中继续
-		end
-		if ngx.re.find(s, [[^.*?server.php$]], "jo") then			-- 服务器列表修改/新增, 删除服务器列表缓存
-			ngx.timer.at(0, driver.fetchservers, driver, true)	-- 异步, timer在请求结束以后也继续执行
-			return ngx.exit(ngx.HTTP_OK) 	 						-- 返回到nginx中继续
 		end
 	end
-	return ngx.exit(ngx.HTTP_OK)        	 						-- 返回到nginx中继续
+	return ngx.exit(ngx.HTTP_OK)		-- 未设置ngx.status的情况下返回nginx继续
 end
 
+
+function _ANALYZE:body_filter()
+
+	if not ngx.ctx.action or ngx.status ~= 200 then
+		return ngx.exit(ngx.HTTP_OK)
+	end
+
+	local action = ngx.ctx.action
+
+	if action == 'get-servers' then
+		driver:setservers(ngx.arg[1])		-- get servers 接口没有缓存
+	elseif action == 'get-roles' then		-- get roles   接口没有缓存
+		ngx.timer.at(0, driver.setrole, driver, ngx.ctx.uid, ngx.arg[1])		-- 异步
+	elseif action == 'add-role' then
+		ngx.timer.at(0, driver.addrole, driver, ngx.ctx.uid, ngx.arg[1])		-- 异步
+	elseif action == 'edit-role' then
+		ngx.timer.at(0, driver.editrole, driver, ngx.ctx.uid, ngx.arg[1]) 	-- 异步
+	elseif action == 'edit-server' then
+		driver:setservers(ngx.arg[1], true)
+	end
+
+	return ngx.exit(ngx.HTTP_OK)
+end
 
 return _ANALYZE

@@ -6,8 +6,7 @@ local C        = ffi.C
 local cjson = require "cjson.safe"
 local asynclock = require "resty.lock"
 local redis = require "resty.redis"
-local mysql = require "resty.mysql"
-local tbconfig = require "tbconfig"
+
 
 ffi.cdef[[
 typedef unsigned char u_char;
@@ -19,141 +18,8 @@ function murmurhash2(value)
 end
 
 
-local _M = {
-    ["lock"] = ngx.null,
-    ["config"] = ngx.null,
-}
-
--- redis set keepalive
-function keepalive(conn)
-    local ok, err = conn:set_keepalive(_M.config.idle, _M.config.pool)
-    if not ok then
-        ngx.log(ngx.ERR, 'Set redis keepalive fail:' .. err)
-        conn:close()
-    end
-end
-
-
-function getcache(conn, key, free)
-    local buffer, _ = conn:get(key)
-    if not buffer then
-        ngx.log(ngx.ERR, "Get data from cache fail: " .._)
-        return nil, "Get data from cache fail: " .._
-    end
-    if free then
-        keepalive(conn)
-    end
-    if buffer == ngx.null then
-        return nil, nil
-    end
-    local data = cjson.decode(buffer)
-    if not data then
-        ngx.log(ngx.ERR, "Gat data not json")
-        return nil, "Cache data not json"
-    end
-    return data, nil
-end
-
-
-function delcache(conn, key, free)
-    local ret, _ = conn:del(key)
-    if not ret then
-        ngx.log(ngx.ERR, "Delete from cache fail: " .. _)
-    else
-        if free then
-            keepalive(conn)
-        end
-    end
-    return ret, _
-end
-
-
-function setcache(conn, key, data, free)
-    local buffer = cjson.encode(data)
-    if not buffer then
-        ngx.log(ngx.ERR, "Set cache fail, data not json")
-        if free then
-            keepalive(conn)
-        end
-        return nil, 'Json encode fail'
-    end
-    local ok, err = conn:set(key, buffer, 'ex', '3600')
-    if not ok then
-        ngx.log(ngx.ERR, "Set cache fail: " .. err)
-        return nil, "Set cache fail: " .. err
-    end
-    if free then
-        keepalive(conn)
-    end
-    return ok, err
-end
-
-
--- 配置初始化
-function _M:init(conf)
-    if _M.config ~= ngx.null then
-        return true, nil
-    end
-    ngx.log(ngx.INFO, 'Init driver config')
-    opts = {
-        ["timeout"] = conf.locktimeout or 5
-    }
-    if _M.lock == ngx.null then
-        local lock, err = asynclock:new(conf.dict, opts)
-        if not lock then
-            ngx.log(ngx.ERR, 'Init worker global lock fail: ' .. err)
-            return nil, 'Init global lock fail'
-        end
-        _M.lock = lock
-    end
-
-    local config = {}
-    -- 参数初始化 --
-    config.prefix = conf.dict                   -- 必要参数,全局锁用到共享字典名,顺便作为前缀
-    config.murmur = conf.murmur
-    -- 全局连接池参数
-    config.idle  = conf.idle or 60000               -- 60000ms
-    config.pool  = conf.pool or 20                  -- 20
-    config.timeout = conf.timeout or 1000           -- 1000  全局timeout,单位ms
-    -- config of mysql --
-    config.dbpath  = conf.dbpath
-    config.dbhost  = conf.dbhost or '127.0.0.1'     -- 127.0.0.1
-    config.dbport  = conf.dbport or 3306            -- 3306
-    config.schema  = conf.schema                    -- 必要参数
-    config.dbuser  = conf.dbuser                    -- 必要参数
-    config.dbpass  = conf.dbpass                    -- 必要参数
-
-    -- config of caches --
-    config.caches = {}
-    config.murmur = conf.murmur                 -- 默认false, 是否使用murmurhash2散布uid
-    if conf.caches then                         -- caches  redis配置列表
-        for index, _conf in ipairs(conf.caches) do
-            config.caches[index] = {
-                ["path"] = _conf.path,
-                ["host"] = _conf.host or '127.0.0.1',
-                ["port"] = _conf.port or 6379,
-                ["db"] = _conf.db or 0,
-                ["passwd"] = _conf.passwd,
-            }
-        end
-    end
-
-    -- 简单校验 禁止长度不一致
-    if #config.caches ~= #conf.caches then
-        return nil, 'cache config error'
-    end
-
-    if #config.caches <= 0 then
-        config.caches = ngx.null
-    end
-
-    ngx.log(ngx.INFO, 'Cache config size: ' .. #config.caches)
-    _M.config = config
-    return true, nil
-end
-
 -- redis 连接池初始化
-function _M:redisconnect(config)
+local function redisconnect(config)
     if config == ngx.null or not config then
         return nil
     end
@@ -196,91 +62,251 @@ function _M:redisconnect(config)
     return conn
 end
 
--- mysql 连接池初始化
-function _M:mysqlconnect(config)
-    if config == ngx.null or not config then
-        return nil
+-- cache 封装
+local Cache = {}
+
+function Cache:new(config, exptime)
+    local obj = {}
+    setmetatable(obj, self)
+    self.__index = self
+    self.config = config
+    self.exptime = exptime
+
+    if config.shared then                       -- nginx shared dict 缓存
+        obj.setkey = self.redis_setkey
+        obj.getkey = self.redis_getkey
+        obj.delkey = self.redis_delkey
+        obj.free = self.redis_free
+        obj.shared = ngx.shared[config.shared]
+    else                                       -- redis 缓存
+        obj.setkey = self.shared_setkey
+        obj.getkey = self.shared_getkey
+        obj.delkey = self.shared_delkey
+        obj.free = self.shared_free
+        obj.conn = redisconnect(config)
     end
 
-    local _config = {}
-    if config.dbpath then
-        _config.path = config.dbpath
-    else
-        _config.host = config.dbhost
-        _config.port = config.dbport
-    end
-    _config.database = config.schema
-    _config.user = config.dbuser
-    _config.password  = config.dbpass
-    _config.charset  = 'utf8'
+    return obj
+end
 
-    local conn = mysql:new()
-    conn:set_timeout(config.timeout or 1000)
-    local ok, err, errcode, sqlstate = conn:connect(_config)  -- mysql 插件内部会自己解决是否需要新开链接还是从池中取
+-- redis
+function Cache:redis_getkey(key)
+    return self.conn:get(key)
+end
+
+function Cache:redis_setkey(key, raw)
+    local ok, _ = self.conn:set(key, raw, 'ex', self.exptime)
+    return ok
+end
+
+function Cache:redis_delkey(key)
+    local ok, _ = self.conn:del(key)
+    return ok
+end
+
+function Cache:redis_free()
+    local ok, err = self.conn:set_keepalive(self.config.idle, self.config.pool)
     if not ok then
-        ngx.log(ngx.ERR, "failed to connect: ", err, ": ", errcode, " ", sqlstate)
-        return nil
+        ngx.log(ngx.ERR, 'Set redis keepalive fail:' .. err)
+        self.conn:close()
     end
-    return conn
 end
 
--- servers数据初始化
-function _M:fetchservers(flush)
-    if _M.config == ngx.null then
-        return nil
+-- shared dict
+function Cache:shared_getkey(key)
+    local raw, err = self.shared:get(key)
+    if not raw and err then
+        return nil, 'Share get key fail: ' .. err
     end
-    local lock = _M.lock
-    local key =  _M.config.prefix .. "-all-servers"
-    local elapsed, _ = lock:lock(key)
-    if elapsed == nil then
-        ngx.log(ngx.ERR, 'Get global lock for redis fail')
-        return nil
+    if not raw then
+        return ngx.null, nil
     end
+    return raw, nil
+end
 
-    local share = ngx.shared[_M.config.dict]
-    local servers, err = share:get('servers')
-
-    if not flush then
-        if not servers and err then
-            ngx.log(ngx.ERR, 'Get servers from share dict fail: ' .. err)
-            lock:unlock()
-            return nil
-        end
-        if servers and servers ~= ngx.null then
-            lock:unlock()
-            return servers
-        end
-    end
-
-    -- fetch servers from mysql
-    local db = _M:mysqlconnect(_M.config)
-    local sql = tbconfig.servers
-    ngx.log(ngx.DEBUG, "sql: " .. sql)
-    local errcode, sqlstate
-    servers, err, errcode, sqlstate = db:query(sql)
-    if not servers then
-        ngx.log(ngx.ERR, "mysql query error: ", err, ": ", errcode, ": ", sqlstate, ".")
-        lock:unlock()
-        return nil
-    end
-
-    local success, _err, _ = share:set('servers', servers)
+function Cache:shared_setkey(key, raw)
+    local success, err, _ self.shared:set(key, raw)
     if not success then
-        ngx.log(ngx.ERR, 'Set servers into share dict fail: ' .. _err)
+        ngx.log(ngx.ERR, 'Share set key fail: ' .. err)
+        return nil
     end
-    lock:unlock()
-    return servers
-
+    self.shared:expire(key, self.exptime)
 end
 
--- 从redis获取服务器列表
-function _M:getservers()
-    local share = ngx.shared[_M.config.dict]
-    local servers = share:get('servers')
-    if not servers or servers == ngx.null then
-        return _M:fetchservers(false)
+function Cache:shared_delkey(key)
+    self.shared:get(key)
+end
+
+function Cache:shared_free()
+    -- do nothing
+end
+
+-- 接口
+function Cache:getrole(key)
+    local raw, err = self.getkey(key)
+    if not raw then
+        ngx.log(ngx.ERR, 'Get role error: ' .. err)
+        return nil
     end
-    return servers
+    if raw == ngx.null then
+        self.free()
+        return nil
+    end
+    self.free()
+    return raw
+end
+
+function Cache:addrole(key, raw)
+    local jdata = cjson.decode(raw)
+     if not jdata then
+         self.free()
+         return nil
+    end
+    local roles, _ = self.getkey(key)
+    if not roles then
+        return nil
+    end
+    if roles == ngx.null then
+        roles = {
+            [1] = jdata
+        }
+    else
+        roles[#roles+1] = jdata
+    end
+    self.setkey(key, cjson.encode(roles))
+    self.free()
+end
+
+function Cache:editrole(key, raw)
+    local jdata = cjson.decode(raw)
+     if not jdata then
+         self.free()
+         return nil
+    end
+    local roles, _ = self.getkey(key)
+    if not roles then
+        return nil
+    end
+    if roles == ngx.null then
+        roles = {
+            [1] = jdata
+        }
+    else
+        roles = cjson.encode(roles)
+        if not roles then
+            self.delkey(key)
+        end
+        -- 循环匹配
+    end
+    self.setkey(key, cjson.encode(roles))
+    self.free()
+end
+
+function Cache:setrole(key, raw)
+    local roles = cjson.decode(raw)
+     if not roles then
+         self.free()
+         return nil
+    end
+    self.setkey(key, raw)
+    self.free()
+end
+
+
+-- 对外接口
+local _M = {
+    ["lock"] = ngx.null,
+    ["config"] = ngx.null,
+    ["shared"] = ngx.null,
+}
+
+-- 配置初始化
+function _M:init(conf)
+    if _M.config ~= ngx.null then
+        return true, nil
+    end
+
+    ngx.log(ngx.INFO, 'Try init driver config')
+
+    opts = {
+        ["timeout"] = conf.locktimeout or 5
+    }
+    if _M.lock == ngx.null then
+        local lock, err = asynclock:new(conf.dict, opts)
+        if not lock then
+            return nil, 'Init global lock fail: ' .. err
+        end
+        _M.lock = lock
+    end
+
+    if _M.shared == ngx.null then
+        local shared = ngx.shared[conf.dict]
+        if not shared then
+            return nil, 'Init get shared dict fail'
+        end
+        _M.shared = shared
+    end
+
+    local config = {}
+    -- 参数初始化 --
+    config.prefix = conf.dict                   -- 必要参数,全局锁用到共享字典名,顺便作为前缀
+    config.murmur = conf.murmur
+    -- 全局过期参数
+    config.exptime = conf.exptime or 90000          -- 90000,全局过期时间,单位s,默认25小时
+    -- config of mysql --
+    config.dbpath  = conf.dbpath
+    config.dbhost  = conf.dbhost or '127.0.0.1'     -- 127.0.0.1
+    config.dbport  = conf.dbport or 3306            -- 3306
+    config.schema  = conf.schema                    -- 必要参数
+    config.dbuser  = conf.dbuser                    -- 必要参数
+    config.dbpass  = conf.dbpass                    -- 必要参数
+
+    -- config of caches --
+    config.caches = {}
+    config.murmur = conf.murmur                 -- 默认false, 是否使用murmurhash2散布uid
+
+    local cache_shared = {}
+
+    if conf.caches then                         -- caches  redis配置列表
+        for index, _conf in ipairs(conf.caches) do
+            if _conf.shared then
+                if cache_shared[_conf.shared] then
+                    return nil, 'Init get cache shared dict duplicate'
+                end
+                if not ngx.shared[_conf.shared] then
+                    return nil, 'Init get cache shared dict fail'
+                end
+                config.caches[index] = {
+                    ["shared"] = _conf.shared
+                }
+                cache_shared[_conf.shared] = true
+            else
+                config.caches[index] = {
+                    ["path"] = _conf.path,
+                    ["host"] = _conf.host or '127.0.0.1',
+                    ["port"] = _conf.port or 6379,
+                    ["db"] = _conf.db or 0,
+                    ["passwd"] = _conf.passwd,
+                    ["idle"] = _conf.idle or 60000,
+                    ["pool"] = _conf.pool or 20,
+                    ["timeout"] = _conf.timeout or 1000,
+                }
+            end
+        end
+    end
+
+    -- 简单校验 禁止长度不一致
+    if #config.caches ~= #conf.caches then
+        return nil, 'cache config error'
+    end
+
+    if #config.caches <= 0 then
+        config.caches = ngx.null
+    end
+
+    ngx.log(ngx.INFO, 'Cache config size: ' .. #config.caches)
+    _M.config = config
+    return true, nil
 end
 
 -- 获取缓存链接对象
@@ -300,82 +326,75 @@ function _M:getcache(uid)
     local index = hashid % #caches
     index = index + 1
     local uidkey = config.prefix .. '-cache-uid-' ..uid
-
     local _config = caches[index]
-    local conn = _M:redisconnect(_config)
-    if not conn then
-        return nil, uidkey, 'connect to redis cache fail'
-    end
-    return conn, uidkey, nil
+    local cache = Cache:new(_config, config.exptime)
+    --if not cache then
+    --    return nil, uidkey, 'Create cache instance fail'
+    --end
+    return cache, uidkey, nil
 end
 
--- 获取用户areas信息
-function _M:getuser(uid, cache)
-    local config = _M.config
-    if config ==  ngx.null then
-        return nil, 'config not init'
+function _M:getservers()
+    local servers, _ = _M.shared:get(_M.config.prefix .. '-all-servers')
+    if not servers or servers == ngx.null or servers == '' then
+        return nil
     end
-    local caches = config.caches
+    return servers
+end
 
-    local flush  = false
-    local conn, key, _
-
-    -- fetch user data from redis
-    if caches ~= ngx.null then
-        conn, key, _ = _M:getcache(uid)
-        if not conn then
-            ngx.log(ngx.ERR, "Get connection for cache fail: " .. _)
-        end
-        if cache and conn then
-            local res, _ = getcache(conn, key, false)
-            if res then
-                keepalive(conn)
-                return res, nil
+function _M:setservers(raw, flush)
+    local jdata = cjson.decode(raw)
+    if jdata and #jdata > 0 then
+        if not flush then
+            local lock = _M.lock
+            local key =  _M.config.prefix .. "-all-servers-lock"
+            local elapsed, _ = lock:lock(key)
+            if elapsed == nil then
+                ngx.log(ngx.ERR, 'Get global lock for redis fail')
+                return nil
             end
-            flush = true                   -- no cache found
+            if self.getservers() then
+                lock:unlock()
+                return
+            end
+        end
+        _M.shared:set(_M.config.prefix .. '-all-servers', raw)
+        if not flush then
+            lock:unlock()
         end
     end
-
-    -- fetch user data from mysql
-    local db = _M:mysqlconnect(config)
-    local sql = tbconfig.user
-    ngx.log(ngx.DEBUG, "sql: " .. sql)
-    local res, err, errcode, sqlstate = db:query(sql)
-    if not res then
-        ngx.log(ngx.ERR, "mysql query error: ", err, ": ", errcode, ": ", sqlstate, ".")
-        if conn then
-            ngx.timer.at(0, delcache, conn, key, true)
-        end
-        return nil, 'Mysql execute query error'
-    end
-
-    local ok, _ = db:set_keepalive(config.idle, config.pool)
-    if not ok then
-        ngx.log(ngx.ERR, "failed to set mysql keepalive: ", _)
-        db:close()
-    end
-    -- flush user data into cache
-    if #res > 0 and flush then
-        ngx.timer.at(0, setcache, conn, key, res, true)
-    end
-    return res, nil
 end
 
--- 注册接口调用的时候删除缓存中用户记录
-function _M:deleteuser(uid)
-    local config = _M.config
-    if config == ngx.null then
-        return
+function _M:getrole(uid)
+    local cache, uidkey, _ = _M:getcache(uid)
+    if not cache then
+        return nil
     end
-    local caches = config.caches
-    if caches ~= ngx.null then
-        local conn, key, _ = _M:getcache(uid)
-        if conn then
-            ngx.timer.at(0, delcache, conn, key, true)
-        else
-            ngx.log(ngx.ERR, "Get connection for cache fail: " .. _)
-        end
+    return cache:getrole(uidkey)
+end
+
+function _M:setrole(uid, raw)
+    local cache, uidkey, _ = _M:getcache(uid)
+    if not cache then
+        return nil
     end
+    return cache:setrole(uidkey, raw)
+end
+
+function _M:addrole(uid, raw)
+    local cache, uidkey, _ = _M:getcache(uid)
+    if not cache then
+        return nil
+    end
+    return cache:addrole(uidkey, raw)
+end
+
+function _M:editrole(uid, raw)
+    local cache, uidkey, _ = _M:getcache(uid)
+    if not cache then
+        return nil
+    end
+    return cache:editrole(uidkey, raw)
 end
 
 
