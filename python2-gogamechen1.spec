@@ -67,6 +67,7 @@ install -p -D -m 0754 bin/* %{buildroot}%{_bindir}
 %{python_sitelib}/%{proj_name}/cmd
 %{python_sitelib}/%{proj_name}-%{version}-py?.?.egg-info
 %{_sbindir}/%{proj_name}-init
+%{_sbindir}/%{proj_name}-clean
 %{_bindir}/%{proj_name}-appentity
 %{_bindir}/%{proj_name}-group
 %{_bindir}/%{proj_name}-objfile
