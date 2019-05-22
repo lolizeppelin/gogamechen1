@@ -79,7 +79,6 @@ function _ANALYZE:access_filter(config)
 		if servers then							-- 直接返回缓存数据,不再继续nginx流程
 			ngx.header["Content-Type"] = 'application/json';
 			ngx.say(servers)
-			action = nil
 			return ngx.exit(ngx.HTTP_OK)
 		end
 	elseif action == 'get-roles' then
@@ -89,55 +88,59 @@ function _ANALYZE:access_filter(config)
 			if roles then						-- 直接返回缓存数据,不再继续nginx流程
 				ngx.header["Content-Type"] = 'application/json';
 				ngx.say(roles)
-				action = nil
 				return ngx.exit(ngx.HTTP_OK)
 			end
 		end
 	end
-	if action then
-		ngx.ctx.action = action
-	end
+	ngx.ctx.action = action
 	return ngx.exit(ngx.OK)
+end
+
+
+function _ANALYZE:_do_body_filter(action, raw)
+	if action == 'get-servers' then
+		driver:setservers(raw)
+	elseif action == 'get-roles' then
+		ngx.timer.at(0, driver.setrole, driver, ngx.ctx.uid, raw)		-- 异步
+	elseif action == 'add-role' then
+		ngx.timer.at(0, driver.addrole, driver, ngx.ctx.uid, raw)		-- 异步
+	elseif action == 'edit-role' then
+		ngx.timer.at(0, driver.editrole, driver, ngx.ctx.uid, raw) 	-- 异步
+	elseif action == 'edit-server' then
+		driver:setservers(raw, true)
+	end
 end
 
 
 function _ANALYZE:body_filter()
 
 	local action = ngx.ctx.action
-
+	local eof = ngx.arg[2]
 	if not action or ngx.status ~= 200 then
+		if eof then ngx.log(ngx.ERR, 'out bodyfilter: ' .. action .. 'http status: ' .. ngx.status) end
 		return
 	end
 
-	local chunk, eof = ngx.arg[1], ngx.arg[2]
-
+	local chunk = ngx.arg[1]
 	local buffer = ngx.ctx.buffer
-	if not buffer then
-		buffer = {}
-		ngx.ctx.buffer = {}
-	end
-
-	if chunk ~= '' then
-		buffer[#chunk + 1] = chunk
-		ngx.arg[1] = nil
-	end
 
 	if eof then
-		local raw = table.concat(buffer)
-		ngx.ctx.buffer = nil
-		if action == 'get-servers' then
-			driver:setservers(raw)		-- get servers 接口没有缓存
-		elseif action == 'get-roles' then		-- get roles   接口没有缓存
-			ngx.timer.at(0, driver.setrole, driver, ngx.ctx.uid, raw)		-- 异步
-		elseif action == 'add-role' then
-			ngx.timer.at(0, driver.addrole, driver, ngx.ctx.uid, raw)		-- 异步
-		elseif action == 'edit-role' then
-			ngx.timer.at(0, driver.editrole, driver, ngx.ctx.uid, raw) 	-- 异步
-		elseif action == 'edit-server' then
-			driver:setservers(raw, true)
+		ngx.ctx.action = nil
+		if not buffer then
+			_ANALYZE:_do_body_filter(action, chunk)
+		else
+			buffer[#chunk + 1] = chunk
+			_ANALYZE:_do_body_filter(action, table.concat(buffer))
+			ngx.ctx.buffer = nil
+		end
+	else
+		if not buffer then
+			buffer = {}
+			ngx.ctx.buffer = {}
+		else
+			buffer[#chunk + 1] = chunk
 		end
 	end
-
 end
 
 
