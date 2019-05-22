@@ -347,27 +347,16 @@ function _M:getservers()
     return servers
 end
 
-function _M:setservers(raw, flush)
+function _M:setservers(raw)
     local jdata = cjson.decode(raw)
+    if not jdata then ngx.log(ngx.ERR, 'Servers response is not json') end
     if jdata and #jdata > 0 then
-        if not flush then
-            local lock = _M.lock
-            local key =  _M.config.prefix .. "-all-servers-lock"
-            local elapsed, _ = lock:lock(key)
-            if elapsed == nil then
-                ngx.log(ngx.ERR, 'Get global lock for redis fail')
-                return nil
-            end
-            if self.getservers() then
-                lock:unlock()
-                return
-            end
-        end
         _M.shared:set(_M.config.prefix .. '-all-servers', raw)
-        if not flush then
-            lock:unlock()
-        end
     end
+end
+
+function _M:cleanservers()
+    _M.shared:set(_M.config.prefix .. '-all-servers', ngx.null)
 end
 
 function _M:getrole(uid)
