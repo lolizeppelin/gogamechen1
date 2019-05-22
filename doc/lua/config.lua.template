@@ -1,0 +1,19 @@
+-- 配置参数
+--[[
+-- 全局参数初始化 --
+config.prefix = conf.dict                   -- 必要参数,全局锁用到共享字典名,顺便作为前缀
+config.murmur = conf.murmur                 -- 默认false, 是否使用murmurhash2散布uid
+config.exptime = conf.exptime or 90000      -- 90000,全局过期时间,单位s,默认25小时
+--]]
+
+
+local config = {}
+config.dict = 'gogamechen1'
+config.murmur = true
+config.caches = {
+    { shared = 'gogameroles' },
+}
+
+return config
+
+

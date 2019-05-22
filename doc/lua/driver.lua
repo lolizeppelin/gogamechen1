@@ -1,11 +1,12 @@
 -- 公共数据接口
-local ffi      = require "ffi"
-local ffi_cast = ffi.cast
-local C        = ffi.C
-
+local ngx = require "ngx"
 local cjson = require "cjson.safe"
 local asynclock = require "resty.lock"
 local redis = require "resty.redis"
+
+local ffi      = require "ffi"
+local ffi_cast = ffi.cast
+local C        = ffi.C
 
 
 ffi.cdef[[
@@ -13,7 +14,7 @@ typedef unsigned char u_char;
 uint32_t ngx_murmur_hash2(u_char *data, size_t len);
 ]]
 
-function murmurhash2(value)
+local function murmurhash2(value)
     return tonumber(C.ngx_murmur_hash2(ffi_cast('uint8_t *', value), #value))
 end
 
@@ -67,7 +68,22 @@ local Cache = {}
 
 function Cache:new(config, exptime)
     local obj = {}
+
+    if config.shared then
+        obj.shared = ngx.shared[config.shared]
+        if not obj.shared then
+            return nil
+        end
+    else
+        obj.conn = redisconnect(config)
+        if not obj.conn then
+            return nil
+        end
+    end
+
+
     setmetatable(obj, self)
+
     self.__index = self
     self.config = config
     self.exptime = exptime
@@ -83,7 +99,6 @@ function Cache:new(config, exptime)
         obj.getkey = self.shared_getkey
         obj.delkey = self.shared_delkey
         obj.free = self.shared_free
-        obj.conn = redisconnect(config)
     end
 
     return obj
@@ -228,7 +243,7 @@ function _M:init(conf)
 
     ngx.log(ngx.INFO, 'Try init driver config')
 
-    opts = {
+    local opts = {
         ["timeout"] = conf.locktimeout or 5
     }
     if _M.lock == ngx.null then
@@ -248,23 +263,13 @@ function _M:init(conf)
     end
 
     local config = {}
-    -- 参数初始化 --
+    -- 全局参数初始化 --
     config.prefix = conf.dict                   -- 必要参数,全局锁用到共享字典名,顺便作为前缀
-    config.murmur = conf.murmur
-    -- 全局过期参数
-    config.exptime = conf.exptime or 90000          -- 90000,全局过期时间,单位s,默认25小时
-    -- config of mysql --
-    config.dbpath  = conf.dbpath
-    config.dbhost  = conf.dbhost or '127.0.0.1'     -- 127.0.0.1
-    config.dbport  = conf.dbport or 3306            -- 3306
-    config.schema  = conf.schema                    -- 必要参数
-    config.dbuser  = conf.dbuser                    -- 必要参数
-    config.dbpass  = conf.dbpass                    -- 必要参数
+    config.murmur = conf.murmur                 -- 默认false, 是否使用murmurhash2散布uid
+    config.exptime = conf.exptime or 90000      -- 90000,全局过期时间,单位s,默认25小时
 
     -- config of caches --
     config.caches = {}
-    config.murmur = conf.murmur                 -- 默认false, 是否使用murmurhash2散布uid
-
     local cache_shared = {}
 
     if conf.caches then                         -- caches  redis配置列表
@@ -328,9 +333,9 @@ function _M:getcache(uid)
     local uidkey = config.prefix .. '-cache-uid-' ..uid
     local _config = caches[index]
     local cache = Cache:new(_config, config.exptime)
-    --if not cache then
-    --    return nil, uidkey, 'Create cache instance fail'
-    --end
+    if not cache then
+        return nil, uidkey, 'Create cache instance fail'
+    end
     return cache, uidkey, nil
 end
 

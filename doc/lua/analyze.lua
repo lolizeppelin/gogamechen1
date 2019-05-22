@@ -1,11 +1,11 @@
 -- 数据解析
 local driver = require "driver"
+local ngx = require "ngx"
 
 
 local _ANALYZE = {
 	switch = ngx.null,
 }
-
 
 function _ANALYZE:init(config)
 
@@ -47,6 +47,7 @@ function _ANALYZE:init(config)
 		end,
 		[urlpath .. '/index.php'] = function (method)
 			if method == 'POST'
+			        -- 解析ngx.var.args,不要多次访问ngx.var
 					and ngx.var.arg_m == 'Admin'
 					and ngx.var.arg_c == 'Operation'
 					and ngx.var.arg_a == 'server_batch_set' then
@@ -65,65 +66,79 @@ function _ANALYZE:access_filter(config)
 	local ok, err = _ANALYZE:init(config)
 	if not ok then
 		ngx.log('Init lua analyze fail:' .. err)
-		return ngx.exit(ngx.HTTP_OK)
+		return ngx.exit(ngx.OK)
 	end
-
 	local switch = _ANALYZE.switch[ngx.var.uri]
 	if not switch then
-		return ngx.exit(ngx.HTTP_OK)
+		return ngx.exit(ngx.OK)
 	end
 	local action = switch(ngx.var.request_method)
-	if not action then
-		return ngx.exit(ngx.HTTP_OK)
-	end
-
-	ngx.ctx.action = action
 
 	if action == 'get-servers' then
 		local servers = driver:getservers()
 		if servers then							-- 直接返回缓存数据,不再继续nginx流程
 			ngx.header["Content-Type"] = 'application/json';
-			table.remove(ngx.ctx, 'action')
 			ngx.say(servers)
-			ngx.status = 200
+			action = nil
+			return ngx.exit(ngx.HTTP_OK)
 		end
 	elseif action == 'get-roles' then
 		local uid = ngx.var.arg_userid
 		if uid then
 			local roles = driver:getrole(uid)
 			if roles then						-- 直接返回缓存数据,不再继续nginx流程
-				table.remove(ngx.ctx, 'action')
 				ngx.header["Content-Type"] = 'application/json';
 				ngx.say(roles)
-				ngx.status = 200
+				action = nil
+				return ngx.exit(ngx.HTTP_OK)
 			end
 		end
 	end
-	return ngx.exit(ngx.HTTP_OK)		-- 未设置ngx.status的情况下返回nginx继续
+	if action then
+		ngx.ctx.action = action
+	end
+	return ngx.exit(ngx.OK)
 end
 
 
 function _ANALYZE:body_filter()
 
-	if not ngx.ctx.action or ngx.status ~= 200 then
-		return ngx.exit(ngx.HTTP_OK)
-	end
-
 	local action = ngx.ctx.action
 
-	if action == 'get-servers' then
-		driver:setservers(ngx.arg[1])		-- get servers 接口没有缓存
-	elseif action == 'get-roles' then		-- get roles   接口没有缓存
-		ngx.timer.at(0, driver.setrole, driver, ngx.ctx.uid, ngx.arg[1])		-- 异步
-	elseif action == 'add-role' then
-		ngx.timer.at(0, driver.addrole, driver, ngx.ctx.uid, ngx.arg[1])		-- 异步
-	elseif action == 'edit-role' then
-		ngx.timer.at(0, driver.editrole, driver, ngx.ctx.uid, ngx.arg[1]) 	-- 异步
-	elseif action == 'edit-server' then
-		driver:setservers(ngx.arg[1], true)
+	if not action or ngx.status ~= 200 then
+		return
 	end
 
-	return ngx.exit(ngx.HTTP_OK)
+	local chunk, eof = ngx.arg[1], ngx.arg[2]
+
+	local buffer = ngx.ctx.buffer
+	if not buffer then
+		buffer = {}
+		ngx.ctx.buffer = {}
+	end
+
+	if chunk ~= '' then
+		buffer[#chunk + 1] = chunk
+		ngx.arg[1] = nil
+	end
+
+	if eof then
+		local raw = table.concat(buffer)
+		ngx.ctx.buffer = nil
+		if action == 'get-servers' then
+			driver:setservers(raw)		-- get servers 接口没有缓存
+		elseif action == 'get-roles' then		-- get roles   接口没有缓存
+			ngx.timer.at(0, driver.setrole, driver, ngx.ctx.uid, raw)		-- 异步
+		elseif action == 'add-role' then
+			ngx.timer.at(0, driver.addrole, driver, ngx.ctx.uid, raw)		-- 异步
+		elseif action == 'edit-role' then
+			ngx.timer.at(0, driver.editrole, driver, ngx.ctx.uid, raw) 	-- 异步
+		elseif action == 'edit-server' then
+			driver:setservers(raw, true)
+		end
+	end
+
 end
+
 
 return _ANALYZE
