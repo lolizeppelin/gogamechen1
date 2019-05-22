@@ -63,10 +63,10 @@ local function redisconnect(config)
     return conn
 end
 
--- cache 封装
-local Cache = {}
+-- cache 代理
+local CachePorxy = {}
 
-function Cache:new(config, exptime)
+function CachePorxy:new(config, exptime)
     local obj = {}
 
     if config.shared then
@@ -105,21 +105,21 @@ function Cache:new(config, exptime)
 end
 
 -- redis
-function Cache:redis_getkey(key)
+function CachePorxy:redis_getkey(key)
     return self.conn:get(key)
 end
 
-function Cache:redis_setkey(key, raw)
+function CachePorxy:redis_setkey(key, raw)
     local ok, _ = self.conn:set(key, raw, 'ex', self.exptime)
     return ok
 end
 
-function Cache:redis_delkey(key)
+function CachePorxy:redis_delkey(key)
     local ok, _ = self.conn:del(key)
     return ok
 end
 
-function Cache:redis_free()
+function CachePorxy:redis_free()
     local ok, err = self.conn:set_keepalive(self.config.idle, self.config.pool)
     if not ok then
         ngx.log(ngx.ERR, 'Set redis keepalive fail:' .. err)
@@ -128,7 +128,7 @@ function Cache:redis_free()
 end
 
 -- shared dict
-function Cache:shared_getkey(key)
+function CachePorxy:shared_getkey(key)
     local raw, err = self.shared:get(key)
     if not raw and err then
         return nil, 'Share get key fail: ' .. err
@@ -139,7 +139,7 @@ function Cache:shared_getkey(key)
     return raw, nil
 end
 
-function Cache:shared_setkey(key, raw)
+function CachePorxy:shared_setkey(key, raw)
     local success, err, _ self.shared:set(key, raw)
     if not success then
         ngx.log(ngx.ERR, 'Share set key fail: ' .. err)
@@ -148,16 +148,16 @@ function Cache:shared_setkey(key, raw)
     self.shared:expire(key, self.exptime)
 end
 
-function Cache:shared_delkey(key)
+function CachePorxy:shared_delkey(key)
     self.shared:get(key)
 end
 
-function Cache:shared_free()
+function CachePorxy:shared_free()
     -- do nothing
 end
 
 -- 接口
-function Cache:getrole(key)
+function CachePorxy:getrole(key)
     local raw, err = self.getkey(key)
     if not raw then
         ngx.log(ngx.ERR, 'Get role error: ' .. err)
@@ -171,7 +171,7 @@ function Cache:getrole(key)
     return raw
 end
 
-function Cache:addrole(key, raw)
+function CachePorxy:addrole(key, raw)
     local jdata = cjson.decode(raw)
      if not jdata then
          self.free()
@@ -192,7 +192,7 @@ function Cache:addrole(key, raw)
     self.free()
 end
 
-function Cache:editrole(key, raw)
+function CachePorxy:editrole(key, raw)
     local jdata = cjson.decode(raw)
      if not jdata then
          self.free()
@@ -217,7 +217,7 @@ function Cache:editrole(key, raw)
     self.free()
 end
 
-function Cache:setrole(key, raw)
+function CachePorxy:setrole(key, raw)
     local roles = cjson.decode(raw)
      if not roles then
          self.free()
@@ -314,7 +314,7 @@ function _M:init(conf)
     return true, nil
 end
 
--- 获取缓存链接对象
+-- 获取缓存对象
 function _M:getcache(uid)
     local config = _M.config
     local caches = config.caches
@@ -332,7 +332,7 @@ function _M:getcache(uid)
     index = index + 1
     local uidkey = config.prefix .. '-cache-uid-' ..uid
     local _config = caches[index]
-    local cache = Cache:new(_config, config.exptime)
+    local cache = CachePorxy:new(_config, config.exptime)
     if not cache then
         return nil, uidkey, 'Create cache instance fail'
     end
