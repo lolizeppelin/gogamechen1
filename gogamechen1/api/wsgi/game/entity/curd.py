@@ -103,8 +103,6 @@ class AppEntityCURDRequest(AppEntityReuestBase):
             if packages:
                 joins = joins.joinedload(GameArea.packages, innerjoin=False)
 
-
-
         def _databases():
             _maps = {}
             if objtype != common.GAMESERVER:
@@ -128,8 +126,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                                            order=order, desc=desc,
                                            option=joins,
                                            filter=and_(AppEntity.group_id == group_id,
-                                                       AppEntity.objtype == objtype,
-                                                       AppEntity.status > common.DELETED),
+                                                       AppEntity.objtype == objtype),
                                            page_num=page_num)
         if detail:
             dbmaps = dth.wait()
