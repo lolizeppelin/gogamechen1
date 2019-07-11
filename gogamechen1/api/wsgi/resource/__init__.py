@@ -80,13 +80,14 @@ CONF = cfg.CONF
 
 DEFAULTVALUE = object()
 
-def resource_url(resource_id, fileinfo=None):
+
+def resource_url(resource_id, filename=None):
     resource = resource_cache_map(resource_id, flush=False)
     etype = resource.get('etype')
     name = resource.get('name')
     paths = [etype, name]
-    if fileinfo:
-        paths.append(fileinfo.get('filename'))
+    if filename:
+        paths.append(filename)
     path = urllib.pathname2url(os.path.join(*paths))
     return [urlparse.urljoin(netloc, path) for netloc in resource.get('netlocs')]
 
@@ -187,7 +188,6 @@ class ObjtypeFileReuest(BaseContorller):
             resource = resource_cache_map(resource_id)
             if not resource.get('internal', False):
                 raise InvalidArgument('objtype file resource not a internal resource')
-            address = resource_url(resource_id, fileinfo)[0]
             objfile.resource_id = resource_id
             # 上传结束后通知
             notify = {'success': dict(action='/files/%s' % md5,
@@ -197,6 +197,7 @@ class ObjtypeFileReuest(BaseContorller):
                                    method='DELETE')}
             uri = gopcdn_upload(req, resource_id, body,
                                 fileinfo=fileinfo, notify=notify)
+            address = resource_url(resource_id, uri.get('filename'))[0]
             status = manager_common.DOWNFILE_UPLOADING
         else:
             status = manager_common.DOWNFILE_FILEOK
@@ -983,25 +984,23 @@ class PackageFileReuest(BaseContorller):
             resource = resource_cache_map(resource_id)
             if resource.get('internal'):
                 raise InvalidArgument('apk resource is internal resource')
-            address = resource_url(resource_id, fileinfo)[0]
-            # 上传结束后通知
             with session.begin():
                 pfile = PackageFile(package_id=package_id, ftype=ftype,
                                     resource_id=resource_id, filename=fileinfo.get('filename'),
                                     uptime=uptime, gversion=gversion,
-                                    address=address, status=manager_common.DOWNFILE_UPLOADING,
+                                    address=None, status=manager_common.DOWNFILE_UPLOADING,
                                     desc=desc)
-                try:
-                    session.add(pfile)
-                    session.flush()
-                except DBDuplicateEntry:
-                    raise InvalidArgument('Address %s duplicate' % address)
+                session.add(pfile)
+                session.flush()
                 url = '/%s/package/%d/pfiles/%d' % (common.NAME, package_id, pfile.pfile_id)
+                # 上传结束后通知
                 _notify = {'success': dict(action=url, method='PUT',
                                            body=dict(status=manager_common.DOWNFILE_FILEOK)),
                            'fail': dict(action=url, method='DELETE')}
                 uri = gopcdn_upload(req, resource_id, body,
                                     fileinfo=fileinfo, notify=_notify)
+                pfile.address = resource_url(resource_id, uri.get('filename'))[0]
+                session.flush()
         return resultutils.results(result='add package file for %d success' % package_id,
                                    data=[dict(pfile_id=pfile.pfile_id, uri=uri)])
 
