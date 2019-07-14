@@ -105,7 +105,7 @@ def format_chiefs(objtype, cfile, chiefs):
         return None
     if not os.path.exists(cfile) and not chiefs:
         raise ValueError('No chiefs found')
-    return _format_chiefs(cfile, chiefs)
+    return _format_chiefs(cfile,  chiefs if chiefs else {})
 
 
 def server_flag(objtype, cfile, flag=None):
