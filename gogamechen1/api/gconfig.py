@@ -103,7 +103,7 @@ def _format_chiefs(cfile, chiefs):
 def format_chiefs(objtype, cfile, chiefs):
     if objtype != common.GAMESERVER:
         return None
-    if not not os.path.exists(cfile) and not chiefs:
+    if not os.path.exists(cfile) and not chiefs:
         raise ValueError('No chiefs found')
     return _format_chiefs(cfile, chiefs)
 
