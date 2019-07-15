@@ -309,7 +309,7 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
         @contextlib.contextmanager
         def context(reqeust_id, entitys, agents):
             post_run = {'executer': 'http',
-                        'ekwargs': {'url': url, 'method': 'POST', 'async': False},
+                        'ekwargs': {'url': url, 'method': 'GET', 'async': False},
                          'condition': 'entitys',
                          'ckwargs': {'all': False,
                                      'operator': '=',
