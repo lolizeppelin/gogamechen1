@@ -172,7 +172,8 @@ def packages():
         print('\033[0m')
         sys.exit(1)
     print '\033[1;32;40m\r',
-    print 'List all packages of group: %d success' % CONF.group_id
+    print 'List all packages of group: %d success\n' % CONF.group_id
+    print [p.get('package_id') for p in data]
     print '\033[0m'
     area_heads = ['id', 'name', 'mark', 'status', 'resource_id']
     tb = table.PleasantTable(ident=0, columns=area_heads, counter=True)
@@ -322,7 +323,7 @@ def upvseion():
 
 def main():
 
-    FUNCS = ['list', 'create', 'areas', 'show', 'delete', 'chiefs', 'upvseion']
+    FUNCS = ['list', 'create', 'areas', 'show', 'delete', 'chiefs', 'packages', 'upvseion']
 
     try:
         func = sys.argv.pop(1)

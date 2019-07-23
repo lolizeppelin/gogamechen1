@@ -5,6 +5,7 @@ import logging
 import time
 import sys
 import eventlet
+import base64
 
 from simpleutil.config import cfg
 from simpleutil.config import types
@@ -93,11 +94,6 @@ opentimes_opts = [
 ]
 
 
-area_name_opt = cfg.StrOpt('name',
-                           required=True,
-                           short='n',
-                           help='Game server area name')
-
 datadb_opt = cfg.IntOpt('datadb',
                         short='d',
                         min=1,
@@ -112,11 +108,6 @@ logdb_opt = cfg.IntOpt('logdb',
 cross_opt = cfg.IntOpt('cross',
                        short='c',
                        help='Game server cross id, if not set auto select')
-
-
-packages_opts = cfg.ListOpt('packages',
-                            item_type=cfg.IntOpt,
-                            help="Belong to packages")
 
 
 one_opts = [group_opt, objtype_opt, entity_opt]
@@ -144,10 +135,13 @@ migrate_opts = [
                help='Migrate dest agent')
 ]
 
-gamesvr_create_ext_opt = [area_name_opt, logdb_opt, opentime_opt, cross_opt, packages_opts,
+gamesvr_create_ext_opt = [logdb_opt, opentime_opt, cross_opt,
                           cfg.ListOpt('packages',
-                                      item_type=cfg.IntOpt,
+                                      item_type=types.Integer(),
                                       help="Belong to packages"),
+                          cfg.StrOpt('areaname',
+                                     required=True,
+                                     help="Area name"),
                           cfg.IntOpt('show_id',
                                      required=True,
                                      help='Area show id'
@@ -289,10 +283,10 @@ def create():
         databases.setdefault('datadb', CONF.datadb)
 
     if objtype == common.GAMESERVER:
-        body.setdefault('show_id', CONF.show_id)
-        body.setdefault('areaname', CONF.name)
-        body.setdefault('platform', CONF.platform)
         body.setdefault('opentime', CONF.opentime)
+        body.setdefault('show_id', CONF.show_id)
+        body.setdefault('areaname', base64.decodestring(base64.urlsafe_b64decode(CONF.areaname)))
+        body.setdefault('platform', CONF.platform)
         if CONF.packages:
             body.setdefault('packages', CONF.packages)
         if CONF.cross:
@@ -323,8 +317,8 @@ def create():
     if objtype == common.GAMESERVER:
         print 'cross id: %d' % appentity.get('cross_id')
         print 'opentime: %s' % timeutils.unix_to_iso(CONF.opentime)
-        print 'area id: %d' % appentity.get('area_id')
-        print 'area name: %s' % CONF.name
+        print 'area id: %d' % appentity.get('areas')[0]['area_id']
+        print 'area name: %s' % CONF.areaname
     print '-------------database info-------------'
     for subtype in databases:
         database = databases[subtype]
