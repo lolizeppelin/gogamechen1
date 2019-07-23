@@ -71,6 +71,20 @@ group_opts = cfg.StrOpt('group_id',
                         help='Package for game group, 1,2,3 or 1-5, or all')
 
 
+new_version_opts = [
+    cfg.IntOpt('resource_id',
+               short='r',
+               required=True,
+               help='Same resource id pakcage'
+               ),
+    cfg.StrOpt('rversion',
+               short='n',
+               required=True,
+               help='New resource version'
+               )
+
+]
+
 
 def client(session=None):
     return GogameChen1DBClient(httpclient=ManagerClient(url=CONF.gcenter, port=CONF.gcenter_port,
@@ -267,8 +281,47 @@ def chiefs():
                     ])
     print tb.pformat()
 
+
+def upvseion():
+    CONF.register_cli_opt(group_opts)
+    CONF.register_cli_opt(new_version_opts)
+    _client = client()
+    code, result, data = prepare_results(_client.group_packages,
+                                         CONF.group_id, body=None)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        print('\033[0m')
+        sys.exit(1)
+    _packages = []
+    for package in data:
+        if package.resource_id == CONF.resource_id:
+            _packages.append(package.package_id)
+
+    if not _packages:
+        print('\033[1;31;40m')
+        print 'No package found with resource %d' % CONF.resource_id
+        print('\033[0m')
+
+    for package_id in _packages:
+        body = {'rversion': CONF.rversion}
+        code, result, data = prepare_results(_client.package_update,
+                                             CONF.group_id, body=body)
+        if code:
+            print('\033[1;31;40m')
+            print 'Fail, code %d, result %s' % (code, result)
+            print 'Change package rversion fail, package %d' % package_id
+            print('\033[0m')
+            sys.exit(1)
+
+    print('\033[1;31;40m')
+    print 'All package found change rversion %s success' % CONF.rversion
+    print('\033[0m')
+
+
 def main():
-    FUNCS = ['list', 'create', 'areas', 'show', 'delete', 'chiefs']
+
+    FUNCS = ['list', 'create', 'areas', 'show', 'delete', 'chiefs', 'upvseion']
 
     try:
         func = sys.argv.pop(1)
