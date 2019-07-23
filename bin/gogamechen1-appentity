@@ -87,7 +87,7 @@ opentimes_opts = [
     cfg.IntOpt('end',
                required=True,
                help='Show id end'),
-    cfg.IntOpt('date',
+    cfg.StrOpt('date',
                short='d',
                required=True,
                help='opentime of date'),
