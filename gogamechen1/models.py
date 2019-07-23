@@ -10,6 +10,9 @@ from sqlalchemy.dialects.mysql import INTEGER
 from sqlalchemy.dialects.mysql import CHAR
 from sqlalchemy.dialects.mysql import ENUM
 from sqlalchemy.dialects.mysql import BLOB
+from sqlalchemy.dialects.mysql import MEDIUMINT
+from sqlalchemy.dialects.mysql import BOOLEAN
+from sqlalchemy.dialects.mysql import BIGINT
 
 from simpleservice.ormdb.models import TableBase
 from simpleservice.ormdb.models import InnoDBTableBase
@@ -106,6 +109,8 @@ class Package(TableBase):
 
 class ObjtypeFile(TableBase):
     md5 = sa.Column(CHAR(36), nullable=False, primary_key=True)
+    srcname = sa.Column(VARCHAR(256), nullable=False)
+    group = sa.Column(INTEGER(unsigned=True), nullable=False)
     objtype = sa.Column(VARCHAR(64), nullable=False)
     subtype = sa.Column(VARCHAR(64), nullable=False)
     version = sa.Column(VARCHAR(128), nullable=False)
@@ -145,6 +150,7 @@ class GameArea(TableBase):
                          nullable=False)
     show_id = sa.Column(INTEGER(unsigned=True), nullable=False)
     areaname = sa.Column(VARCHAR(128), nullable=False)
+    gid = sa.Column(BIGINT(unsigned=True), nullable=True)
     entity = sa.Column(sa.ForeignKey('appentitys.entity', ondelete="RESTRICT", onupdate='RESTRICT'),
                        nullable=False)
     packages = orm.relationship(PackageArea, backref='area', lazy='select', cascade='delete,delete-orphan')
@@ -166,6 +172,7 @@ class AppEntity(TableBase):
     opentime = sa.Column(INTEGER(unsigned=True), nullable=True)
     status = sa.Column(TINYINT(64), nullable=False, default=common.UNACTIVE)
     cross_id = sa.Column(INTEGER(unsigned=True), nullable=True)
+    set_id = sa.Column(INTEGER(unsigned=True), nullable=True)
     # 资源版本优先级设置, key pakcage id  value  version
     versions = sa.Column(BLOB, nullable=True)
     areas = orm.relationship(GameArea, backref='appentity', lazy='select',
@@ -184,6 +191,8 @@ class Group(TableBase):
     group_id = sa.Column(INTEGER(unsigned=True), nullable=False, primary_key=True,
                          autoincrement=True)
     name = sa.Column(VARCHAR(64), default=None, nullable=False)
+    platfrom_id = sa.Column(MEDIUMINT(unsigned=True), nullable=False, default=0)
+    warsvr = sa.Column(BOOLEAN, default=False, nullable=False)
     desc = sa.Column(VARCHAR(256), nullable=True)
     areas = orm.relationship(GameArea, backref='group', lazy='select',
                              cascade='delete,delete-orphan')

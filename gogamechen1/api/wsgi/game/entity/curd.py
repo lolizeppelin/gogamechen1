@@ -154,6 +154,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                 for area in areas:
                     _area = dict(area_id=area.area_id,
                                  show_id=area.show_id,
+                                 gid=0,
                                  areaname=area.areaname)
                     if packages:
                         _area.setdefault('packages', [parea.package_id for parea in area.packages])
@@ -348,10 +349,11 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                 session.add(appentity)
                 session.flush()
                 if objtype == common.GAMESERVER:
-                    gamearea = GameArea(areaname=areaname.decode('utf-8')
-                    if isinstance(areaname, six.binary_type) else areaname,
-                                        group_id=_group.group_id,
+                    areaname = areaname.decode('utf-8') if isinstance(areaname, six.binary_type) else areaname
+                    gamearea = GameArea(group_id=_group.group_id,
                                         show_id=show_id,
+                                        areaname=areaname,
+                                        gid=None,
                                         entity=appentity.entity)
                     session.add(gamearea)
                     session.flush()
@@ -375,7 +377,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
 
             areas = []
             if objtype == common.GAMESERVER:
-                areas = [dict(area_id=gamearea.area_id, areaname=areaname, show_id=show_id)]
+                areas = [dict(area_id=gamearea.area_id, gid=0, areaname=areaname, show_id=show_id)]
                 _result.setdefault('areas', areas)
                 _result.setdefault('cross_id', cross_id)
                 _result.setdefault('opentime', opentime)
@@ -436,6 +438,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                                               versions=jsonutils.loads_as_bytes(_entity.versions)
                                               if _entity.versions else None,
                                               areas=[dict(area_id=area.area_id,
+                                                          gid=0,
                                                           show_id=area.show_id,
                                                           areaname=area.areaname.encode('utf-8'),
                                                           ) for area in _entity.areas],

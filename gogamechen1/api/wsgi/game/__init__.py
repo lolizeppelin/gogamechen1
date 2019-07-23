@@ -111,6 +111,8 @@ class GroupReuest(BaseContorller):
         session = endpoint_session(readonly=True)
         columns = [Group.group_id,
                    Group.name,
+                   Group.platfrom_id,
+                   Group.warsvr,
                    Group.desc,
                    Group.areas]
 
@@ -134,7 +136,7 @@ class GroupReuest(BaseContorller):
         session = endpoint_session()
         name = utils.validate_string(body.get('name'))
         desc = body.get('desc')
-        _group = Group(name=name, desc=desc)
+        _group = Group(name=name, desc=desc, platfrom_id=0, warsvr=False)
         session.add(_group)
         try:
             session.flush()
@@ -143,6 +145,8 @@ class GroupReuest(BaseContorller):
         return resultutils.results(result='create group success',
                                    data=[dict(group_id=_group.group_id,
                                               name=_group.name,
+                                              platfrom_id=_group.platfrom_id,
+                                              warsvr=_group.warsvr,
                                               desc=_group.desc)])
 
     def show(self, req, group_id, body=None):
@@ -158,6 +162,8 @@ class GroupReuest(BaseContorller):
         _group = query.one()
         group_info = dict(group_id=_group.group_id,
                           name=_group.name,
+                          platfrom_id=_group.platfrom_id,
+                          warsvr=_group.warsvr,
                           desc=_group.desc)
         if detail:
             _entitys = {}

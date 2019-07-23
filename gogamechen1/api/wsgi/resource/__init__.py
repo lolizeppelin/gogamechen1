@@ -146,9 +146,11 @@ class ObjtypeFileReuest(BaseContorller):
 
         session = endpoint_session(readonly=True)
         columns = [ObjtypeFile.md5,
+                   ObjtypeFile.srcname,
                    ObjtypeFile.resource_id,
                    ObjtypeFile.objtype,
                    ObjtypeFile.subtype,
+                   ObjtypeFile.group,
                    ObjtypeFile.version]
 
         results = resultutils.bulk_results(session,
@@ -167,11 +169,13 @@ class ObjtypeFileReuest(BaseContorller):
         subtype = utils.validate_string(body.pop('subtype'))
         objtype = body.pop('objtype')
         version = body.pop('version')
+        group = body.pop('group', 0)
 
         address = body.get('address')
         fileinfo = body.pop('fileinfo', None)
         if not fileinfo:
             raise InvalidArgument('Fileinfo and address is none')
+        srcname = fileinfo.get('filename')
 
         md5 = fileinfo.get('md5')
         ext = fileinfo.get('ext') or os.path.splitext(fileinfo.get('filename'))[1][1:]
@@ -179,7 +183,9 @@ class ObjtypeFileReuest(BaseContorller):
         if ext.startswith('.'):
             ext = ext[1:]
 
-        objfile = ObjtypeFile(md5=md5, objtype=objtype, version=version, subtype=subtype)
+        objfile = ObjtypeFile(md5=md5, srcname=srcname,
+                              objtype=objtype, version=version,
+                              subtype=subtype, group=group)
         # 没有地址,通过gopcdn上传并存放
         if not address:
             resource_id = CONF[common.NAME].objfile_resource
@@ -234,6 +240,8 @@ class ObjtypeFileReuest(BaseContorller):
         file_info.setdefault('objtype', objfile.objtype)
         file_info.setdefault('version', objfile.version)
         file_info.setdefault('resource_id', objfile.resource_id)
+        file_info.setdefault('srcname', objfile.srcname)
+        file_info.setdefault('group', objfile.group)
         return resultutils.results(result='get file of %s success' % md5,
                                    data=[file_info, ])
 
@@ -447,6 +455,7 @@ class PackageReuest(BaseContorller):
             if areas:
                 info.setdefault('areas', [
                     dict(area_id=area_id,
+                         gid=0,
                          show_id=areas_maps[area_id].get('show_id'),
                          areaname=areas_maps[area_id].get('areaname'),
                          entity=areas_maps[area_id].get('entity'),
