@@ -16,6 +16,6 @@ update `groups` set `platfrom_id` = 0;
 alter TABLE `groups` modify column `platfrom_id` mediumint(8) unsigned NOT NULL;
 
 
-alter TABLE `groups` add column warsvr` tinyint(1) DEFAULT NULL after `platfrom_id`;
+alter TABLE `groups` add column `warsvr` tinyint(1) DEFAULT NULL after `platfrom_id`;
 update `groups` set `warsvr` = 0;
-alter TABLE `groups` modify column warsvr` tinyint(1) NOT NULL;
+alter TABLE `groups` modify column `warsvr` tinyint(1) NOT NULL;
