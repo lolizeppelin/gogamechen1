@@ -78,6 +78,21 @@ opentime_opt = cfg.IntOpt('opentime',
                           short='t',
                           help='Game server opentime time, default is now')
 
+
+opentimes_opts = [
+    cfg.IntOpt('start',
+               required=True,
+               help='Show id start'),
+    cfg.IntOpt('end',
+               required=True,
+               help='Show id end'),
+    cfg.IntOpt('date',
+               short='d',
+               required=True,
+               help='opentime of date'),
+]
+
+
 area_name_opt = cfg.StrOpt('name',
                            required=True,
                            short='n',
@@ -99,12 +114,18 @@ cross_opt = cfg.IntOpt('cross',
                        help='Game server cross id, if not set auto select')
 
 
+packages_opts = cfg.ListOpt('packages',
+                            item_type=cfg.IntOpt,
+                            help="Belong to packages")
+
+
 one_opts = [group_opt, objtype_opt, entity_opt]
 
 create_opts = [group_opt, objtype_opt,
                agent_opt, zone_opt,
                appfile_opt,
-               datadb_opt]
+               datadb_opt,
+               ]
 
 reset_opts = [
     cfg.BoolOpt('databases',
@@ -123,7 +144,20 @@ migrate_opts = [
                help='Migrate dest agent')
 ]
 
-gamesvr_create_ext_opt = [area_name_opt, logdb_opt, area_name_opt, opentime_opt, cross_opt]
+gamesvr_create_ext_opt = [area_name_opt, logdb_opt, opentime_opt, cross_opt, packages_opts,
+                          cfg.ListOpt('packages',
+                                      item_type=cfg.IntOpt,
+                                      help="Belong to packages"),
+                          cfg.IntOpt('show_id',
+                                     required=True,
+                                     help='Area show id'
+                                     ),
+                          cfg.StrOpt('platform',
+                                     choices=[common.ANDROID, common.IOS, common.ANY],
+                                     required=True,
+                                     help='Entity platform type'
+                                     ),
+                          ]
 
 area_opt = cfg.IntOpt('area', help='Target area id')
 
@@ -255,8 +289,12 @@ def create():
         databases.setdefault('datadb', CONF.datadb)
 
     if objtype == common.GAMESERVER:
+        body.setdefault('show_id', CONF.show_id)
         body.setdefault('areaname', CONF.name)
+        body.setdefault('platform', CONF.platform)
         body.setdefault('opentime', CONF.opentime)
+        if CONF.packages:
+            body.setdefault('packages', CONF.packages)
         if CONF.cross:
             body.setdefault('cross_id', CONF.cross)
         if CONF.logdb:
@@ -660,10 +698,47 @@ def opentime():
     print('\033[0m')
 
 
+def opentimes():
+    CONF.register_cli_opt(group_opt)
+    CONF.register_cli_opts(opentimes_opts)
+    CONF(project='cmd')
+
+    show_ids = set([])
+    entitys = set()
+
+    import datetime
+    opentime = int(time.mktime(datetime.datetime.strptime(CONF.date, '%Y%m%d').timetuple()))
+
+    for index in range(CONF.start, CONF.end + 1):
+        show_ids.add(index)
+
+    _client = client()
+    emap = maps(_client, CONF.group_id)
+    for entity in emap:
+        areas = emap[entity]
+        for area in areas:
+            if area['show_id'] in show_ids:
+                entitys.add(entity)
+
+    for entity in entitys:
+        code, result, data = prepare_results(_client.game_opentime, CONF.group_id,
+                                             entity, opentime)
+        if code:
+            print('\033[1;31;40m')
+            print 'Fail, code %d, result %s' % (code, result)
+            print('\033[0m')
+            sys.exit(1)
+        print 'Change opentime for entity %d success' % entity
+
+    print('\033[1;31;40m')
+    print 'All appentity chaange opentime success'
+    print('\033[0m')
+
+
 def main():
     FUNCS = ['list', 'create', 'show', 'delete',
              'start', 'stop', 'status', 'flushconfig', 'upgrade',
-             'vquote', 'unvquote', 'clean', 'opentime', 'reset', 'migrate']
+             'vquote', 'unvquote', 'clean', 'opentime', 'reset', 'migrate', 'opentimes']
     try:
         func = sys.argv.pop(1)
         if func not in FUNCS:
