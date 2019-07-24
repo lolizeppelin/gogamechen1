@@ -136,9 +136,12 @@ migrate_opts = [
 ]
 
 gamesvr_create_ext_opt = [logdb_opt, opentime_opt, cross_opt,
-                          cfg.ListOpt('packages',
+                          cfg.ListOpt('include',
                                       item_type=types.Integer(),
-                                      help="Belong to packages"),
+                                      help="include packages"),
+                          cfg.ListOpt('exclude',
+                                      item_type=types.Integer(),
+                                      help="exclude packages"),
                           cfg.StrOpt('areaname',
                                      required=True,
                                      help="Area name"),
@@ -287,8 +290,10 @@ def create():
         body.setdefault('show_id', CONF.show_id)
         body.setdefault('areaname', base64.decodestring(base64.urlsafe_b64decode(CONF.areaname)))
         body.setdefault('platform', CONF.platform)
-        if CONF.packages:
-            body.setdefault('packages', CONF.packages)
+        if CONF.include:
+            body.setdefault('include', CONF.include)
+        if CONF.exclude:
+            body.setdefault('exclude', CONF.exclude)
         if CONF.cross:
             body.setdefault('cross_id', CONF.cross)
         if CONF.logdb:

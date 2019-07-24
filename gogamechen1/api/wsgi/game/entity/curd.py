@@ -72,8 +72,10 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                            'areaname': {'type': 'string', 'description': '区服名称, gameserver专用参数'},
                            'platform': {'type': 'string', 'enum': [common.ANDROID, common.IOS, common.ANY],
                                         'description': '平台类型, gameserver专用参数'},
-                           'packages': {'type': 'array', 'items': {'type': 'integer', 'minimum': 1},
-                                        'description': '新建实体对指定包可见'},
+                           'exclude': {'type': 'array', 'items': {'type': 'integer', 'minimum': 1},
+                                       'description': '新建实体可见包排除过滤, 与exclude参数互斥'},
+                           'include': {'type': 'array', 'items': {'type': 'integer', 'minimum': 1},
+                                       'description': '新建实体可见包包含过滤,与exclude参数互斥'},
                            'databases': {'type': 'object', 'description': '程序使用的数据库,不填自动分配'}}
                        }
 
@@ -189,7 +191,13 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         areaname = body.pop('areaname', None)
         # 平台类型
         platform = body.get('platform')
-        packages = list(set(body.pop('packages', [])))
+
+        include = set(body.pop('include', []))
+        exclude = set(body.pop('exclude', []))
+        if include and exclude:
+            raise InvalidArgument('Both packages and exclude is forbidden')
+        packages = []
+
         session = endpoint_session()
         if objtype == common.GAMESERVER:
             platform = common.PlatformTypeMap.get(platform)
@@ -213,17 +221,19 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         _group = query.one()
         glock = get_gamelock()
         with glock.grouplock(group_id):
-            if objtype == common.GAMESERVER and packages:
-                _packages = model_query(session, Package, filter=Package.package_id.in_(packages)).all()
-                if len(_packages) != len(packages):
-                    raise InvalidArgument('Package can not be found when create entity')
-                for package in _packages:
-                    if package.group_id != group_id:
-                        raise InvalidArgument('Package group not match when create entity')
-                    if not (package.platform & platform):
-                        raise InvalidArgument('Pacakge platform not match when create entity')
-            else:
-                _packages = []
+            if objtype == common.GAMESERVER:
+                _pquery = model_query(session, Package, filter=Package.group_id == group_id)
+                _packages = set([p.package_id for p in _pquery.all() if p.platform & platform])
+
+                if (include - _packages) or (exclude - _packages):
+                    raise InvalidArgument('Package can not be found in include or exclude')
+                if exclude:
+                    packages = _packages - exclude
+                elif include:
+                    packages = include
+                else:
+                    packages = _packages
+
             typemap = {}
             for _entity in _group.entitys:
                 # 跳过未激活的实体
@@ -382,7 +392,7 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                 _result.setdefault('cross_id', cross_id)
                 _result.setdefault('opentime', opentime)
                 _result.setdefault('platform', platform)
-                _result.setdefault('packages', [package.package_id for package in _packages])
+                _result.setdefault('packages', sorted(packages))
 
         # 添加端口
         # threadpool.add_thread(port_controller.unsafe_create,
