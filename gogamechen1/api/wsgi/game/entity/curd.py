@@ -181,6 +181,8 @@ class AppEntityCURDRequest(AppEntityReuestBase):
         body = body or {}
         group_id = int(group_id)
         jsonutils.schema_validate(body, self.CREATEAPPENTITY)
+        if body.get('packages'):
+            raise InvalidArgument('Package parameter is removed')
         # 找cross服务, gameserver专用
         cross_id = body.pop('cross_id', None)
         # 开服时间, gameserver专用
