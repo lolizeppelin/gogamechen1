@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # -*- encoding: utf-8 -*-
+import json
 import logging
 import sys
 
@@ -29,6 +30,12 @@ subtype_opt = cfg.StrOpt('subtype',
                          choices=['datadb', 'logdb', 'appfile'],
                          help='Game subtype objfile for')
 
+format_opt = cfg.StrOpt('format',
+                        default='table',
+                        choices=['table', 'json'],
+                        help='Out put format'
+                        )
+
 
 def client(session=None):
     return GogameChen1DBClient(httpclient=ManagerClient(url=CONF.gcenter, port=CONF.gcenter_port,
@@ -39,6 +46,7 @@ def client(session=None):
 def agents():
     CONF.register_cli_opt(zone_opt)
     CONF.register_cli_opt(objtype_opt)
+    CONF.register_cli_opt(format_opt)
     CONF(project='cmd')
     _client = client()
     code, result, data = prepare_results(_client.agents_chioces, CONF.objtype, CONF.zone)
@@ -49,19 +57,23 @@ def agents():
             print data
         print('\033[0m')
         sys.exit(1)
-    agents_head = ['index', 'agent id']
-    print '\033[1;32;40m\r',
-    print 'List %s agents chioces success' % CONF.objtype
-    print '\033[0m'
-    tb = table.PleasantTable(ident=0, columns=agents_head, counter=True)
-    for index, agent_id in enumerate(data):
-        tb.add_row([index + 1, agent_id])
-    print tb.pformat()
+    if CONF.format == 'table':
+        agents_head = ['index', 'agent id']
+        print '\033[1;32;40m\r',
+        print 'List %s agents chioces success' % CONF.objtype
+        print '\033[0m'
+        tb = table.PleasantTable(ident=0, columns=agents_head, counter=True)
+        for index, agent_id in enumerate(data):
+            tb.add_row([index + 1, agent_id])
+        print tb.pformat()
+    elif CONF.format == 'json':
+        print json.dumps(data, ensure_ascii=False)
 
 
 def databases():
     CONF.register_cli_opt(zone_opt)
     CONF.register_cli_opt(objtype_opt)
+    CONF.register_cli_opt(format_opt)
     CONF(project='cmd')
     _client = client()
     code, result, data = prepare_results(_client.databases_chioces, CONF.objtype, CONF.zone)
@@ -73,17 +85,20 @@ def databases():
         print('\033[0m')
         sys.exit(1)
     database_heads = ['index', 'database_id']
-    print '\033[1;32;40m\r',
-    print 'List %s databases chioces success' % CONF.objtype
-    print('\033[0m')
-    for chioce in data:
-        print '\033[1;32;40m\raffinity: %d\033[0m' % chioce['affinity']
-        _databases = chioce.get('databases')
-        if _databases:
-            tb = table.PleasantTable(ident=8, columns=database_heads, counter=True)
-            for index, database_id in enumerate(_databases):
-                tb.add_row([index + 1, database_id])
-            print tb.pformat()
+    if CONF.format == 'table':
+        print '\033[1;32;40m\r',
+        print 'List %s databases chioces success' % CONF.objtype
+        print('\033[0m')
+        for chioce in data:
+            print '\033[1;32;40m\raffinity: %d\033[0m' % chioce['affinity']
+            _databases = chioce.get('databases')
+            if _databases:
+                tb = table.PleasantTable(ident=8, columns=database_heads, counter=True)
+                for index, database_id in enumerate(_databases):
+                    tb.add_row([index + 1, database_id])
+                print tb.pformat()
+    elif CONF.format == 'json':
+        print json.dumps(data, ensure_ascii=False)
 
 
 def main():
