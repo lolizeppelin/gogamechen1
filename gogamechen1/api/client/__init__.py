@@ -488,7 +488,7 @@ class GogameChen1DBClient(GopDBClient, GopCdnClient):
         return results
 
     def package_update(self, group_id, package_id, body):
-        resp, results = self.put(action=self.package_path % (str(group_id), package_id), body=body)
+        resp, results = self.put(action=self.package_path % (str(group_id), str(package_id)), body=body)
         if results['resultcode'] != common.RESULT_SUCCESS:
             raise ServerExecuteRequestError(message='update %d package fail:%d' %
                                                     (group_id, results['resultcode']),

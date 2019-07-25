@@ -4,6 +4,7 @@ import logging
 import sys
 
 from simpleutil.config import cfg
+from simpleutil.config.cfg import types
 from simpleutil.utils import table
 
 from goperation.api.client.config import client_opts
@@ -72,6 +73,11 @@ group_opts = cfg.StrOpt('group_id',
 
 
 new_version_opts = [
+    cfg.IntOpt('group_id',
+               required=True,
+               short='g',
+               help='Package for game group'
+               ),
     cfg.IntOpt('resource_id',
                short='r',
                required=True,
@@ -81,8 +87,11 @@ new_version_opts = [
                short='n',
                required=True,
                help='New resource version'
-               )
-
+               ),
+    cfg.ListOpt('exclude',
+                item_type=types.Integer(),
+                help='Exclude package id',
+                )
 ]
 
 
@@ -283,9 +292,9 @@ def chiefs():
     print tb.pformat()
 
 
-def upvseion():
-    CONF.register_cli_opt(group_opts)
+def upversion():
     CONF.register_cli_opts(new_version_opts)
+    CONF(project='cmd')
     _client = client()
     code, result, data = prepare_results(_client.group_packages,
                                          CONF.group_id, body=None)
@@ -296,18 +305,29 @@ def upvseion():
         sys.exit(1)
     _packages = []
     for package in data:
-        if package.resource_id == CONF.resource_id:
-            _packages.append(package.package_id)
+        if package['resource_id'] == CONF.resource_id:
+            _packages.append(package['package_id'])
+
+    if CONF.exclude:
+        exclude = set(CONF.exclude)
+        if exclude - set(_packages):
+            print('\033[1;31;40m')
+            print('Exclude package not in package list')
+            print('\033[0m')
+            sys.exit(1)
+        _packages = set(_packages) - exclude
 
     if not _packages:
         print('\033[1;31;40m')
         print 'No package found with resource %d' % CONF.resource_id
         print('\033[0m')
 
+    _packages = sorted(_packages)
+
     for package_id in _packages:
         body = {'rversion': CONF.rversion}
         code, result, data = prepare_results(_client.package_update,
-                                             CONF.group_id, body=body)
+                                             CONF.group_id, str(package_id), body=body)
         if code:
             print('\033[1;31;40m')
             print 'Fail, code %d, result %s' % (code, result)
@@ -323,7 +343,7 @@ def upvseion():
 
 def main():
 
-    FUNCS = ['list', 'create', 'areas', 'show', 'delete', 'chiefs', 'packages', 'upvseion']
+    FUNCS = ['list', 'create', 'areas', 'show', 'delete', 'chiefs', 'packages', 'upversion']
 
     try:
         func = sys.argv.pop(1)
