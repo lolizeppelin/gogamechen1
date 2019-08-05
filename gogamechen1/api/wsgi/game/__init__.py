@@ -404,11 +404,11 @@ class GroupReuest(BaseContorller):
                               ro_user=database.ro_user,
                               ro_passwd=database.ro_passwd,
                               subtype=database.subtype,
-                              schema='%s_%s_%s_%d' % (common.NAME, objtype, database.subtype, entity),
+                              schema='%s_%s_%s_%d' % (common.NAME, objtype, database.subtype, entity.entity),
                               slaves=slaves,
                               )
                 databases[database.subtype] = dbinfo
-            data.append({'entity': entity.entity, 'group_id': group_id, 'objtype': objtype, 'database': databases})
+            data.append({'entity': entity.entity, 'group_id': group_id, 'objtype': objtype, 'databases': databases})
         return resultutils.results(result='list group entity database success', data=data)
 
 @singleton.singleton

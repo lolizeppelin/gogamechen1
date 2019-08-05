@@ -370,7 +370,7 @@ def databases():
         entity_heads = ['id', 'group', 'objtype']
         for entity in data:
             tb = table.PleasantTable(ident=0, columns=entity_heads, counter=False)
-            tb.add_row([entity.get('entity'), entity.get('group'), entity.get('objtype')])
+            tb.add_row([entity.get('entity'), entity.get('group_id'), entity.get('objtype')])
             print tb.pformat()
             tb = table.PleasantTable(ident=15, columns=db_heads, counter=False)
             _databases = entity.get('databases')
