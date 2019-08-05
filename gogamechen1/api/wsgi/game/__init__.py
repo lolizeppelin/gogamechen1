@@ -375,6 +375,41 @@ class GroupReuest(BaseContorller):
         return resultutils.results(result='list group areas success',
                                    data=[dict(chiefs=chiefs, areas=areas)])
 
+    def databases(self, req, group_id, body=None):
+        body = body or {}
+        objtype = body.get('objtype', common.GAMESERVER)
+        group_id = int(group_id)
+        session = endpoint_session(readonly=True)
+        _format = body.get('format') or 'list'
+        query = model_query(session, AppEntity, filter=and_(AppEntity.group_id == group_id,
+                                                            AppEntity.objtype == objtype))
+        query = query.options(joinedload(AppEntity.databases, innerjoin=False))
+
+        entitys = query.all()
+        slaves_map = database_controller.slaves_address([database.database_id
+                                                         for entity in entitys for database in entity.databases])
+
+        data = []
+        for entity in entitys:
+            databases = {}
+            for database in entity.databases:
+                try:
+                    slaves = slaves_map[database.database_id]
+                except KeyError:
+                    slaves = []
+
+                dbinfo = dict(database_id=database.database_id,
+                              host=database.host,
+                              port=database.port,
+                              ro_user=database.ro_user,
+                              ro_passwd=database.ro_passwd,
+                              subtype=database.subtype,
+                              schema='%s_%s_%s_%d' % (common.NAME, objtype, database.subtype, entity),
+                              slaves=slaves,
+                              )
+                databases[database.subtype] = dbinfo
+            data.append({'entity': entity.entity, 'group_id': group_id, 'objtype': objtype, 'database': databases})
+        return resultutils.results(result='list group entity database success', data=data)
 
 @singleton.singleton
 class AppEntityReuest(AppEntityCURDRequest,

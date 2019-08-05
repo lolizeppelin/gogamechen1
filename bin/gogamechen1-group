@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # -*- encoding: utf-8 -*-
+import json
 import logging
 import sys
 
@@ -93,6 +94,13 @@ new_version_opts = [
                 help='Exclude package id',
                 )
 ]
+
+
+format_opt = cfg.StrOpt('format',
+                        default='table',
+                        choices=['table', 'json'],
+                        help='Out put format'
+                        )
 
 
 def client(session=None):
@@ -341,9 +349,47 @@ def upversion():
     print('\033[0m')
 
 
+def databases():
+    CONF.register_cli_opts(one_opts)
+    CONF.register_cli_opts(format_opt)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.group_databases, CONF.group_id)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+    if CONF.format == 'table':
+        print '\033[1;32;40m\r',
+        print 'List all databases of group: %d success\n' % CONF.group_id
+        print '\033[0m'
+        db_heads = ['id', 'host', 'port', 'ro_user', 'ro_passwd', 'subtype', 'schema']
+        entity_heads = ['id', 'group', 'objtype']
+        for entity in data:
+            tb = table.PleasantTable(ident=0, columns=entity_heads, counter=False)
+            tb.add_row([entity.get('entity'), entity.get('group'), entity.get('objtype')])
+            print tb.pformat()
+            tb = table.PleasantTable(ident=15, columns=db_heads, counter=False)
+            _databases = entity.get('databases')
+            if _databases:
+                for subtype in entity.get('databases'):
+                    database = _databases[subtype]
+                    tb.add_row([database.get('database_id'), database.get('host'), database.get('port'),
+                                database.get('ro_user'), database.get('ro_passwd'),  database.get('subtype'),
+                                database.get('schema'),
+                                ])
+            print tb.pformat()
+    elif CONF.format == 'json':
+        print json.dumps(data, ensure_ascii=False)
+
+
+
 def main():
 
-    FUNCS = ['list', 'create', 'areas', 'show', 'delete', 'chiefs', 'packages', 'upversion']
+    FUNCS = ['list', 'create', 'areas', 'show', 'delete', 'chiefs', 'packages', 'upversion', 'databases']
 
     try:
         func = sys.argv.pop(1)

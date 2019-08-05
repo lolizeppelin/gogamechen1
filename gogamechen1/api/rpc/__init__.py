@@ -188,7 +188,6 @@ class EntityProcessCheckTasker(IntervalLoopinTask):
                     self.deads.pop(entity, None)
 
 
-
 @singleton.singleton
 class Application(AppEndpointBase):
 
@@ -353,7 +352,7 @@ class Application(AppEndpointBase):
     def _entity_process(self, entity, pids=None):
         entityinfo = self.konwn_appentitys.get(entity)
         if not entityinfo:
-            return ValueError('Entity info not found')
+            raise ValueError('Entity info not found in konwn entits')
         objtype = entityinfo.get('objtype')
         _pid = entityinfo.get('pid')
         if _pid:
@@ -711,7 +710,6 @@ class Application(AppEndpointBase):
                                           resultcode=manager_common.RESULT_SUCCESS,
                                           result='check file success')
 
-
     def rpc_reset_entity(self, ctxt, entity, appfile,
                          databases, chiefs, **kwargs):
         timeout = count_timeout(ctxt, kwargs)
@@ -888,14 +886,16 @@ class Application(AppEndpointBase):
         def safe_wapper(__entity):
             try:
                 self.start_entity(__entity, pids=proc_snapshot_before)
+                LOG.debug('Call start entity %d success' % __entity)
                 details.append(formater(__entity, manager_common.RESULT_SUCCESS))
             except RpcTargetLockException as e:
+                LOG.error('Start entity fail , get rpc target lock fail')
                 details.append(formater(__entity, manager_common.RESULT_ERROR,
                                         'start entity %d fail, %s' % (__entity, e.message)))
             except Exception as e:
+                LOG.exception('Start entity %d fail' % __entity)
                 details.append(formater(__entity, manager_common.RESULT_ERROR,
                                         'start entity %d fail: %s' % (__entity, e.__class__.__name__)))
-                LOG.exception('Start entity %d fail' % __entity)
 
         for entity in entitys:
             status = self.konwn_appentitys[entity].get('status')
@@ -907,8 +907,9 @@ class Application(AppEndpointBase):
         while len(details) < len(entitys):
             eventlet.sleep(0.5)
             if int(time.time()) > overtime:
+                LOG.error('Start get details overtime')
                 break
-
+        eventlet.sleep(0.1)
         responsed_entitys = set()
         # 启动后进程快照
         proc_snapshot_after = utils.find_process()
@@ -917,6 +918,13 @@ class Application(AppEndpointBase):
             entity = detail.get('detail_id')
             # 确认entity进程
             if not self._entity_process(entity, proc_snapshot_after):
+                LOG.error("Start entity %d success, but entity process can not be found" % entity)
+                if LOG.isEnabledFor(logging.DEBUG):
+                    LOG.debug('Entity %d process can not be found on process snapshot' % entity)
+                    LOG.debug('----------process snapshot----------')
+                    for p in proc_snapshot_after:
+                        LOG.debug('process info %s' % str(p))
+                    LOG.debug('----------process snapshot----------')
                 detail.update(formater(entity, manager_common.RESULT_ERROR,
                                        'start entity %d fail, process not exist after start' % entity))
             else:
@@ -1018,7 +1026,8 @@ class Application(AppEndpointBase):
         proc_snapshot = utils.find_process()
         formater = AsyncActionResult('status', self.konwn_appentitys)
         for entity in entitys:
-            self._entity_process(entity, proc_snapshot)
+            if self._entity_process(entity, proc_snapshot) and not self.konwn_appentitys[entity]['started']:
+                LOG.warning('Entity has process but started mark is false')
             if self._objtype(entity) == common.GAMESERVER:
                 msg = self._entity_version(entity)
             else:

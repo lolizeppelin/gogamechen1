@@ -300,7 +300,7 @@ def create():
             databases.setdefault('logdb', CONF.logdb)
 
     if databases:
-        body.setdefault('database', databases)
+        body.setdefault('databases', databases)
 
     code, result, data = prepare_results(_client.appentitys_create, CONF.group_id, CONF.objtype, body)
     if code:

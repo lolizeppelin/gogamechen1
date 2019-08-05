@@ -91,6 +91,7 @@ class Routers(router.RoutersBase):
         collection.member.link('areas', method='GET')
         collection.member.link('packages', method='GET')
         collection.member.link('area', method='PUT')
+        collection.member.link('databases', method='GET')
 
         resource_name = 'entity'
         collection_name = resource_name + 's'
