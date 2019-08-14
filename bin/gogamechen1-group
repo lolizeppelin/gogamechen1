@@ -103,6 +103,17 @@ format_opt = cfg.StrOpt('format',
                         )
 
 
+backup_opts = [
+    cfg.IntOpt('last',
+               short='l',
+               required=True,
+               help='last entity'),
+    cfg.IntOpt('start',
+               short='s',
+               help='start entity'),
+               ]
+
+
 def client(session=None):
     return GogameChen1DBClient(httpclient=ManagerClient(url=CONF.gcenter, port=CONF.gcenter_port,
                                                         retries=CONF.retries, timeout=CONF.apitimeout,
@@ -386,11 +397,34 @@ def databases():
         print json.dumps(data, ensure_ascii=False)
 
 
+def backup():
+    CONF.register_cli_opts(one_opts)
+    CONF.register_cli_opts(backup_opts)
+    CONF(project='cmd')
+    _client = client()
+    code, result, data = prepare_results(_client.group_databases, CONF.group_id)
+    if code:
+        print('\033[1;31;40m')
+        print 'Fail, code %d, result %s' % (code, result)
+        if data:
+            print data
+        print('\033[0m')
+        sys.exit(1)
+
+    start = CONF.start
+
+    for entity in data:
+        if start is not None and entity['entity'] < start:
+            continue
+        if entity['entity'] > CONF.last:
+            continue
+        database = entity['databases'][common.DATADB]
+        print "mysqldump --lock-tables=false -u'%(ro_user)s' -p'%(ro_passwd)s' " \
+              "-h%(host)s -P%(port)d %(schema)s | gzip > %(schema)s.gz" % database
+
 
 def main():
-
-    FUNCS = ['list', 'create', 'areas', 'show', 'delete', 'chiefs', 'packages', 'upversion', 'databases']
-
+    FUNCS = ['list', 'create', 'areas', 'show', 'delete', 'chiefs', 'packages', 'upversion', 'databases', 'backup']
     try:
         func = sys.argv.pop(1)
         if func not in FUNCS:

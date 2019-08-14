@@ -73,6 +73,7 @@ install -p -D -m 0754 bin/* %{buildroot}%{_bindir}
 %{_bindir}/%{proj_name}-objfile
 %{_bindir}/%{proj_name}-package
 %{_bindir}/%{proj_name}-select
+%{_bindir}/%{proj_name}-runsql
 %doc README.md
 %doc doc/*
 

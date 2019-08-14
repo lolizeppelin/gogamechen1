@@ -1,0 +1,210 @@
+#!/usr/bin/python
+# -*- encoding: utf-8 -*-
+import os
+import time
+import sys
+import mysql.connector
+import subprocess
+import contextlib
+import re
+
+import json
+import logging
+from simpleutil.config import cfg
+from simpleutil.config.cfg import types
+
+from gogamechen1 import common
+
+from simpleutil.utils.threadgroup import ThreadGroup
+
+
+CONF = cfg.CONF
+
+
+_opts = [
+    cfg.IntOpt('group',
+               short='g',
+               required=True,
+               help='Target group'
+               ),
+    # cfg.StrOpt('objtype',
+    #            short='o',
+    #            choices=common.ALLTYPES,
+    #            help="Target objtype"
+    #            ),
+    cfg.StrOpt('subtype',
+               short='s',
+               default=common.DATADB,
+               choices=[common.DATADB, common.LOGDB],
+               help="Target objtype"
+               ),
+    cfg.StrOpt('file',
+               short='f',
+               help="target sql file"
+               ),
+    cfg.StrOpt('execute',
+               short='e',
+               required=True,
+               help="execute sql"
+               ),
+    cfg.BoolOpt('master',
+                default=False,
+                help="Use master databases"),
+    cfg.ListOpt('exclude',
+                default=[],
+                item_type=types.Integer(),
+                help="exclude entitys"),
+]
+
+
+@contextlib.contextmanager
+def db_conn(host, port, user, passwd, schema):
+    kwargs = dict(user=user, passwd=passwd, host=host, port=port, database=schema,
+                  raise_on_warnings=False)
+    conn = mysql.connector.connect(**kwargs)
+    try:
+        yield conn
+    except Exception:
+        raise
+    finally:
+        conn.close()
+
+
+def get_database_address():
+    cmd = 'gogamechen1-group databases -g %d --format json' % CONF.group
+    sub = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+    jdata = sub.communicate()[0]
+    dbdata = json.loads(jdata.encode('utf-8'))
+
+    excludes = set(CONF.exclude)
+    master = CONF.master
+    databases = {}
+
+    for entity in dbdata:
+        if entity['entity'] in excludes:
+            continue
+        database = entity['databases'][CONF.subtype]
+        user = database['ro_user']
+        passwd = database['ro_passwd']
+        schema = database['schema']
+        if not master and database['slaves']:
+            database_id = database['slaves'][0]['database_id']
+            address = (database['slaves'][0]['address']['host'], database['slaves'][0]['address']['port'])
+        else:
+            database_id = database['database_id']
+            address = (database['host'], database['port'])
+        if database_id not in databases:
+            databases[database_id] = {
+                'address': address,
+                'entitys': []
+            }
+        databases[database_id]['entitys'].append(dict(user=user, passwd=passwd, schema=schema,
+                                                      eneity=entity['entity']))
+    return databases
+
+
+def build_sql():
+    if CONF.file and CONF.execute:
+        print('\033[1;32;40m')
+        print 'Both sql file and execute sql'
+        print('\033[0m')
+        sys.exit(1)
+    elif CONF.file:
+        target = os.path.abspath(CONF.file)
+        with open(target, 'r') as f:
+            sql = f.read()
+    elif CONF.execute:
+        sql = CONF.execute
+    else:
+        print('\033[1;32;40m')
+        print 'Not sql found'
+        print('\033[0m')
+        sys.exit(1)
+    sql = sql.strip()
+    if sql == 'show tables':
+        return sql
+    if re.match('^select .*$', sql):
+        return sql
+    print('\033[1;32;40m')
+    print 'sql found error [%s]' % sql
+    print('\033[0m')
+    sys.exit(1)
+
+
+def fetch(host, port, user, passwd, schema, sql):
+
+    with db_conn(host, port, user, passwd, schema) as conn:
+        cursor = conn.cursor()
+        cursor.execute(sql)
+        result = cursor.fetchall()
+        cursor.close()
+
+    return result, schema
+
+
+def execute():
+    sql = build_sql()
+    # sql = 'select count(*) from players'
+    databases = get_database_address()
+    if not databases:
+        print('\033[1;32;40m')
+        print 'Not database'
+        print('\033[0m')
+
+    process_count = len(databases)
+
+    print('\033[1;32;40m')
+    print 'Database intance count:%d, execute process %d' % (len(databases), process_count)
+    print 'Forking and executeing [%s]' % sql
+    # print('\033[0m')
+    start = time.time()
+    pool = ThreadGroup(thread_pool_size=process_count)
+
+    threads = []
+
+    while True:
+        entity = None
+        for database in databases.values():
+            entitys = database['entitys']
+            if entitys:
+                entity = entitys.pop(0)
+                schema = entity['schema']
+                user = entity['user']
+                passwd = entity['passwd']
+                address = database['address']
+                # th = pool.apply_async(fetch, (address[0], address[1], user, passwd, schema, sql))
+                th = pool.add_thread(fetch, address[0], address[1], user, passwd, schema, sql)
+                threads.append(th)
+        if entity is None:
+            break
+
+    use = time.time() - start
+    print('\033[1;32;40m')
+    print 'multiprocessing execute finish, time use %ds' % int(use)
+    print 'Merging results'
+    print('\033[0m')
+
+    data = []
+    for th in threads:
+        data.append(th.wait())
+
+    for d in data:
+        rows, schema = d
+        print schema
+        print '-----------------------'
+        for row in rows:
+            for col in row:
+                print col,
+            print ''
+        print '-----------------------\n'
+
+
+def main():
+    logging.basicConfig(level=logging.WARN)
+    CONF.register_cli_opts(_opts)
+    CONF(project='cmd')
+    execute()
+
+
+if __name__ == '__main__':
+    main()

@@ -871,7 +871,8 @@ class Application(AppEndpointBase):
 
     def rpc_start_entitys(self, ctxt, entitys, **kwargs):
         timeout = count_timeout(ctxt, kwargs)
-        overtime = timeout + time.time()
+        start = time.time()
+        overtime = timeout + start
         entitys = argutils.map_to_int(entitys) & set(self.entitys)
         if not entitys:
             return resultutils.AgentRpcResult(agent_id=self.manager.agent_id,
@@ -886,6 +887,7 @@ class Application(AppEndpointBase):
         def safe_wapper(__entity):
             try:
                 self.start_entity(__entity, pids=proc_snapshot_before)
+                eventlet.sleep(1.0)
                 LOG.debug('Call start entity %d success' % __entity)
                 details.append(formater(__entity, manager_common.RESULT_SUCCESS))
             except RpcTargetLockException as e:
@@ -905,11 +907,11 @@ class Application(AppEndpointBase):
                 details.append(formater(entity, manager_common.RESULT_ERROR,
                                         'start entity %d fail, status %s' % str(status)))
         while len(details) < len(entitys):
-            eventlet.sleep(0.5)
+            eventlet.sleep(0.1)
             if int(time.time()) > overtime:
                 LOG.error('Start get details overtime')
                 break
-        eventlet.sleep(0.1)
+        LOG.info('Bluck start entity end, time user %1.2f' % (time.time() - start))
         responsed_entitys = set()
         # 启动后进程快照
         proc_snapshot_after = utils.find_process()
