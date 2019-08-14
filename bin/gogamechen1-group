@@ -106,11 +106,14 @@ format_opt = cfg.StrOpt('format',
 backup_opts = [
     cfg.IntOpt('last',
                short='l',
-               required=True,
                help='last entity'),
     cfg.IntOpt('start',
                short='s',
                help='start entity'),
+    cfg.BoolOpt('master',
+                short='m',
+                default=True,
+                help='backup from master database'),
                ]
 
 
@@ -399,6 +402,7 @@ def databases():
 
 def backup():
     CONF.register_cli_opts(one_opts)
+    CONF.register_cli_opt(format_opt)
     CONF.register_cli_opts(backup_opts)
     CONF(project='cmd')
     _client = client()
@@ -412,15 +416,57 @@ def backup():
         sys.exit(1)
 
     start = CONF.start
+    last = CONF.last
 
+    backups = {}
     for entity in data:
         if start is not None and entity['entity'] < start:
             continue
-        if entity['entity'] > CONF.last:
+        if last and entity['entity'] > last:
             continue
         database = entity['databases'][common.DATADB]
-        print "mysqldump --lock-tables=false -u'%(ro_user)s' -p'%(ro_passwd)s' " \
-              "-h%(host)s -P%(port)d %(schema)s | gzip > %(schema)s.gz" % database
+
+        _schema = dict(user=database['ro_user'],
+                       passwd=database['ro_passwd'],
+                       schema=database['schema'],
+                       )
+        if not CONF.master and database['slaves']:
+            database_id = database['slaves'][0]['database_id']
+            address = database['slaves'][0]['address']
+        else:
+            database_id = database['database_id']
+            address = dict(host=database['host'], port=database['port'])
+        if database_id not in backups:
+            backups[database_id] = {
+                'schemas': [],
+                'address': address
+            }
+        backups[database_id]['schemas'].append(_schema)
+
+    if CONF.format == 'json':
+        jdata = []
+        for database_id in backups:
+            jdata.append(
+                {
+                    'address': backups[database_id]['address'],
+                    'schemas': backups[database_id]['schemas']
+                }
+            )
+        print json.dumps(jdata, indent=2, ensure_ascii=True)
+    else:
+        db_head = ['user', 'passwd', 'schema']
+        for database_id in backups:
+            db = backups[database_id]
+            tb = table.PleasantTable(ident=0, columns=db_head, counter=False)
+            print '\033[1;32;40m\r',
+            print 'Schemas in database %d, host: %s, port: %d' % (database_id,
+                                                                  db['address']['host'],
+                                                                  db['address']['port'])
+            print '\033[0m'
+            for sc in db['schemas']:
+                tb.add_row([sc.get('user'), sc.get('passwd'), sc.get('schema')])
+            print tb.pformat()
+            print('\n')
 
 
 def main():

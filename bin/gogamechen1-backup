@@ -1,0 +1,95 @@
+import json
+import logging
+import os
+import sys
+import datetime
+import eventlet
+import time
+
+from eventlet import hubs
+import subprocess
+
+from simpleutil.utils import systemutils
+
+from simpleutil.config import cfg
+
+CONF = cfg.CONF
+
+
+backup_opts = [
+    cfg.IntOpt('timeout',
+               min=60,
+               default=3600,
+               help='Backup one server database timeout'),
+    cfg.StrOpt('workpath',
+               default=os.getcwd(),
+               help='Backup data path'
+               ),
+    cfg.StrOpt('file',
+               short='f',
+               default='backup.json',
+               help='Backup srouce info in json'
+               )
+]
+
+
+def execute_backup(info, timeout):
+
+    address = info['address']
+    schemas = info['schemas']
+    prefix = 'mysqldump --lock-tables=false -h%(host)s -P%(port)d' % address
+
+    for sinfo in schemas:
+        post = "-u'%(user)s' -p'%(passwd)s' %(schema)s | gzip > %(schema)s.gz" % sinfo
+        cmd = prefix + ' ' + post
+        start_time = time.time()
+        sub = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        systemutils.subwait(sub, timeout=timeout)
+        print('dump %s success, time use %1.2f' % (sinfo['schema'], time.time()-start_time))
+        # print "mysqldump --lock-tables=false -u'%(ro_user)s' -p'%(ro_passwd)s' " \
+        #       "-h%(host)s -P%(port)d %(schema)s | gzip > %(schema)s.gz" % database
+
+
+def start(cfdata, timeout):
+
+    pool = eventlet.GreenPool()
+    for info in cfdata:
+        pool.spawn(execute_backup, info, timeout)
+    pool.waitall()
+
+
+def main():
+    logging.basicConfig(level=logging.WARN)
+    CONF.register_cli_opts(backup_opts)
+    CONF(project='backup')
+    work_path = os.path.abspath(CONF.workpath)
+    if work_path == '/':
+        raise RuntimeError('Wrokt path error')
+    os.chdir(work_path)
+    logpath = os.path.join(work_path, 'log')
+
+    with open(CONF.file, 'r') as f:
+        cfdata = json.load(f)
+    if not os.path.exists(logpath):
+        os.makedirs(logpath)
+    logfile = os.path.join(logpath, 'backup-%s.log' % datetime.datetime.now().strftime('%Y%m%d'))
+    pid = os.fork()
+    if pid:
+        _pid = os.fork()
+        if _pid:
+            hub = hubs.get_hub()
+            hub.abort(wait=False)
+            hubs.use_hub()
+            hubs.get_hub()
+            with open(logfile, 'ab') as f:
+                os.dup2(f.fileno(), sys.stdout.fileno())
+                os.dup2(f.fileno(), sys.stderr.fileno())
+            start(cfdata, CONF.timeout)
+        else:
+            os._exit(0)
+    else:
+        os._exit(0)
+
+
+if __name__ == '__main__':
+    main()

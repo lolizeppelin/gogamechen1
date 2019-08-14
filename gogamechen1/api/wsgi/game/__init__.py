@@ -411,6 +411,7 @@ class GroupReuest(BaseContorller):
             data.append({'entity': entity.entity, 'group_id': group_id, 'objtype': objtype, 'databases': databases})
         return resultutils.results(result='list group entity database success', data=data)
 
+
 @singleton.singleton
 class AppEntityReuest(AppEntityCURDRequest,
                       AppEntityAsyncReuest,
