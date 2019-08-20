@@ -74,9 +74,9 @@ def main():
         os.makedirs(logpath)
     logfile = os.path.join(logpath, 'backup-%s.log' % datetime.datetime.now().strftime('%Y%m%d'))
     pid = os.fork()
-    if pid:
+    if pid == 0:
         _pid = os.fork()
-        if _pid:
+        if _pid == 0:
             hub = hubs.get_hub()
             hub.abort(wait=False)
             hubs.use_hub()

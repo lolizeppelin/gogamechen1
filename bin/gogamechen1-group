@@ -365,7 +365,7 @@ def upversion():
 
 def databases():
     CONF.register_cli_opts(one_opts)
-    CONF.register_cli_opts(format_opt)
+    CONF.register_cli_opt(format_opt)
     CONF(project='cmd')
     _client = client()
     code, result, data = prepare_results(_client.group_databases, CONF.group_id)
