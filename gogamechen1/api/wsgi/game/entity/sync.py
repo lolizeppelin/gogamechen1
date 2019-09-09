@@ -165,10 +165,12 @@ class AppEntitySyncReuest(AppEntityReuestBase):
                         except GopdbError as e:
                             LOG.error('Delete schema:%s from %d fail, %s' % (schema, _database.database_id,
                                                                              e.message))
-                            raise e
+                            if not force:
+                                raise e
                         except Exception:
                             LOG.exception('Delete schema:%s from %d fail' % (schema, _database.database_id))
-                            raise
+                            if not force:
+                                raise
                     elif action == 'unquote':
                         LOG.info('Try unquote %d' % _database.quote_id)
                         try:
@@ -182,8 +184,9 @@ class AppEntitySyncReuest(AppEntityReuestBase):
                                                   quote_id=_database.quote_id, schema=schema))
                         except Exception as e:
                             LOG.error('Unquote %d fail, try rollback' % _database.quote_id)
-                            threadpool.add_thread(_rollback)
-                            raise e
+                            if not force:
+                                threadpool.add_thread(_rollback)
+                                raise e
                 token = uuidutils.generate_uuid()
                 LOG.info('Send delete command with token %s' % token)
                 session.delete(_entity)
