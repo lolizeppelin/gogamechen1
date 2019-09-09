@@ -74,6 +74,7 @@ install -p -D -m 0754 bin/* %{buildroot}%{_bindir}
 %{_bindir}/%{proj_name}-package
 %{_bindir}/%{proj_name}-select
 %{_bindir}/%{proj_name}-runsql
+%{_bindir}/%{proj_name}-backup
 %doc README.md
 %doc doc/*
 
