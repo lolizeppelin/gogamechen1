@@ -82,6 +82,22 @@ class AppEntitySyncReuest(AppEntityReuestBase):
         query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
         query = query.options(joinedload(AppEntity.databases, innerjoin=False))
         _entity = query.one()
+
+        rollbacks = []
+
+        def _rollback():
+            for back in rollbacks:
+                __database_id = back.get('database_id')
+                __schema = back.get('schema')
+                __quote_id = back.get('quote_id')
+                rbody = dict(quote_id=__quote_id, entity=entity)
+                rbody.setdefault(dbcommon.ENDPOINTKEY, common.NAME)
+                try:
+                    schema_controller.bond(req, database_id=__database_id, schema=__schema, body=rbody)
+                except Exception:
+                    LOG.error('rollback entity %d quote %d.%s.%d fail' %
+                              (entity, __database_id, schema, __quote_id))
+
         with glock.grouplock(group=group_id):
             target = targetutils.target_agent_by_string(metadata.get('agent_type'),
                                                         metadata.get('host'))
@@ -138,7 +154,6 @@ class AppEntitySyncReuest(AppEntityReuestBase):
                                                            resultcode=manager_common.RESULT_ERROR)
                             LOG.info('Databae quotes check success for %s' % schema)
                 # clean database
-                rollbacks = []
                 for _database in _entity.databases:
                     schema = '%s_%s_%s_%d' % (common.NAME, objtype, _database.subtype, entity)
                     if action == 'delete':
@@ -150,8 +165,10 @@ class AppEntitySyncReuest(AppEntityReuestBase):
                         except GopdbError as e:
                             LOG.error('Delete schema:%s from %d fail, %s' % (schema, _database.database_id,
                                                                              e.message))
+                            raise e
                         except Exception:
                             LOG.exception('Delete schema:%s from %d fail' % (schema, _database.database_id))
+                            raise
                     elif action == 'unquote':
                         LOG.info('Try unquote %d' % _database.quote_id)
                         try:
@@ -163,8 +180,10 @@ class AppEntitySyncReuest(AppEntityReuestBase):
                                 raise RuntimeError('Data error, quote database not the same')
                             rollbacks.append(dict(database_id=_database.database_id,
                                                   quote_id=_database.quote_id, schema=schema))
-                        except Exception:
+                        except Exception as e:
                             LOG.error('Unquote %d fail, try rollback' % _database.quote_id)
+                            threadpool.add_thread(_rollback)
+                            raise e
                 token = uuidutils.generate_uuid()
                 LOG.info('Send delete command with token %s' % token)
                 session.delete(_entity)
@@ -173,19 +192,6 @@ class AppEntitySyncReuest(AppEntityReuestBase):
                     entity_controller.delete(req, common.NAME, entity=entity, body=dict(token=token))
                 except Exception as e:
                     # roll back unquote
-                    def _rollback():
-                        for back in rollbacks:
-                            __database_id = back.get('database_id')
-                            __schema = back.get('schema')
-                            __quote_id = back.get('quote_id')
-                            rbody = dict(quote_id=__quote_id, entity=entity)
-                            rbody.setdefault(dbcommon.ENDPOINTKEY, common.NAME)
-                            try:
-                                schema_controller.bond(req, database_id=__database_id, schema=__schema, body=rbody)
-                            except Exception:
-                                LOG.error('rollback entity %d quote %d.%s.%d fail' %
-                                          (entity, __database_id, schema, __quote_id))
-
                     threadpool.add_thread(_rollback)
                     raise e
         return resultutils.results(result='delete %s:%d success' % (objtype, entity),
