@@ -109,14 +109,19 @@ class Swallow(Task):
 class DumpData(Task):
 
     NODUMPTABLES = [
+        'battlefield_log_lowfight',
+        'limit_level',
         'mining_area',
-        'timer_boss',
-        'pvp_arena_rank',
+        'pay_censoring',
+        'player_censoring',
+        'quick_report',
         'pvp_arena_pet_rank',
         'var_world',
-        'oper_record_plot',
-        'pve_campaign_log',
         'pvp_cupmatch_fight_log',
+        'oper_record_plot',
+        'timer_boss',
+        'pvp_arena_rank',
+        'pve_campaign_log',
     ]
 
     def __init__(self, uuid, steps, entity,
