@@ -334,16 +334,17 @@ class AppEntityCURDRequest(AppEntityReuestBase):
                                                local_ip=chiefmetadata.get('local_ip')))
                     cross_id = cross.entity
             # 完整的rpc数据包
-            body = dict(objtype=objtype,
-                        appfile=appfile,
-                        databases=databases,
-                        chiefs=chiefs)
+            create_body = dict(objtype=objtype,
+                               appfile=appfile,
+                               databases=databases,
+                               chiefs=chiefs,
+                               entity=int(body.get('entity', 0)))
 
             with session.begin():
                 body.setdefault('finishtime', rpcfinishtime()[0] + 5)
                 try:
                     create_result = entity_controller.create(req=req, agent_id=agent_id,
-                                                             endpoint=common.NAME, body=body)['data'][0]
+                                                             endpoint=common.NAME, body=create_body)['data'][0]
                 except RpcResultError as e:
                     LOG.error('Create entity rpc call fail: %s' % e.message)
                     raise InvalidArgument(e.message)
