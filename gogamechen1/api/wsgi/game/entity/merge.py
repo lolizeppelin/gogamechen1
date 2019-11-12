@@ -368,7 +368,7 @@ class AppEntityMergeReuest(AppEntityReuestBase):
                     if _entity.status != common.SWALLOWING:
                         raise InvalidArgument('Swallowed entity find status error')
                     _query = model_query(session, AppEntity, filter=AppEntity.entity == entity)
-                    _query = query.options(joinedload(AppEntity.databases, innerjoin=False))
+                    _query = _query.options(joinedload(AppEntity.databases, innerjoin=False))
                     appentity = _query.one_or_none()
                     break
             if not appentity:
