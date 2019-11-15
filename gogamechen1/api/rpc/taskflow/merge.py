@@ -124,19 +124,25 @@ class DumpData(Task):
         'pve_campaign_log',
     ]
 
+    DUMPONLYONE = [
+        'var_world'
+    ]
+
     def __init__(self, uuid, steps, entity,
-                 endpoint=None):
+                 endpoint=None,
+                 skip_only_one=True):
         self.entity = entity
         self.stpes = steps
         self.uuid = uuid
         self.endpoint = endpoint
+        self.skip_only_one = skip_only_one
         super(DumpData, self).__init__(name='dump_%d' % entity,
                                        rebind=['mergeroot', 'dtimeout', 'db_%d' % entity])
 
-    @staticmethod
-    def _ext_args(schema):
+    def _ext_args(self, schema):
         extargs = ['-t', '-c']
-        for table in DumpData.NODUMPTABLES:
+        nodumps = (self.NODUMPTABLES + self.DUMPONLYONE) if self.skip_only_one else self.NODUMPTABLES
+        for table in nodumps:
             extargs.append('--ignore-table=%s.%s' % (schema, table))
         return extargs
 
@@ -403,6 +409,7 @@ def merge_entitys(appendpoint, uuid, entity, databases):
             return
         if step != INSERT:
             prepares.append(_entity)
+    mini_entity = min(prepares)
     if prepares:
         name = 'prepare-merge-at-%d' % int(time.time())
         book = LogBook(name=name)
@@ -414,7 +421,7 @@ def merge_entitys(appendpoint, uuid, entity, databases):
         for _entity in prepares:
             entity_flow = lf.Flow('prepare-%d' % _entity)
             entity_flow.add(Swallow(uuid, steps, _entity, appendpoint))
-            entity_flow.add(DumpData(uuid, steps, _entity, appendpoint))
+            entity_flow.add(DumpData(uuid, steps, _entity, appendpoint, _entity != mini_entity))
             entity_flow.add(Swallowed(uuid, steps, _entity, appendpoint))
             prepare_uflow.add(entity_flow)
         engine = load(connection, prepare_uflow, store=store,

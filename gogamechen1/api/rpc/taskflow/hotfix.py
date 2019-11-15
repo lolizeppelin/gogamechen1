@@ -58,6 +58,7 @@ def hotfix_entitys(appendpoint,
     backupfile = None
     download_time = 600
     upzip_timeout = 600
+
     md5 = appfile.get('md5')
     backup = appfile.get('backup', True)
     revertable = appfile.get('revertable', False)
@@ -67,8 +68,11 @@ def hotfix_entitys(appendpoint,
         download_time = timeout
     if timeout < upzip_timeout:
         upzip_timeout = timeout
+    stream = appfile.get('stream')
+
     # 程序更新文件
-    upgradefile = GogameAppFile(md5, objtype, rollback=rollback, revertable=revertable)
+    upgradefile = GogameAppFile(md5, objtype, rollback=rollback,
+                                revertable=revertable, stream=stream)
     if backup:
         # 备份entity在flow_factory随机抽取
         outfile = os.path.join(appendpoint.endpoint_backup,
@@ -112,4 +116,6 @@ def hotfix_entitys(appendpoint,
             LOG.error('Hotfix task execute fail, %s %s' % (e.__class__.__name__, str(e)))
     finally:
         connection.destroy_logbook(book.uuid)
+    if stream:
+        upgradefile.clean()
     return middlewares, e

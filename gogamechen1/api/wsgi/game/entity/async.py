@@ -126,7 +126,10 @@ class AppEntityAsyncReuest(AppEntityReuestBase):
                                                     'description': '程序文件是否可以回滚,默认是'},
                                      'rollback': {'oneOf': [{'type': 'boolean'}, {'type': 'null'}],
                                                   'description': '是否连带回滚(回滚前方已经成功的步骤),默认否'},
-                                     }},}
+                                     'stream': {'oneOf': [{'type': 'string', "minLength": 6, "maxLength": 40000},
+                                                          {'type': 'null'}],
+                                                'description': '直接以stream流文件发送文件'},
+                                     }}}
               }
 
     def _async_bluck_rpc(self, action, group_id, objtype, entity, body=None, context=None):
